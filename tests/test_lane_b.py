@@ -533,3 +533,47 @@ def test_late_tool_calls_after_timeout_are_logged_as_abandoned(monkeypatch):
     r = investigate("x", loader=_loader_with(edit), model=FunctionModel(fn))
     assert any(t.note.startswith("abandoned") for t in r.trial_log)
     assert any("abandoned" in lim for lim in r.limitations)
+
+
+# ------------------------------------------------------------------ real-data Argon run (Lane A loader), round 3
+
+def _proposal_with_text(ctx, rationale):
+    ev = ctx.test_gate_train(gate(ctx, pid="agent::P1"))
+    p = GateProposal(proposal_id="P1", based_on=["H1"], conditions=[ThresholdCondition(**gate(ctx)["conditions"][0])],
+                     allocation_when_true=0.0, allocation_when_false=1.0, rationale=rationale, evidence_ids=[ev["evidence_id"]],
+                     falsification_test="reject if the 90% CI of the validation delta includes zero")
+    return verify_proposals(ctx, ProposalSet(proposals=[p]), {"H1"})
+
+
+def test_numbers_the_agent_was_given_are_not_fabrications():
+    ctx = make_ctx()      # fixture strategy id: btc-momentum-24h-demo
+    assert not _proposal_with_text(ctx, "the 24h momentum strategy; buckets with fewer than 20 trades are weak")
+    assert _proposal_with_text(ctx, "the 73h momentum strategy")
+
+
+@pytest.mark.parametrize("text,ok", [("gross 0.3043", True), ("mean -3.54e-05", True), ("30.43%", True),
+                                     ("gross 0.3044", False), ("mean -3.55e-05", False)])
+def test_rounding_to_significant_digits_is_allowed_but_changing_digits_is_not(text, ok):
+    ev = [{"gross_return": 0.304327785348499, "mean_net_return": -3.54385266639645e-05}]
+    assert (not unsupported_numbers(text, ev)) is ok
+
+
+def test_new_lane_a_features_are_allowlisted_only_where_covered():
+    from packages.research_agents.allowlist import check_gate
+    tq = {"atr_14": {0.5: 0.0042}}
+    cond = [{"feature": "atr_14", "op": "<=", "threshold": 0.0042}]
+    assert not check_gate(cond, 1.0, 0.5, {"atr_14": 1.0}, tq)
+    assert check_gate(cond, 1.0, 0.5, {}, tq)          # loader without the feature -> refused
+
+
+def test_default_timeouts_fit_a_strong_model():
+    assert agents.REQUEST_TIMEOUT_S >= 180 and agents.STAGE_TIMEOUT_S >= 400
+
+
+@pytest.mark.parametrize("text", ["over 73h", "a 5d window of 41 bars"])
+def test_durations_glued_to_units_are_checked(text):
+    assert unsupported_numbers(text, EV)
+
+
+def test_small_durations_are_trivial_like_small_integers():
+    assert not unsupported_numbers("a 7d window", EV) and unsupported_numbers("a 17d window", EV)

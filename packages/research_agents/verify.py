@@ -6,8 +6,11 @@ Every text field an agent writes is checked, not just the headline statement:
 - integers above 10 must equal a count that appears in the evidence exactly;
 - an explicit sign (+/-) must match the evidence; unsigned numbers compare by magnitude;
 - zeros in the evidence never 'support' anything; numbers written as words (above ten),
-  multiples like '3.5x' and basis points are numbers too and are checked;
-- the only free-standing label allowed is the CI level '90%' (all Lane A intervals are 90%).
+  multiples like '3.5x', durations like '73h' / '5d' and basis points are numbers too and are checked;
+- the only free-standing label allowed is the CI level '90%' (all Lane A intervals are 90%);
+- numbers the agent was GIVEN rather than measured are allowed too: digits in the strategy id/version
+  (e.g. '24' and '72' in 'btc-trend-24-72-demo') and the instruction threshold MIN_TRADES.
+Rounding for print is fine (3-4 significant digits); changing digits is not.
 """
 
 from __future__ import annotations
@@ -19,9 +22,10 @@ from decimal import Decimal, InvalidOperation
 from .models import CritiqueSet, DiagnosticReport, ProposalSet
 
 CI_LEVEL = 90
+MIN_TRADES = 20          # 'treat buckets with fewer than 20 trades as weak' (agent instructions)
 TRIVIAL_INTS = set(range(0, 11)) | {100}
 DATE_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?\b")
-NUM_RE = re.compile(r"(?<![A-Za-z_\d.])([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*(%|bps|bp|x)?(?![A-Za-z_\d])")
+NUM_RE = re.compile(r"(?<![A-Za-z_\d.])([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*(%|bps|bp|x|h|d)?(?![A-Za-z_\d])")
 WORD_NUM_RE = re.compile(r"\b(eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|"
                          r"fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|percent)\b", re.I)
 
@@ -66,7 +70,7 @@ def unsupported_numbers(text: str, payloads: list) -> list[str]:
         is_int = d == d.to_integral_value() and "." not in raw and "e" not in raw.lower()
         if unit == "%" and val == CI_LEVEL:
             continue
-        if not unit and is_int:
+        if unit in ("", "h", "d") and is_int:      # '73h' is the integer 73 with a unit
             if abs(int(val)) in TRIVIAL_INTS or abs(int(val)) in ints:
                 continue
             bad.append(m.group(0).strip())
@@ -86,13 +90,21 @@ def unsupported_numbers(text: str, payloads: list) -> list[str]:
     return bad
 
 
+def context_numbers(ctx) -> dict:
+    """Numbers the agents were given in their prompt/instructions, not measured by a tool."""
+    exp = ctx.experiment
+    label = f"{getattr(exp, 'strategy_id', '')} {getattr(exp, 'strategy_version', '')}"
+    return {"strategy_label_numbers": [float(x) for x in re.findall(r"\d+(?:\.\d+)?", label)],
+            "instruction_numbers": [MIN_TRADES]}
+
+
 def _payloads(ctx, ids: list[str]) -> list:
-    return [ctx.store.get(e).payload for e in ids if e in ctx.store]
+    return [ctx.store.get(e).payload for e in ids if e in ctx.store] + [context_numbers(ctx)]
 
 
 def _check_texts(label: str, texts: list[str], payloads: list) -> list[str]:
     bad = sorted({tok for t in texts for tok in unsupported_numbers(t, payloads)})
-    return [f"{label}: numbers {bad} are not copied from the cited evidence (copy digits exactly; all CIs are 90%)"] if bad else []
+    return [f"{label}: numbers {bad} are not copied from the cited evidence (copy digits from the cited tool output; rounding to 3-4 significant digits is fine; all CIs are 90%)"] if bad else []
 
 
 def verify_diagnostic(ctx, out: DiagnosticReport) -> list[str]:
@@ -113,7 +125,7 @@ def verify_diagnostic(ctx, out: DiagnosticReport) -> list[str]:
                 if r and not abs(r["mean_net_return"]) > (r["ci_high"] - r["ci_low"]):
                     problems.append(f"{h.hypothesis_id}: confidence 'high' needs |mean| larger than the CI width for {c}; use 'medium' or 'low'")
         problems += _check_texts(h.hypothesis_id, [h.statement, h.suggested_test, *h.caveats], cited)
-    everything = [e.payload for e in ctx.store.all()]
+    everything = [e.payload for e in ctx.store.all()] + [context_numbers(ctx)]
     problems += _check_texts("summary/rejected/limitations", [out.summary, *out.rejected_explanations, *out.limitations], everything)
     return problems
 

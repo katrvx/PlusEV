@@ -35,8 +35,8 @@ from .tools import HoldoutAccessError, ToolContext, spec_hash
 MODEL_ENV = "KOK_AGENT_MODEL"
 
 # Hard bounds so a slow or looping model can never hang the run (any breach -> fallback, disclosed).
-STAGE_TIMEOUT_S = float(os.environ.get("KOK_STAGE_TIMEOUT", "240"))     # whole agent stage
-REQUEST_TIMEOUT_S = float(os.environ.get("KOK_REQUEST_TIMEOUT", "90"))  # single model request
+STAGE_TIMEOUT_S = float(os.environ.get("KOK_STAGE_TIMEOUT", "400"))     # whole agent stage
+REQUEST_TIMEOUT_S = float(os.environ.get("KOK_REQUEST_TIMEOUT", "180"))  # single model request (strong models can take >90s)
 MAX_REQUESTS = int(os.environ.get("KOK_MAX_REQUESTS", "15"))            # model round-trips per stage
 
 
@@ -73,7 +73,7 @@ def model_name(model) -> str | None:
 
 # ------------------------------------------------------------------ claim verification lives in verify.py
 
-from .verify import unsupported_numbers, verify_critiques, verify_diagnostic, verify_proposals  # noqa: E402,F401
+from .verify import MIN_TRADES, unsupported_numbers, verify_critiques, verify_diagnostic, verify_proposals  # noqa: E402,F401
 
 
 # ------------------------------------------------------------------ tool wrappers (what the LLM sees)
@@ -160,26 +160,32 @@ def trial_log(ctx: RunContext[ToolContext]) -> list[dict]:
 
 # ------------------------------------------------------------------ agents
 
-DIAGNOSTIC_INSTRUCTIONS = """You are a quantitative research analyst supervising an EXISTING trading strategy that must not be changed.
+DIAGNOSTIC_INSTRUCTIONS = f"""You are a quantitative research analyst supervising an EXISTING trading strategy that must not be changed.
 Find WHEN it works and when it fails, using TRAIN data: regime_performance and cost_attribution; news_context only as context.
 Rules: every hypothesis cites evidence_id values returned by tools; its conditions must be regime buckets exactly as written in
 regime_performance rows (e.g. 'vol_regime=high'); any number you write must be copied from the cited tool output; all confidence intervals are 90%; treat buckets
-with fewer than 20 trades or confidence intervals spanning zero as weak; say what would falsify each hypothesis; news
-co-occurrence is not causation. Validation and test periods are not available to you."""
+with fewer than {MIN_TRADES} trades or confidence intervals spanning zero as weak; say what would falsify each hypothesis; news
+co-occurrence is not causation. Validation and test periods are not available to you.
+Numbers: copy them from the cited tool output and round to 3-4 significant digits (0.3043, -3.54e-05, 5.15%);
+rounding is fine, changing digits or computing new numbers is not."""
 
 PROPOSER_INSTRUCTIONS = f"""You propose SUPERVISORY gates for an unchanged strategy: when to run it at full, half or zero size.
 Only the threshold_gate family with 1-2 conditions on these features: {list(GATE_FEATURES)}; ops '<=' or '>';
 allocations in {list(ALLOCATIONS)}; thresholds MUST be values returned by feature_grid. You may evaluate candidates with
 test_gate_train (TRAIN only, limited budget, every attempt is logged and disclosed). Use unique proposal ids, base each
 proposal on the given hypotheses, cite evidence ids, and state a falsification test. Prefer fewer, simpler gates.
-Code, not you, will evaluate your proposals on validation and pick at most one for the frozen test."""
+Code, not you, will evaluate your proposals on validation and pick at most one for the frozen test.
+Numbers: copy them from the cited tool output and round to 3-4 significant digits (0.3043, -3.54e-05, 5.15%);
+rounding is fine, changing digits or computing new numbers is not."""
 
 CRITIC_INSTRUCTIONS = """You are an independent critic. For each proposed gate, look for: look-ahead or leakage, overfitting (many
 trials, effects only in train, validation contradicting train), fragile sample sizes, a gate that is almost always on or off
 (see allocation_mix), and counterexamples. Use trial_log (it includes the arbiter's validation runs) and lookup_evidence.
 Critique every proposal exactly once and cite that gate's own evaluation evidence id. You cannot change thresholds.
 All confidence intervals are 90%. Put only issues that should BLOCK the frozen test in fragile_samples; non-blocking
-remarks go in observations. Verdict 'approve_for_frozen_test' only if the validation evidence supports it."""
+remarks go in observations. Verdict 'approve_for_frozen_test' only if the validation evidence supports it.
+Numbers: copy them from the cited tool output and round to 3-4 significant digits (0.3043, -3.54e-05, 5.15%);
+rounding is fine, changing digits or computing new numbers is not."""
 
 
 def _check(problems: list[str]) -> None:

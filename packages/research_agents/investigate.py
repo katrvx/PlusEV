@@ -237,7 +237,8 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
                            "this selection biases its validation number upwards; only the frozen test is unbiased.")
     if lgbm is not None:
         note = f"LightGBM competitor: single seed ({getattr(lgbm, 'seed', 'unknown')}); its result can vary with the seed."
-        if str(getattr(lgbm, "fitted_on", "")).startswith("train["):
+        if (str(getattr(lgbm, "fitted_on", "")).startswith("train[")
+                or str(getattr(lgbm, "calibrated_on", "")).startswith("train")):
             note += " Calibrated on late train instead of validation (spec deviation, keeps validation out-of-sample)."
         limitations.append(note)
     else:
