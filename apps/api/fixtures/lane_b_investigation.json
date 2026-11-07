@@ -1,0 +1,663 @@
+{
+  "experiment_id": "exp_fixture_32a792b6",
+  "strategy_id": "btc-momentum-24h-demo",
+  "generated_at": "2026-11-07T17:06:48.514410Z",
+  "agent_mode": "deterministic_fallback",
+  "model_id": null,
+  "diagnostic": {
+    "summary": "Train net -0.674 (gross -0.414, switching costs 0.260). 1 regime effect(s) with CI excluding zero on train; 4 bucket(s) rejected as weak.",
+    "hypotheses": [
+      {
+        "hypothesis_id": "H1",
+        "statement": "The unchanged strategy performs worse when vol_regime is high (train mean -2.35e-04 per interval after costs, n=2040).",
+        "direction": "works_worse",
+        "conditions": [
+          "vol_regime=high"
+        ],
+        "evidence_ids": [
+          "ev_regime_perfo_106ee0aced",
+          "ev_regime_perfo_4c1cae9acb"
+        ],
+        "confidence": "medium",
+        "caveats": [
+          "validation sign agrees",
+          "regime label uses lagged features; descriptive, not yet a tested gate"
+        ],
+        "suggested_test": "Gate on vol_regime=high must improve validation net return vs always-on after switching costs."
+      }
+    ],
+    "rejected_explanations": [
+      "trend_regime=bull: only 1 trades on train; too few to say anything",
+      "trend_regime=sideways: train CI [-3.46e-04, 1.32e-04] spans zero",
+      "vol_regime=low: train CI [-2.53e-04, 6.84e-05] spans zero",
+      "trend_regime=bear: only 0 trades on train; too few to say anything"
+    ],
+    "limitations": [
+      "deterministic fallback: no economic reasoning or news interpretation",
+      "single strategy, single asset",
+      "regime buckets are coarse (terciles / median)"
+    ]
+  },
+  "proposals": [
+    {
+      "proposal_id": "P1",
+      "family": "threshold_gate",
+      "based_on": [
+        "H1"
+      ],
+      "conditions": [
+        {
+          "feature": "realized_vol_7d",
+          "op": ">",
+          "threshold": 0.009749804674596628
+        }
+      ],
+      "allocation_when_true": 0.0,
+      "allocation_when_false": 1.0,
+      "rationale": "Follows H1: switch off when realized_vol_7d > train q50.",
+      "evidence_ids": [
+        "ev_feature_grid_f37e7c0cda",
+        "ev_test_gate_tr_2f6501de49",
+        "ev_regime_perfo_106ee0aced",
+        "ev_regime_perfo_4c1cae9acb"
+      ],
+      "falsification_test": "Reject if validation delta vs always-on is <= 0 after switching costs."
+    }
+  ],
+  "critiques": [
+    {
+      "proposal_id": "P1",
+      "verdict": "approve_for_frozen_test",
+      "leakage_concerns": [],
+      "overfit_risks": [
+        "train improvement CI includes zero"
+      ],
+      "fragile_samples": [],
+      "counterexamples": [],
+      "evidence_ids": [
+        "ev_feature_grid_f37e7c0cda",
+        "ev_test_gate_tr_2f6501de49",
+        "ev_regime_perfo_106ee0aced",
+        "ev_regime_perfo_4c1cae9acb",
+        "ev_test_gate_tr_eadaa16621"
+      ]
+    }
+  ],
+  "trial_log": [
+    {
+      "policy_id": "agent::P1",
+      "source": "agent",
+      "split": "train",
+      "delta_net_return_vs_always_on": 0.47431837965955614,
+      "ci_delta": [
+        -0.019912094552682464,
+        0.9748604056779148
+      ],
+      "evidence_id": "ev_test_gate_tr_2f6501de49",
+      "status": "evaluated",
+      "note": ""
+    },
+    {
+      "policy_id": "agent::P1",
+      "source": "agent",
+      "split": "validation",
+      "delta_net_return_vs_always_on": 0.33615912443406115,
+      "ci_delta": [
+        -0.09621122932516557,
+        0.7818347539833493
+      ],
+      "evidence_id": "ev_test_gate_tr_eadaa16621",
+      "status": "evaluated",
+      "note": ""
+    },
+    {
+      "policy_id": "meta::lgbm_gate_v1",
+      "source": "meta_model",
+      "split": "validation",
+      "delta_net_return_vs_always_on": 0.14927403885394358,
+      "ci_delta": [
+        -0.08997737584849592,
+        0.3923922421715726
+      ],
+      "evidence_id": "ev_test_gate_tr_ed7f897500",
+      "status": "evaluated",
+      "note": ""
+    }
+  ],
+  "candidates": [
+    {
+      "policy_id": "agent::P1",
+      "source": "agent",
+      "policy_spec": {
+        "policy_id": "agent::P1",
+        "family": "threshold_gate",
+        "conditions": [
+          {
+            "feature": "realized_vol_7d",
+            "op": ">",
+            "threshold": 0.009749804674596628
+          }
+        ],
+        "allocation_when_true": 0.0,
+        "allocation_when_false": 1.0,
+        "thresholds_selected_on": "train"
+      },
+      "status": "accepted_for_frozen_test",
+      "reasons": [
+        "validation delta vs always-on +0.3362, CI (-0.09621122932516557, 0.7818347539833493)",
+        "note: validation CI includes zero; the frozen test decides"
+      ],
+      "evidence_ids": [
+        "ev_feature_grid_f37e7c0cda",
+        "ev_test_gate_tr_2f6501de49",
+        "ev_regime_perfo_106ee0aced",
+        "ev_regime_perfo_4c1cae9acb",
+        "ev_test_gate_tr_eadaa16621"
+      ]
+    },
+    {
+      "policy_id": "meta::lgbm_gate_v1",
+      "source": "meta_model",
+      "policy_spec": {
+        "policy_id": "meta::lgbm_gate_v1",
+        "family": "lgbm_gate",
+        "features": [
+          "momentum_24h",
+          "realized_vol_7d",
+          "volume_zscore",
+          "fear_greed"
+        ],
+        "thresholds": [
+          0.45,
+          0.55
+        ],
+        "fitted_on": "train",
+        "calibrated_on": "validation"
+      },
+      "status": "accepted_for_frozen_test",
+      "reasons": [
+        "competitor: always carried to the frozen test for comparison",
+        "validation delta +0.1493"
+      ],
+      "evidence_ids": [
+        "ev_test_gate_tr_ed7f897500"
+      ]
+    }
+  ],
+  "test_requests": [
+    "Lane A: run always_on, cash, simple_rule and every accepted candidate ONCE on the sealed test split, same costs."
+  ],
+  "limitations": [
+    "3 policies evaluated (including refused attempts: 3 logged); results are subject to multiple-comparison risk.",
+    "Validation was used for acceptance; only the frozen test is unbiased.",
+    "Regime effects are associations under lagged features; not causal.",
+    "Agents ran in deterministic fallback mode (no LLM configured).",
+    "news_sentiment coverage 30%: not allowed in gates; market-only gating."
+  ],
+  "evidence": [
+    {
+      "evidence_id": "ev_regime_perfo_106ee0aced",
+      "tool": "regime_performance",
+      "args": {
+        "split": "train",
+        "regime_feature": null
+      },
+      "payload": {
+        "split": "train",
+        "rows": [
+          {
+            "split": "train",
+            "regime_feature": "trend_regime",
+            "bucket": "bear",
+            "n_decisions": 1360,
+            "n_trades": 0,
+            "mean_net_return": -0.000026029411764705883,
+            "ci_low": -0.000036607142857142853,
+            "ci_high": -0.000016964285714285715,
+            "total_cost": 0.0354,
+            "hit_rate": null
+          },
+          {
+            "split": "train",
+            "regime_feature": "trend_regime",
+            "bucket": "bull",
+            "n_decisions": 1360,
+            "n_trades": 1,
+            "mean_net_return": -0.00037151719433589235,
+            "ci_low": -0.0008284691595694237,
+            "ci_high": 0.000027100175472773222,
+            "total_cost": 0.024,
+            "hit_rate": 0.49779411764705883
+          },
+          {
+            "split": "train",
+            "regime_feature": "trend_regime",
+            "bucket": "sideways",
+            "n_decisions": 1360,
+            "n_trades": 182,
+            "mean_net_return": -0.00009827545661446751,
+            "ci_low": -0.0003455403318842182,
+            "ci_high": 0.00013204680764289755,
+            "total_cost": 0.201,
+            "hit_rate": 0.5084967320261438
+          },
+          {
+            "split": "train",
+            "regime_feature": "vol_regime",
+            "bucket": "high",
+            "n_decisions": 2040,
+            "n_trades": 128,
+            "mean_net_return": -0.00023515606846056676,
+            "ci_low": -0.000492917498331199,
+            "ci_high": -0.00003639729074412823,
+            "total_cost": 0.1518,
+            "hit_rate": 0.48811700182815354
+          },
+          {
+            "split": "train",
+            "regime_feature": "vol_regime",
+            "bucket": "low",
+            "n_decisions": 2040,
+            "n_trades": 92,
+            "mean_net_return": -0.0000953919733494771,
+            "ci_low": -0.00025299929824493326,
+            "ci_high": 0.00006844780503585049,
+            "total_cost": 0.1086,
+            "hit_rate": 0.516003879728419
+          }
+        ],
+        "note": "mean_net_return is per decision interval after costs; CI is Lane A's block bootstrap (90%). Buckets with n_trades < 20 are fragile."
+      },
+      "created_at": "2026-11-07T17:06:48.095304Z"
+    },
+    {
+      "evidence_id": "ev_regime_perfo_4c1cae9acb",
+      "tool": "regime_performance",
+      "args": {
+        "split": "validation",
+        "regime_feature": null
+      },
+      "payload": {
+        "split": "validation",
+        "rows": [
+          {
+            "split": "validation",
+            "regime_feature": "trend_regime",
+            "bucket": "bear",
+            "n_decisions": 365,
+            "n_trades": 0,
+            "mean_net_return": -0.00004438356164383561,
+            "ci_low": -0.000076875,
+            "ci_high": -0.00001964285714285714,
+            "total_cost": 0.0162,
+            "hit_rate": null
+          },
+          {
+            "split": "validation",
+            "regime_feature": "trend_regime",
+            "bucket": "bull",
+            "n_decisions": 599,
+            "n_trades": 1,
+            "mean_net_return": -0.00043219030099920087,
+            "ci_low": -0.001182265349094238,
+            "ci_high": 0.0004923300635981553,
+            "total_cost": 0.0126,
+            "hit_rate": 0.5308848080133556
+          },
+          {
+            "split": "validation",
+            "regime_feature": "trend_regime",
+            "bucket": "sideways",
+            "n_decisions": 396,
+            "n_trades": 74,
+            "mean_net_return": -0.00005925779648829741,
+            "ci_low": -0.0009436221109246255,
+            "ci_high": 0.000498735143836525,
+            "total_cost": 0.0756,
+            "hit_rate": 0.4936708860759494
+          },
+          {
+            "split": "validation",
+            "regime_feature": "vol_regime",
+            "bucket": "high",
+            "n_decisions": 935,
+            "n_trades": 61,
+            "mean_net_return": -0.0003601701865604931,
+            "ci_low": -0.0008230809032929791,
+            "ci_high": 0.00003547749831072193,
+            "total_cost": 0.0726,
+            "hit_rate": 0.48902195608782434
+          },
+          {
+            "split": "validation",
+            "regime_feature": "vol_regime",
+            "bucket": "low",
+            "n_decisions": 425,
+            "n_trades": 27,
+            "mean_net_return": 0.00008990834523805645,
+            "ci_low": -0.00039878076870963783,
+            "ci_high": 0.0008294200353838373,
+            "total_cost": 0.0318,
+            "hit_rate": 0.5671641791044776
+          }
+        ],
+        "note": "mean_net_return is per decision interval after costs; CI is Lane A's block bootstrap (90%). Buckets with n_trades < 20 are fragile."
+      },
+      "created_at": "2026-11-07T17:06:48.095386Z"
+    },
+    {
+      "evidence_id": "ev_cost_attribu_9e9bcf5397",
+      "tool": "cost_attribution",
+      "args": {
+        "split": "train"
+      },
+      "payload": {
+        "split": "train",
+        "costs": [
+          {
+            "split": "train",
+            "gross_return": -0.41391800529248945,
+            "fees": 0.15623999999999996,
+            "slippage": 0.10415999999999999,
+            "switching": 0.26039999999999996,
+            "funding": 0.0,
+            "net_return": -0.6743180052924892,
+            "turnover": 434.0
+          }
+        ],
+        "baselines": [
+          {
+            "split": "train",
+            "policy": "always_on",
+            "metrics": {
+              "net_return": -0.5377545042252475,
+              "sharpe": -2.2415577539586153,
+              "sortino": -2.258145981251006,
+              "max_drawdown": 0.5951652147815036,
+              "turnover": 434.0,
+              "n_switches": 434,
+              "exposure": 0.5208333333333334,
+              "ci_net_return": [
+                -1.233101912876869,
+                -0.03927181007594362
+              ]
+            }
+          },
+          {
+            "split": "train",
+            "policy": "cash",
+            "metrics": {
+              "net_return": 0.0,
+              "sharpe": null,
+              "sortino": null,
+              "max_drawdown": 0.0,
+              "turnover": 0.0,
+              "n_switches": 0,
+              "exposure": 0.0,
+              "ci_net_return": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "split": "train",
+            "policy": "simple_rule",
+            "metrics": {
+              "net_return": -0.38447462979877,
+              "sharpe": -2.0672572626697394,
+              "sortino": -2.001845653553385,
+              "max_drawdown": 0.43479646932067906,
+              "turnover": 312.0,
+              "n_switches": 443,
+              "exposure": 0.38676470588235295,
+              "ci_net_return": [
+                -0.8232213742381878,
+                -0.009736106159157596
+              ]
+            }
+          }
+        ]
+      },
+      "created_at": "2026-11-07T17:06:48.095504Z"
+    },
+    {
+      "evidence_id": "ev_feature_grid_f37e7c0cda",
+      "tool": "feature_grid",
+      "args": {},
+      "payload": {
+        "train_quantiles": {
+          "momentum_24h": {
+            "0.2": -0.025187237363760318,
+            "0.33": -0.012241898632925456,
+            "0.5": 0.0018140220297713228,
+            "0.67": 0.016317887835374346,
+            "0.8": 0.028530230835386666
+          },
+          "realized_vol_7d": {
+            "0.2": 0.005232517435600845,
+            "0.33": 0.007442549106761657,
+            "0.5": 0.009749804674596628,
+            "0.67": 0.011441022990310567,
+            "0.8": 0.012278833234197331
+          },
+          "volume_zscore": {
+            "0.2": -0.539894047075402,
+            "0.33": -0.32074179011621196,
+            "0.5": -0.04445074571364609,
+            "0.67": 0.23485423851956444,
+            "0.8": 0.5248223608338501
+          },
+          "fear_greed": {
+            "0.2": 35.934032750639645,
+            "0.33": 42.36372051186172,
+            "0.5": 51.347845154249846,
+            "0.67": 58.67225642910199,
+            "0.8": 63.151849801065424
+          },
+          "news_sentiment": {
+            "0.2": -0.5953040543371074,
+            "0.33": -0.33001098484121677,
+            "0.5": 0.01190460329861076,
+            "0.67": 0.331702304363341,
+            "0.8": 0.5658978980889607
+          }
+        },
+        "coverage": {
+          "momentum_24h": 1.0,
+          "realized_vol_7d": 1.0,
+          "volume_zscore": 0.9267156862745098,
+          "fear_greed": 1.0,
+          "news_sentiment": 0.3031862745098039
+        }
+      },
+      "created_at": "2026-11-07T17:06:48.095613Z"
+    },
+    {
+      "evidence_id": "ev_test_gate_tr_2f6501de49",
+      "tool": "test_gate_train",
+      "args": {
+        "policy_id": "agent::P1",
+        "split": "train"
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "agent::P1",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "realized_vol_7d",
+              "op": ">",
+              "threshold": 0.009749804674596628
+            }
+          ],
+          "allocation_when_true": 0.0,
+          "allocation_when_false": 1.0
+        },
+        "evaluation": {
+          "policy_id": "agent::P1",
+          "split": "train",
+          "metrics": {
+            "net_return": -0.2068381607757086,
+            "sharpe": -1.1650015509962706,
+            "sortino": -0.7416863288082306,
+            "max_drawdown": 0.2576504396552999,
+            "turnover": 190.0,
+            "n_switches": 190,
+            "exposure": 0.25269607843137254,
+            "ci_net_return": [
+              -0.5167041125898116,
+              0.13530964531174092
+            ]
+          },
+          "always_on": {
+            "net_return": -0.5377545042252475,
+            "sharpe": -2.2415577539586153,
+            "sortino": -2.258145981251006,
+            "max_drawdown": 0.5951652147815036,
+            "turnover": 434.0,
+            "n_switches": 434,
+            "exposure": 0.5208333333333334,
+            "ci_net_return": [
+              -1.2559599455259014,
+              -0.0775855232207745
+            ]
+          },
+          "delta_net_return_vs_always_on": 0.47431837965955614,
+          "ci_delta": [
+            -0.019912094552682464,
+            0.9748604056779148
+          ],
+          "audit_id": "audit_83e7e27604"
+        }
+      },
+      "created_at": "2026-11-07T17:06:48.321250Z"
+    },
+    {
+      "evidence_id": "ev_test_gate_tr_eadaa16621",
+      "tool": "test_gate_train",
+      "args": {
+        "policy_id": "agent::P1",
+        "split": "validation"
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "agent::P1",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "realized_vol_7d",
+              "op": ">",
+              "threshold": 0.009749804674596628
+            }
+          ],
+          "allocation_when_true": 0.0,
+          "allocation_when_false": 1.0,
+          "thresholds_selected_on": "train"
+        },
+        "evaluation": {
+          "policy_id": "agent::P1",
+          "split": "validation",
+          "metrics": {
+            "net_return": 0.02949856204103618,
+            "sharpe": 0.7305860060238469,
+            "sortino": 0.45694231317933093,
+            "max_drawdown": 0.1417498947708734,
+            "turnover": 54.0,
+            "n_switches": 54,
+            "exposure": 0.24632352941176472,
+            "ci_net_return": [
+              -0.26802816220881104,
+              0.3258241039497425
+            ]
+          },
+          "always_on": {
+            "net_return": -0.28779592607800586,
+            "sharpe": -2.6540900259411626,
+            "sortino": -2.8834222517833292,
+            "max_drawdown": 0.4887407775228525,
+            "turnover": 174.0,
+            "n_switches": 174,
+            "exposure": 0.6147058823529412,
+            "ci_net_return": [
+              -0.7890759265779318,
+              0.19321664308059874
+            ]
+          },
+          "delta_net_return_vs_always_on": 0.33615912443406115,
+          "ci_delta": [
+            -0.09621122932516557,
+            0.7818347539833493
+          ],
+          "audit_id": "audit_2802971768"
+        }
+      },
+      "created_at": "2026-11-07T17:06:48.417307Z"
+    },
+    {
+      "evidence_id": "ev_test_gate_tr_ed7f897500",
+      "tool": "test_gate_train",
+      "args": {
+        "policy_id": "meta::lgbm_gate_v1",
+        "split": "validation"
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "meta::lgbm_gate_v1",
+          "family": "lgbm_gate",
+          "features": [
+            "momentum_24h",
+            "realized_vol_7d",
+            "volume_zscore",
+            "fear_greed"
+          ],
+          "thresholds": [
+            0.45,
+            0.55
+          ],
+          "fitted_on": "train",
+          "calibrated_on": "validation"
+        },
+        "evaluation": {
+          "policy_id": "meta::lgbm_gate_v1",
+          "split": "validation",
+          "metrics": {
+            "net_return": -0.14741018245454662,
+            "sharpe": -2.6540900259411626,
+            "sortino": -2.8834222517833292,
+            "max_drawdown": 0.2809232336148283,
+            "turnover": 87.0,
+            "n_switches": 174,
+            "exposure": 0.3073529411764706,
+            "ci_net_return": [
+              -0.4072312278194963,
+              0.10870352269062455
+            ]
+          },
+          "always_on": {
+            "net_return": -0.28779592607800586,
+            "sharpe": -2.6540900259411626,
+            "sortino": -2.8834222517833292,
+            "max_drawdown": 0.4887407775228525,
+            "turnover": 174.0,
+            "n_switches": 174,
+            "exposure": 0.6147058823529412,
+            "ci_net_return": [
+              -0.7766258452116117,
+              0.17546600354525035
+            ]
+          },
+          "delta_net_return_vs_always_on": 0.14927403885394358,
+          "ci_delta": [
+            -0.08997737584849592,
+            0.3923922421715726
+          ],
+          "audit_id": "audit_06a81fcda8"
+        }
+      },
+      "created_at": "2026-11-07T17:06:48.514280Z"
+    }
+  ],
+  "n_policies_tried": 3,
+  "holdout_accessed": false
+}

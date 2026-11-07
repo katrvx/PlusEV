@@ -61,6 +61,7 @@ existing strategy (immutable) ─► import / validate / hash
 | [`KEEP_OR_KILL_PROJECT_SPEC.md`](KEEP_OR_KILL_PROJECT_SPEC.md) | **Authoritative spec**: idea, maths, data rules, evaluation, agents, API, risk, demo script |
 | [`KEEP_OR_KILL_AGENTS.md`](KEEP_OR_KILL_AGENTS.md) | Handoff brief for the three lanes, shared contracts, collaboration rules, definition of done |
 | [`LANE_B.md`](LANE_B.md) | What Lane B built, its interface, guardrails, adversarial review, and what it needs from Lane A |
+| [`LANE_C.md`](LANE_C.md) (branch `lane-c`) | Web workspace, shared route constants and types, and the teammate integration guide |
 | [`archive/`](archive/) | Earlier +EV design notes, kept for reference only |
 
 ## Team and lanes
@@ -69,7 +70,7 @@ existing strategy (immutable) ─► import / validate / hash
 |---|---|---|---|
 | **A · Quant / Data** | `A/` (target layout was `packages/ingestion`, `feature_store`, `strategies`, `quant`, `evaluation`) | `run_experiment(...) -> ExperimentResult`, including a deterministic verdict and a recorded 14-day plan | on this branch |
 | **B · Agents / Context** (Kate) | `packages/research_agents`, `meta_policy`, news enrichment | `investigate(experiment_id) -> InvestigationReport` | current `main` agents. Default loader is the synthetic stand-in. `--lane-a` uses Lane A's development view |
-| **C · API / UI / Demo** | `apps/api`, `apps/web`, docs, paper-run interface | consumes `ExperimentResult` + `InvestigationReport` | in progress |
+| **C · API / UI / Demo** | `apps/api`, `apps/web`, docs, practice-plan interface | consumes native Lane B reports; adapts Lane A results into UI contracts | on this branch, from `lane-c`. Start at [`LANE_C.md`](LANE_C.md). |
 
 Work on branches per lane; don't edit another lane's directories without coordinating. Freeze shared Pydantic contracts before integrating.
 
@@ -78,7 +79,8 @@ Work on branches per lane; don't edit another lane's directories without coordin
 ```text
 apps/api            FastAPI routes                       (C)
 apps/web            Next.js UI                           (C)
-packages/contracts  shared Pydantic schemas              (all, frozen first)
+packages/contracts  Part C TypeScript types + API constants (C)
+packages/contracts_lane_b  native Python research contracts (B)
 packages/ingestion, feature_store, strategies, quant, evaluation   (A)
 packages/research_agents, meta_policy                    (B)
 packages/paper      paper-only shadow runner             (C)
