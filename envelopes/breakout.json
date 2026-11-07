@@ -1,0 +1,149 @@
+{
+  "strategy": "breakout",
+  "trained_on": "kit-train + holdout kit-holdout @ d379473",
+  "n_train_trades": 583,
+  "n_holdout_trades": 190,
+  "mean_net_return_train": 0.06306118797379531,
+  "hypotheses_proposed": 8,
+  "survived_training": 0,
+  "confirmed_holdout": 0,
+  "fdr_q": 0.1,
+  "buckets": [
+    {
+      "feature": "vol",
+      "bucket": "low",
+      "source": "default_panel",
+      "n_train": 74,
+      "effect_train": -0.00950442542992418,
+      "ci_train": [
+        -0.03999503770026098,
+        0.020279882958439646
+      ],
+      "p_train": 0.5995,
+      "survived_bh": false,
+      "n_holdout": null,
+      "effect_holdout": null,
+      "ci_holdout": null,
+      "status": "neutral"
+    },
+    {
+      "feature": "vol",
+      "bucket": "mid",
+      "source": "default_panel",
+      "n_train": 64,
+      "effect_train": -0.011568103030952844,
+      "ci_train": [
+        -0.04252156761613783,
+        0.023178567348037773
+      ],
+      "p_train": 0.5695,
+      "survived_bh": false,
+      "n_holdout": null,
+      "effect_holdout": null,
+      "ci_holdout": null,
+      "status": "neutral"
+    },
+    {
+      "feature": "vol",
+      "bucket": "high",
+      "source": "default_panel",
+      "n_train": 215,
+      "effect_train": 0.013825143278959161,
+      "ci_train": [
+        -0.007918564761693243,
+        0.034920522674503726
+      ],
+      "p_train": 0.265,
+      "survived_bh": false,
+      "n_holdout": null,
+      "effect_holdout": null,
+      "ci_holdout": null,
+      "status": "neutral"
+    },
+    {
+      "feature": "shock",
+      "bucket": "calm",
+      "source": "default_panel",
+      "n_train": 326,
+      "effect_train": 0.004291003993080243,
+      "ci_train": [
+        -0.006975988195836633,
+        0.015460238307336175
+      ],
+      "p_train": 0.545,
+      "survived_bh": false,
+      "n_holdout": null,
+      "effect_holdout": null,
+      "ci_holdout": null,
+      "status": "neutral"
+    },
+    {
+      "feature": "shock",
+      "bucket": "shock",
+      "source": "default_panel",
+      "n_train": 27,
+      "effect_train": -0.004291003993080243,
+      "ci_train": [
+        -0.01598599641853115,
+        0.007158031362318028
+      ],
+      "p_train": 0.53,
+      "survived_bh": false,
+      "n_holdout": null,
+      "effect_holdout": null,
+      "ci_holdout": null,
+      "status": "neutral"
+    },
+    {
+      "feature": "trend",
+      "bucket": "up",
+      "source": "default_panel",
+      "n_train": 137,
+      "effect_train": -0.0027779561999246383,
+      "ci_train": [
+        -0.02581322008903357,
+        0.021751970759582392
+      ],
+      "p_train": 0.8365,
+      "survived_bh": false,
+      "n_holdout": null,
+      "effect_holdout": null,
+      "ci_holdout": null,
+      "status": "neutral"
+    },
+    {
+      "feature": "trend",
+      "bucket": "down",
+      "source": "default_panel",
+      "n_train": 12,
+      "effect_train": -0.003267563028184997,
+      "ci_train": [
+        -0.015196350487329976,
+        0.008905118415533536
+      ],
+      "p_train": 0.656,
+      "survived_bh": false,
+      "n_holdout": null,
+      "effect_holdout": null,
+      "ci_holdout": null,
+      "status": "thin"
+    },
+    {
+      "feature": "trend",
+      "bucket": "chop",
+      "source": "default_panel",
+      "n_train": 204,
+      "effect_train": 0.0031443659619523247,
+      "ci_train": [
+        -0.021409538172429285,
+        0.028305338131407547
+      ],
+      "p_train": 0.8375,
+      "survived_bh": false,
+      "n_holdout": null,
+      "effect_holdout": null,
+      "ci_holdout": null,
+      "status": "neutral"
+    }
+  ]
+}

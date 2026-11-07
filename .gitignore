@@ -21,3 +21,9 @@ node_modules/
 dist/
 
 # eval outputs are committed on purpose (eval/results/)
+
+# organisers kit (each teammate keeps their own copy)
+agentverse/
+
+# practice datasets are regenerated from the kit with fixed seeds (see README)
+data/

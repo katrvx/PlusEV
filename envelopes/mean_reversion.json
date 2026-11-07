@@ -1,0 +1,170 @@
+{
+  "strategy": "mean_reversion",
+  "trained_on": "kit-train + holdout kit-holdout @ d379473",
+  "n_train_trades": 654,
+  "n_holdout_trades": 223,
+  "mean_net_return_train": -0.0642478785522887,
+  "hypotheses_proposed": 8,
+  "survived_training": 7,
+  "confirmed_holdout": 6,
+  "fdr_q": 0.1,
+  "buckets": [
+    {
+      "feature": "vol",
+      "bucket": "low",
+      "source": "default_panel",
+      "n_train": 90,
+      "effect_train": 0.02707765579724483,
+      "ci_train": [
+        0.002616235416375917,
+        0.053422747264482866
+      ],
+      "p_train": 0.078,
+      "survived_bh": true,
+      "n_holdout": 38,
+      "effect_holdout": 0.03964678902814247,
+      "ci_holdout": [
+        0.0049423074846863604,
+        0.07360117067735948
+      ],
+      "status": "green"
+    },
+    {
+      "feature": "vol",
+      "bucket": "mid",
+      "source": "default_panel",
+      "n_train": 72,
+      "effect_train": 0.05253741329646584,
+      "ci_train": [
+        0.02400548864965716,
+        0.08370956895848773
+      ],
+      "p_train": 0.0025,
+      "survived_bh": true,
+      "n_holdout": 28,
+      "effect_holdout": 0.03629338493875937,
+      "ci_holdout": [
+        -0.008524676378752852,
+        0.07721525743578905
+      ],
+      "status": "neutral"
+    },
+    {
+      "feature": "vol",
+      "bucket": "high",
+      "source": "default_panel",
+      "n_train": 330,
+      "effect_train": -0.04804341497997466,
+      "ci_train": [
+        -0.07097882056582605,
+        -0.025915926736684535
+      ],
+      "p_train": 0.0005,
+      "survived_bh": true,
+      "n_holdout": 100,
+      "effect_holdout": -0.05046660927821987,
+      "ci_holdout": [
+        -0.08106991731596792,
+        -0.018497631516122912
+      ],
+      "status": "red"
+    },
+    {
+      "feature": "shock",
+      "bucket": "calm",
+      "source": "default_panel",
+      "n_train": 469,
+      "effect_train": -0.0406873915313479,
+      "ci_train": [
+        -0.05108537121067111,
+        -0.03043717584679873
+      ],
+      "p_train": 0.0005,
+      "survived_bh": true,
+      "n_holdout": 159,
+      "effect_holdout": -0.02438598707833929,
+      "ci_holdout": [
+        -0.0398234003134758,
+        -0.008053786471131029
+      ],
+      "status": "red"
+    },
+    {
+      "feature": "shock",
+      "bucket": "shock",
+      "source": "default_panel",
+      "n_train": 23,
+      "effect_train": 0.0406873915313479,
+      "ci_train": [
+        0.030499440994405578,
+        0.051173637261932324
+      ],
+      "p_train": 0.0005,
+      "survived_bh": true,
+      "n_holdout": 7,
+      "effect_holdout": 0.02438598707833929,
+      "ci_holdout": [
+        0.008190905869366058,
+        0.040651623220924
+      ],
+      "status": "green"
+    },
+    {
+      "feature": "trend",
+      "bucket": "up",
+      "source": "default_panel",
+      "n_train": 0,
+      "effect_train": 0.0,
+      "ci_train": [
+        0.0,
+        0.0
+      ],
+      "p_train": 1.0,
+      "survived_bh": false,
+      "n_holdout": null,
+      "effect_holdout": null,
+      "ci_holdout": null,
+      "status": "thin"
+    },
+    {
+      "feature": "trend",
+      "bucket": "down",
+      "source": "default_panel",
+      "n_train": 152,
+      "effect_train": 0.036698889409064885,
+      "ci_train": [
+        0.018385858861402104,
+        0.055244656413699
+      ],
+      "p_train": 0.0015,
+      "survived_bh": true,
+      "n_holdout": 49,
+      "effect_holdout": 0.07038178440391459,
+      "ci_holdout": [
+        0.03929169094343207,
+        0.10198133817449069
+      ],
+      "status": "green"
+    },
+    {
+      "feature": "trend",
+      "bucket": "chop",
+      "source": "default_panel",
+      "n_train": 340,
+      "effect_train": -0.036698889409064885,
+      "ci_train": [
+        -0.0559382972507088,
+        -0.01758325669733444
+      ],
+      "p_train": 0.0015,
+      "survived_bh": true,
+      "n_holdout": 117,
+      "effect_holdout": -0.07038178440391459,
+      "ci_holdout": [
+        -0.10196745047249353,
+        -0.040889273532425545
+      ],
+      "status": "red"
+    }
+  ]
+}

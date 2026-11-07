@@ -1,0 +1,124 @@
+{
+  "data": "synthetic kit `markets` pack (practice data, not a hidden-test result)",
+  "commit": "d379473",
+  "paths": {
+    "train": 600,
+    "holdout": 200,
+    "dev": 200
+  },
+  "strategies": {
+    "mean_reversion": {
+      "train_trades": 654,
+      "holdout_trades": 223,
+      "proposed": 8,
+      "survived_training": 7,
+      "confirmed_holdout": 6,
+      "red": [
+        "vol=high",
+        "shock=calm",
+        "trend=chop"
+      ],
+      "green": [
+        "vol=low",
+        "shock=shock",
+        "trend=down"
+      ],
+      "dev_mean_return": {
+        "raw": -0.08469418283537436,
+        "governed": -0.002538762346138036,
+        "buy_and_hold": -0.009638874628855926
+      },
+      "dev_mean_drawdown": {
+        "raw": 0.11674563080445571,
+        "governed": 0.0038185211866651227
+      },
+      "governed_minus_raw_return": {
+        "mean": 0.08215542048923632,
+        "ci90": [
+          0.06472197130620727,
+          0.09932444924452756
+        ]
+      },
+      "governed_minus_raw_drawdown": {
+        "mean": -0.11292710961779058,
+        "ci90": [
+          -0.12911639430511343,
+          -0.09781689576163294
+        ]
+      },
+      "paths_changed_by_governor": 129,
+      "wins_vs_raw": 106,
+      "losses_vs_raw": 20
+    },
+    "trend": {
+      "train_trades": 794,
+      "holdout_trades": 281,
+      "proposed": 8,
+      "survived_training": 0,
+      "confirmed_holdout": 0,
+      "red": [],
+      "green": [],
+      "dev_mean_return": {
+        "raw": 0.06870805641270375,
+        "governed": 0.06870805641270375,
+        "buy_and_hold": -0.009638874628855926
+      },
+      "dev_mean_drawdown": {
+        "raw": 0.048181403638464404,
+        "governed": 0.048181403638464404
+      },
+      "governed_minus_raw_return": {
+        "mean": 0.0,
+        "ci90": [
+          0.0,
+          0.0
+        ]
+      },
+      "governed_minus_raw_drawdown": {
+        "mean": 0.0,
+        "ci90": [
+          0.0,
+          0.0
+        ]
+      },
+      "paths_changed_by_governor": 0,
+      "wins_vs_raw": 0,
+      "losses_vs_raw": 0
+    },
+    "breakout": {
+      "train_trades": 583,
+      "holdout_trades": 190,
+      "proposed": 8,
+      "survived_training": 0,
+      "confirmed_holdout": 0,
+      "red": [],
+      "green": [],
+      "dev_mean_return": {
+        "raw": 0.07123978047563499,
+        "governed": 0.07123978047563499,
+        "buy_and_hold": -0.009638874628855926
+      },
+      "dev_mean_drawdown": {
+        "raw": 0.03544965332410029,
+        "governed": 0.03544965332410029
+      },
+      "governed_minus_raw_return": {
+        "mean": 0.0,
+        "ci90": [
+          0.0,
+          0.0
+        ]
+      },
+      "governed_minus_raw_drawdown": {
+        "mean": 0.0,
+        "ci90": [
+          0.0,
+          0.0
+        ]
+      },
+      "paths_changed_by_governor": 0,
+      "wins_vs_raw": 0,
+      "losses_vs_raw": 0
+    }
+  }
+}

@@ -72,9 +72,37 @@ We run strategies with **planted truth** on real price history: one with a live 
 | Relevance and impact | 20% | A named user (retail/small-fund algo trader), the failure on screen: killing a live bot in a bad week. |
 | Ambition and technical quality | 15% | Strategy-conditional regime analysis + anytime-valid sequential decay detection + LLM swarm under a frozen judge. |
 
-## Status
+## MVP: run it
 
-Docs only. Code starts Saturday 15:30. Build order in [docs/10-build-plan.md](docs/10-build-plan.md).
+Needs Python 3.10+ and the organisers' `agentverse/` kit folder in the repo root (not committed).
+
+```bash
+pip install -r requirements.txt
+K=agentverse/finance/bench.py
+python3 $K generate --pack markets --cases 600 --seed 101 --output data/kit-train
+python3 $K generate --pack markets --cases 200 --seed 202 --output data/kit-dev
+python3 $K generate --pack markets --cases 200 --seed 303 --output data/kit-holdout
+python3 scripts/build.py        # regimes -> trades -> X-ray envelopes -> dev comparison -> Kill-or-Keep demo
+python3 scripts/kit_check.py    # our simulator vs the organisers' runner, to the penny
+streamlit run app/streamlit_app.py
+```
+
+Real Binance paths instead of synthetic (needs internet on your own machine):
+`python3 $K fetch --cases 400 --seed 101 --output data/real-train` (same for dev/holdout with other seeds), then
+`python3 scripts/build.py --train data/real-train --dev data/real-dev --holdout data/real-holdout --label "real Binance practice paths"`.
+
+Hidden test with the organisers' bench:
+`python3 $K challenge --pack real-markets --cases 300 --project . --output eval/challenge/governed --adapter python3 -m plusev.adapter --strategy trend --mode governed`
+
+| Path | What |
+|---|---|
+| `plusev/regime.py` | volatility / shock / trend labels from past prices only |
+| `plusev/strategies.py` | three simple base bots |
+| `plusev/execution.py` | the kit's fill rules, re-implemented; trades tagged with regime |
+| `plusev/judge.py` | X-ray (bootstrap, BH, sealed holdout) and Kill or Keep (drawdown percentile, e-processes) |
+| `plusev/governor.py` | blocks entries / exits in confirmed red regimes |
+| `plusev/adapter.py` | JSONL adapter for `bench.py run / challenge / live` |
+| `app/streamlit_app.py` | the demo |
 
 ## Team
 

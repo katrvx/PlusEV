@@ -1,0 +1,43 @@
+{
+  "dataset": "kit-dev",
+  "runs": [
+    {
+      "strategy": "mean_reversion",
+      "mode": "raw",
+      "paths": 200,
+      "mismatches": 0
+    },
+    {
+      "strategy": "mean_reversion",
+      "mode": "governed",
+      "paths": 200,
+      "mismatches": 0
+    },
+    {
+      "strategy": "trend",
+      "mode": "raw",
+      "paths": 200,
+      "mismatches": 0
+    },
+    {
+      "strategy": "trend",
+      "mode": "governed",
+      "paths": 200,
+      "mismatches": 0
+    },
+    {
+      "strategy": "breakout",
+      "mode": "raw",
+      "paths": 200,
+      "mismatches": 0
+    },
+    {
+      "strategy": "breakout",
+      "mode": "governed",
+      "paths": 200,
+      "mismatches": 0
+    }
+  ],
+  "total_paths": 1200,
+  "total_mismatches": 0
+}
