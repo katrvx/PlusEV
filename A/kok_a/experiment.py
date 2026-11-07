@@ -18,12 +18,15 @@ import pandas as pd
 from kok_a.arbiter import build_paper_plan, decide
 from kok_a.contracts import (
     BaselineRow,
+    ComparisonPoint,
     CostBreakdown,
     EquityPoint,
     ExperimentResult,
+    FeeCheck,
     GateEvaluation,
     Metrics,
     RegimeRow,
+    WalkForwardFold,
     Window,
 )
 from kok_a.features import FEATURE_COLUMNS, build_frame, coverage_table
@@ -36,6 +39,19 @@ from kok_a.strategies import positions
 
 QUANTILES = (0.2, 0.33, 0.5, 0.67, 0.8)
 SPLITS = ("train", "validation", "test")
+EMBARGO_BARS = 2
+WALK_FORWARD_FOLDS = 4
+PAPER_HORIZON_BARS = 14 * 24
+REQUIRED_FEATURES = (
+    "momentum_24h",
+    "momentum_7d",
+    "realized_vol_7d",
+    "atr_14",
+    "price_drawdown",
+    "volume_zscore",
+    "target_position",
+    "ret_next",
+)
 
 
 @dataclass
@@ -196,6 +212,7 @@ def agent_view(result: ExperimentResult) -> ExperimentResult:
             "per_regime": [row for row in result.per_regime if row.split != "test"],
             "costs": [row for row in result.costs if row.split != "test"],
             "equity": [point for point in result.equity if point.split != "test"],
+            "comparison_equity": [point for point in result.comparison_equity if point.split != "test"],
             "decision": None,
             "paper_plan": None,
             "notes": notes,
@@ -272,6 +289,8 @@ def assemble(
             baselines.append(BaselineRow(split=split, policy=name, metrics=evaluation.metrics))  # type: ignore[arg-type]
 
     always = simulate(sample, pd.Series(1.0, index=sample.index), fee_bps=fee, slippage_bps=slip)
+    train_net = always.loc[sample["split"] == "train", "net"].to_numpy(dtype=float)
+    horizon_range = _predictive_range(train_net, _rng(seed, "paper", "range"), n_boot)
     experiment_id = f"exp_{signal_hash[:12]}"
     n_test = int((sample["split"] == "test").sum())
     decision = decide({name: scored[(name, "test")] for name in ("always_on", "cash", "simple_rule", "lgbm_gate")}, n_test)
@@ -281,6 +300,7 @@ def assemble(
         version,
         decision,
         f"{fee:.0f} bps fee + {slip:.0f} bp slippage on |change in exposure|",
+        horizon_range,
     )
     result = ExperimentResult(
         experiment_id=experiment_id,
@@ -301,6 +321,9 @@ def assemble(
             "pre_registered_holdout:always_on,cash,simple_rule,lgbm_gate",
         ],
         equity=_equity(sample, always),
+        comparison_equity=_comparison_equity(sample, runner, fee, slip),
+        walk_forward=_walk_forward(sample, seed, n_estimators, fee, slip),
+        fee_checks=_fee_checks(sample, fee, slip),
         provenance=provenance,
         notes=_notes(thresholds, provenance, decision.verdict, fee, slip, imported=external_positions is not None),
         decision=decision,
@@ -365,7 +388,7 @@ def _analysis_sample(
     else:
         version = "imported-positions"
         sample["target_position"] = _overlay_positions(sample, external_positions)
-    sample = sample.dropna(subset=["momentum_24h", "realized_vol_7d", "volume_zscore", "target_position", "ret_next"])
+    sample = sample.dropna(subset=list(REQUIRED_FEATURES))
     sample = sample.reset_index(drop=True)
     if external_positions is not None:
         sample = _longest_hourly_run(sample)
@@ -385,9 +408,24 @@ def _analysis_sample(
     return version, sample
 
 
+def _embargoed(frame: pd.DataFrame, split: str) -> pd.Series:
+    """True except the last EMBARGO_BARS of this split. Their labels reach into the next split."""
+
+    times = frame.loc[frame["split"] == split, "decision_time"]
+    if len(times) <= EMBARGO_BARS:
+        banned = set(times)
+    else:
+        banned = set(times.iloc[-EMBARGO_BARS:])
+    return ~frame["decision_time"].isin(list(banned))
+
+
+def _in_market(frame: pd.DataFrame, split: str) -> pd.DataFrame:
+    return frame[(frame["split"] == split) & (frame["target_position"] > 0) & _embargoed(frame, split)]
+
+
 def _fit_lgbm(frame: pd.DataFrame, seed: int, n_estimators: int) -> LGBMGate:
-    train = frame[(frame["split"] == "train") & (frame["target_position"] > 0)]
-    valid = frame[(frame["split"] == "validation") & (frame["target_position"] > 0)]
+    train = _in_market(frame, "train")
+    valid = _in_market(frame, "validation")
     if len(train) < 40 or len(valid) < 10:
         raise RuntimeError("not enough in-market train/validation rows to fit the LightGBM gate")
     if train["ret_next"].gt(0).nunique() < 2:
@@ -500,6 +538,129 @@ def _equity(frame: pd.DataFrame, always: pd.DataFrame) -> list[EquityPoint]:
         )
         for i in range(len(frame))
     ]
+
+
+def _comparison_equity(frame: pd.DataFrame, runner: GateRunner, fee_bps: float, slippage_bps: float) -> list[ComparisonPoint]:
+    specs = {
+        "always_on": {"policy_id": "always_on", "family": "always_on"},
+        "cash": {"policy_id": "cash", "family": "cash"},
+        "simple_rule": runner.rule_spec,
+        "lgbm_gate": runner.lgbm.spec(),
+    }
+    curves: dict[str, np.ndarray] = {}
+    for name, spec in specs.items():
+        multiplier = allocation(spec, frame, lgbm=runner.lgbm)
+        simulated = simulate(frame, multiplier, fee_bps=fee_bps, slippage_bps=slippage_bps)
+        curves[name] = np.cumprod(1.0 + simulated["net"].to_numpy(dtype=float))
+    return [
+        ComparisonPoint(
+            decision_time=_py(frame["decision_time"].iloc[i]),
+            split=frame["split"].iloc[i],
+            base=float(curves["always_on"][i]),
+            rule=float(curves["simple_rule"][i]),
+            lgbm=float(curves["lgbm_gate"][i]),
+            cash=float(curves["cash"][i]),
+        )
+        for i in range(len(frame))
+    ]
+
+
+def _walk_forward(frame: pd.DataFrame, seed: int, n_estimators: int, fee_bps: float, slippage_bps: float) -> list[WalkForwardFold]:
+    """Expanding folds inside train. The embargo keeps a fold's labels out of the next block."""
+
+    train = frame[frame["split"] == "train"].reset_index(drop=True)
+    block = len(train) // WALK_FORWARD_FOLDS
+    if block < 40:
+        start = _py(train["decision_time"].iloc[0]) if len(train) else datetime.now()
+        end = _py(train["decision_time"].iloc[-1]) if len(train) else start
+        return [
+            WalkForwardFold(
+                fold=0,
+                n_fit=0,
+                n_score=len(train),
+                score_start=start,
+                score_end=end,
+                note="train is too short for 4 expanding folds",
+            )
+        ]
+    folds: list[WalkForwardFold] = []
+    for fold in range(1, WALK_FORWARD_FOLDS):
+        fit_end = fold * block - EMBARGO_BARS
+        score_start = fold * block
+        score_end = (fold + 1) * block if fold < WALK_FORWARD_FOLDS - 1 else len(train)
+        fit_rows = train.iloc[: max(fit_end, 0)]
+        score_rows = train.iloc[score_start:score_end]
+        if score_rows.empty:
+            continue
+        window_start = _py(score_rows["decision_time"].iloc[0])
+        window_end = _py(score_rows["decision_time"].iloc[-1])
+        in_market = fit_rows[fit_rows["target_position"] > 0]
+        if len(in_market) < 40 or in_market["ret_next"].gt(0).nunique() < 2 or len(score_rows) < 20:
+            folds.append(
+                WalkForwardFold(
+                    fold=fold,
+                    n_fit=int(len(in_market)),
+                    n_score=int(len(score_rows)),
+                    score_start=window_start,
+                    score_end=window_end,
+                    note="fold skipped: not enough in-market rows after the embargo",
+                )
+            )
+            continue
+        model = LGBMGate(seed=seed, n_estimators=n_estimators)
+        model.fit(in_market, in_market["ret_next"], split="train")
+        multiplier = model.allocation(score_rows)
+        gated = simulate(score_rows, multiplier, fee_bps=fee_bps, slippage_bps=slippage_bps)
+        base = simulate(score_rows, pd.Series(1.0, index=score_rows.index), fee_bps=fee_bps, slippage_bps=slippage_bps)
+        delta = _compound(gated["net"].to_numpy(dtype=float)) - _compound(base["net"].to_numpy(dtype=float))
+        folds.append(
+            WalkForwardFold(
+                fold=fold,
+                n_fit=int(len(in_market)),
+                n_score=int(len(score_rows)),
+                score_start=window_start,
+                score_end=window_end,
+                delta_net_return_vs_always_on=delta,
+                note="expanding train fold with a 2-bar embargo; not used to choose the sealed-test policy",
+            )
+        )
+    return folds
+
+
+def _fee_checks(frame: pd.DataFrame, fee_bps: float, slippage_bps: float) -> list[FeeCheck]:
+    visible = (frame["split"] == "validation").to_numpy()
+    ones = pd.Series(1.0, index=frame.index)
+    checks: list[FeeCheck] = []
+    for scale in (0.5, 1.0, 2.0):
+        simulated = simulate(frame, ones, visible=visible, fee_bps=fee_bps * scale, slippage_bps=slippage_bps * scale)
+        net = simulated.loc[visible, "net"].to_numpy(dtype=float)
+        checks.append(
+            FeeCheck(
+                scale=scale,
+                fee_bps=fee_bps * scale,
+                slippage_bps=slippage_bps * scale,
+                net_return=_compound(net),
+            )
+        )
+    return checks
+
+
+def _predictive_range(net: np.ndarray, rng: np.random.Generator, n_boot: int) -> tuple[float, float, int] | None:
+    """90% range for a 14-day path drawn from the training return distribution."""
+
+    horizon = min(PAPER_HORIZON_BARS, len(net))
+    block = 24
+    if horizon < block * 2:
+        return None
+    draws = np.empty(n_boot)
+    for i in range(n_boot):
+        draws[i] = _compound(net[_path_indices(len(net), horizon, rng, block)])
+    return float(np.quantile(draws, 0.05)), float(np.quantile(draws, 0.95)), horizon
+
+
+def _path_indices(n: int, horizon: int, rng: np.random.Generator, block: int) -> np.ndarray:
+    starts = rng.integers(0, n - block + 1, size=horizon // block + 1)
+    return np.concatenate([np.arange(start, start + block) for start in starts])[:horizon]
 
 
 def _compound(values: np.ndarray) -> float:
@@ -617,6 +778,11 @@ def _notes(
         f"vol regime splits at the train median {thresholds['vol_median']:.5f}.",
         "The simple rule allocates 1 when 24h momentum is positive and 7d vol is at or below "
         "the train median, and 0 otherwise.",
+        "The label is the next open-to-open return, so the last 2 bars of train and of validation "
+        "are embargoed from the LightGBM fit and calibration. Their labels would otherwise fall inside the next split.",
+        "Expanding walk-forward folds stay inside train. They are a stability check, not a way to pick the sealed-test policy.",
+        "Fee checks resimulate always-on on validation at half, one, and double the assumed cost. The arbiter does not read them.",
+        "Spot venue: funding is zero. News is omitted because this snapshot has no first-seen archive.",
         "The test split is scored inside run_experiment only for the pre-registered "
         "always-on, cash, simple-rule and LightGBM policies. GateRunner.evaluate refuses it.",
         f"Verdict {verdict} comes from the deterministic arbiter in kok_a.arbiter. "

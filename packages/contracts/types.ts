@@ -36,7 +36,7 @@ export type Experiment = {
   windows: { train: string; validation: string; test: string };
   metrics: Metric[]; baselines: Baseline[]; equity: EquityPoint[]; regimes: Regime[];
   evidence: Evidence[]; steps: ResearchStep[]; hypotheses: Hypothesis[];
-  verdict: "CONDITIONAL" | "KEEP" | "KILL" | "MONITOR" | "INCONCLUSIVE";
+  verdict: "CONDITIONAL" | "KEEP" | "KILL" | "REDUCE" | "MONITOR" | "INCONCLUSIVE";
   recommendation: string; limitations: string[];
   policy: { description: string; conditions: string[]; holdout_frozen: boolean; test_evaluated: boolean };
 };

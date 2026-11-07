@@ -139,7 +139,7 @@ export default function ResearchOverview({ experiment, setTab, onEvidence }: { e
   const negativeRegime = [...experiment.regimes].filter(item => item.net_return < 0).sort((a, b) => a.net_return - b.net_return)[0];
   const supportedHypothesis = experiment.hypotheses.find(item => item.status === "supported");
   const unclearHypothesis = experiment.hypotheses.find(item => item.status === "inconclusive");
-  const briefTitle = experiment.verdict === "CONDITIONAL" ? "Promising in the right conditions." : experiment.verdict === "KEEP" ? "This strategy is holding up." : experiment.verdict === "KILL" ? "The strategy is not earning its keep." : experiment.verdict === "MONITOR" ? "Worth watching before changing." : "More evidence is needed before deciding.";
+  const briefTitle = experiment.verdict === "CONDITIONAL" ? "Promising in the right conditions." : experiment.verdict === "KEEP" ? "This strategy is holding up." : experiment.verdict === "KILL" ? "The strategy is not earning its keep." : experiment.verdict === "REDUCE" ? "Cut size where the risk cap allows it." : experiment.verdict === "MONITOR" ? "Worth watching before changing." : "More evidence is needed before deciding.";
   const plainSupportedHypothesis = supportedHypothesis ? displayedHypothesis(supportedHypothesis, experiment.mode) : null;
   const plainUnclearHypothesis = unclearHypothesis ? displayedHypothesis(unclearHypothesis, experiment.mode) : null;
   const worksSummary = positiveRegime ? marketSummary(positiveRegime) : plainSupportedHypothesis ? `${plainSupportedHypothesis.title}: ${plainSupportedHypothesis.finding}` : "No clear strength was recorded in this run.";
@@ -188,7 +188,7 @@ export default function ResearchOverview({ experiment, setTab, onEvidence }: { e
       </article>
 
       <aside className="ro-verdict panel" aria-labelledby="verdict-title">
-        <div className="ro-verdict-head"><span className="eyebrow"><ShieldCheck size={14} />NEXT DECISION</span><span className={`ro-verdict-pill ${experiment.verdict.toLowerCase()}`}>{experiment.mode === "demo" ? "Illustrative only" : experiment.verdict === "CONDITIONAL" ? "Activate conditionally" : experiment.verdict}</span></div>
+        <div className="ro-verdict-head"><span className="eyebrow"><ShieldCheck size={14} />NEXT DECISION</span><span className={`ro-verdict-pill ${experiment.verdict.toLowerCase()}`}>{experiment.mode === "demo" ? "Illustrative only" : experiment.verdict === "CONDITIONAL" ? "Activate conditionally" : experiment.verdict === "REDUCE" ? "Reduce size" : experiment.verdict}</span></div>
         <h2 id="verdict-title">Try a better rule.</h2>
         <p>{decisionCopy}</p>
         <div className="ro-policy"><span className="eyebrow">SUGGESTED CHANGE</span><strong>{experiment.policy.description}</strong>{experiment.policy.conditions.length > 0 && <ul>{experiment.policy.conditions.slice(0, 3).map(condition => <li key={condition}><Check size={13} />{condition}</li>)}</ul>}</div>

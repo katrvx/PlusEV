@@ -70,6 +70,39 @@ class EquityPoint(BaseModel):
     exposure: float
 
 
+class ComparisonPoint(BaseModel):
+    """Equity index of the pre-registered policies. 1.0 is the start, before the first bar's return."""
+
+    decision_time: datetime
+    split: Split
+    base: float
+    rule: float
+    lgbm: float
+    cash: float
+
+
+class WalkForwardFold(BaseModel):
+    """One expanding fold inside the train window. It does not see validation or the sealed test."""
+
+    fold: int
+    n_fit: int
+    n_score: int
+    score_start: datetime
+    score_end: datetime
+    delta_net_return_vs_always_on: float | None = None
+    note: str
+
+
+class FeeCheck(BaseModel):
+    """Always-on validation return at a pre-registered cost multiple. Not used to pick a policy."""
+
+    split: Literal["validation"] = "validation"
+    scale: float
+    fee_bps: float
+    slippage_bps: float
+    net_return: float
+
+
 class ExperimentResult(BaseModel):
     experiment_id: str
     strategy_id: str
@@ -85,6 +118,9 @@ class ExperimentResult(BaseModel):
     missingness: dict[str, dict[str, float]] = Field(default_factory=dict)
     audit_ids: list[str] = Field(default_factory=list)
     equity: list[EquityPoint] = Field(default_factory=list)
+    comparison_equity: list[ComparisonPoint] = Field(default_factory=list)
+    walk_forward: list[WalkForwardFold] = Field(default_factory=list)
+    fee_checks: list[FeeCheck] = Field(default_factory=list)
     provenance: dict[str, str] = Field(default_factory=dict)
     notes: list[str] = Field(default_factory=list)
     decision: Decision | None = None
@@ -138,4 +174,7 @@ class PaperPlan(BaseModel):
     challenger_policy_id: str
     frozen_at_experiment: str
     cost_assumptions: str
+    predictive_range_low: float | None = None
+    predictive_range_high: float | None = None
+    predictive_horizon_bars: int | None = None
     notes: list[str]

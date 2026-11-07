@@ -140,6 +140,7 @@ def build_paper_plan(
     strategy_version: str,
     decision: Decision,
     cost_assumptions: str,
+    predictive_range: tuple[float, float, int] | None = None,
 ) -> PaperPlan:
     challenger = decision.policy_id if decision.policy_id != "always_on" else "simple_rule"
     return PaperPlan(
@@ -150,14 +151,29 @@ def build_paper_plan(
         challenger_policy_id=challenger,
         frozen_at_experiment=experiment_id,
         cost_assumptions=cost_assumptions,
-        notes=[
-            "Recorded plan for a 14-day shadow run. It has not been started and it is not a result.",
-            "approved is false until a person accepts this frozen champion and challenger.",
-            "Retuning either policy after the window starts is a new experiment, not an edit of this plan.",
-            "COMBINE is not offered. This experiment contains one strategy.",
-            f"Arbiter verdict at freeze: {decision.verdict}. Recommended policy: {decision.policy_id}.",
-        ],
+        predictive_range_low=None if predictive_range is None else predictive_range[0],
+        predictive_range_high=None if predictive_range is None else predictive_range[1],
+        predictive_horizon_bars=None if predictive_range is None else predictive_range[2],
+        notes=_plan_notes(decision, predictive_range),
     )
+
+
+def _plan_notes(decision: Decision, predictive_range: tuple[float, float, int] | None) -> list[str]:
+    notes = [
+        "Recorded plan for a 14-day shadow run. It has not been started and it is not a result.",
+        "approved is false until a person accepts this frozen champion and challenger.",
+        "Retuning either policy after the window starts is a new experiment, not an edit of this plan.",
+        "COMBINE is not offered. This experiment contains one strategy.",
+        f"Arbiter verdict at freeze: {decision.verdict}. Recommended policy: {decision.policy_id}.",
+    ]
+    if predictive_range is not None:
+        low, high, horizon = predictive_range
+        notes.append(
+            f"Training-distribution range for a {horizon}-bar path: compounded net return {low:+.3f} to {high:+.3f} "
+            "(5th to 95th percentile of block-bootstrap paths). 336 bars is 14 days of hourly decisions. "
+            "A later paper result inside this range is a plausible draw from the training returns, not by itself evidence the strategy broke."
+        )
+    return notes
 
 
 def _beats_always_on(evaluation: GateEvaluation, always: GateEvaluation) -> bool:

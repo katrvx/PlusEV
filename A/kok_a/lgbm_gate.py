@@ -12,7 +12,15 @@ import numpy as np
 import pandas as pd
 from sklearn.isotonic import IsotonicRegression
 
-DEFAULT_FEATURES = ("momentum_24h", "realized_vol_7d", "volume_zscore", "fear_greed")
+DEFAULT_FEATURES = (
+    "momentum_24h",
+    "momentum_7d",
+    "realized_vol_7d",
+    "atr_14",
+    "price_drawdown",
+    "volume_zscore",
+    "fear_greed",
+)
 LOW, HIGH = 0.45, 0.55
 
 

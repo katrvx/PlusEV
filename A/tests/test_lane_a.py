@@ -435,6 +435,8 @@ def test_agent_view_drops_sealed_test_numbers_and_keeps_the_window(bundle):
     assert all(row.split != "test" for row in view.per_regime)
     assert all(row.split != "test" for row in view.costs)
     assert all(point.split != "test" for point in view.equity)
+    assert all(point.split != "test" for point in view.comparison_equity)
+    assert any(point.split == "test" for point in bundle.result.comparison_equity)
     assert any(row.split == "test" for row in bundle.result.baselines)
     assert bundle.result.decision is not None
 
@@ -451,6 +453,15 @@ def test_experiment_records_an_unstarted_paper_plan(bundle):
     assert plan.champion_policy_id == "always_on"
     assert plan.frozen_at_experiment == bundle.result.experiment_id
     assert "not a result" in " ".join(plan.notes)
+    assert plan.predictive_range_low is not None and plan.predictive_range_high is not None
+    assert plan.predictive_range_low < plan.predictive_range_high
+    assert plan.predictive_horizon_bars == 14 * 24
+    scored = [fold for fold in bundle.result.walk_forward if fold.delta_net_return_vs_always_on is not None]
+    assert scored and all("sealed-test" in fold.note for fold in scored)
+    assert {check.scale for check in bundle.result.fee_checks} == {0.5, 1.0, 2.0}
+    assert bundle.result.coverage["atr_14"] == 1.0
+    assert bundle.result.coverage["momentum_7d"] == 1.0
+    assert bundle.result.coverage["price_drawdown"] == 1.0
     rule = next(row for row in bundle.result.baselines if row.policy == "simple_rule" and row.split == "test")
     assert rule.metrics.cvar_05 is not None
     assert rule.metrics.avg_holding_bars is not None

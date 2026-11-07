@@ -2,6 +2,8 @@
 
 Recorded while putting current `main` (Lane B), `lane-c` (the API and web app), and Lane A on one branch. The spec in `KEEP_OR_KILL_PROJECT_SPEC.md` still wins if this note disagrees with it.
 
+Lane A now also carries the spec items that were still open on this lane: 7-day momentum, 14-bar ATR, and trailing price drawdown; a 2-bar embargo on the LightGBM fit; expanding walk-forward folds inside train; a training-distribution range for a 14-day path on the unstarted paper plan; and validation fee checks at half and double cost. News stays omitted because the snapshot has no first-seen archive. Funding stays zero because the venue is spot. The screen can show `REDUCE` as its own verdict. `ACTIVATE CONDITIONALLY` is still stored as `CONDITIONAL`, which is the word the UI already uses.
+
 ## Which Lane B
 
 The agents, tools, and contracts are the ones on current `main`. The earlier local copies of `investigate.py` and `tools.py` were not kept.
