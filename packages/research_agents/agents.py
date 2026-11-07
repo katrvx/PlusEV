@@ -51,7 +51,8 @@ def _run(agent: Agent, prompt: str, ctx: ToolContext, stage: str):
     result = agent.run_sync(prompt, deps=ctx, timeout=STAGE_TIMEOUT_S,
                             usage_limits=UsageLimits(request_limit=MAX_REQUESTS),
                             model_settings={"timeout": REQUEST_TIMEOUT_S, "temperature": 0.2})
-    u = result.usage() if callable(getattr(result, "usage", None)) else None
+    u = getattr(result, "usage", None)
+    u = u() if callable(u) else u
     _log(f"{stage}: done in {time.monotonic() - t0:.0f}s" + (f", {u.requests} requests, {u.total_tokens} tokens" if u else ""))
     return result.output
 
@@ -69,7 +70,8 @@ def model_name(model) -> str | None:
 # ------------------------------------------------------------------ claim verification (shared with fallback)
 
 NUM_RE = re.compile(r"(?<![A-Za-z_\d.])[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?%?(?![A-Za-z_\d])")
-TRIVIAL = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 90, 95, 100}
+TRIVIAL = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 100}
+CI_LEVEL = 90   # every interval Lane A reports is a 90% block-bootstrap CI
 
 
 def _evidence_numbers(obj, out: list[float]) -> list[float]:
@@ -99,6 +101,8 @@ def unsupported_numbers(text: str, payloads: list[dict]) -> list[str]:
             continue
         val = float(d)
         if not pct and val == int(val) and abs(val) in TRIVIAL:
+            continue
+        if pct and val == CI_LEVEL:
             continue
         tol = 0.5 * 10 ** d.as_tuple().exponent
         targets = [val / 100] if pct else [val, val / 100, val / 1e4]
