@@ -1,0 +1,23 @@
+# env / secrets
+.env
+*.key
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+
+# data (pulled, cached) — manifests are committed, raw data is not
+data/raw/
+data/parquet/
+*.parquet
+!docs/**
+
+# node
+node_modules/
+dist/
+
+# eval outputs are committed on purpose (eval/results/)
