@@ -1,113 +1,120 @@
-# +EV
+# Keep or Kill
 
-> **+EV** = positive expected value: the only reason to keep a trading bot running. We tell you whether yours still is.
+**Don't rewrite the strategy. Discover when to trust it.**
 
-**Before you run a trading bot, we show you where it works. While it runs, we tell you whether it's broken or just in bad weather, and how long until you'd know.**
+AgentVerse 2026 · Finance track (supported by Jane Street) · UCL · 7–8 November 2026 · repo: +EV
 
-AgentVerse 2026 · Finance Track (supported by Jane Street) · 7–8 November 2026 · UCL
+> Keep or Kill is an AI-powered research supervisor for trading strategies. It uses historical market regimes, sentiment and news to discover **when** an existing strategy has an edge, then independently tests whether activating or disabling it under those conditions actually improves risk-adjusted returns on unseen data.
+
+Hackathon MVP. Paper-only. Not a claim of validated alpha.
 
 ---
 
 ## The problem
 
-Algo traders don't know *when* their bot works. When it loses money they can't tell whether it's broken or just in bad conditions, so they kill good bots and keep dead ones. This is the single most-asked question on r/algotrading in 2026 ("how many live trades before I trust it?") and the answers range from "fifty" to "a thousand" to "go by feel". One team that tracked its own manual interventions found 8 of 11 made things worse.
+A backtest gives you a Sharpe ratio, not an answer to the questions that decide whether a strategy keeps its capital. Traders routinely confuse three situations:
 
-Existing tools solve half of it each:
+1. **Unlucky:** a valid strategy in a plausible drawdown.
+2. **Condition-dependent:** it works in identifiable market conditions and fails in others.
+3. **Broken:** the edge is gone, the backtest was flawed, or costs ate it.
 
-| Tools | Know the market | Know your bot | Say *why* | Say *how long until you know* |
-|---|---|---|---|---|
-| Regime APIs (getregime, TradingView scripts) | ✅ | ❌ | ❌ | ❌ |
-| Drift monitors (Algo Studio, AlgoTradingHub) | ❌ | ✅ | ❌ | ❌ |
-| **+EV** | ✅ | ✅ | ✅ | ✅ |
+An aggregate return chart can't tell these apart, and building point-in-time regime gates by hand is slow and easy to overfit.
 
-Regime tools tell you what the market is doing. Drift tools tell you your bot changed. +EV is the first to put your bot and the market in the same table.
+**User:** an independent systematic trader or small quant team running 2–10 strategies.
+**Decision:** keep, activate only in some conditions, reduce, combine, monitor, kill, or *inconclusive*.
 
-## What it does
+## How it works
 
-One data model: **every trade (backtest or live) tagged with the regime it happened in** (volatility, trend, liquidity, scheduled event, LLM-read news sentiment). Two views on it:
+1. **Import** an existing strategy's timestamped target positions. The strategy is **immutable**: we never change its signals.
+2. **Reconstruct context** at every decision: trend, volatility, volume, funding, sentiment, news, all **point-in-time** (`data_max_available_at <= decision_time`).
+3. **Diagnose** where it works and fails: regime heatmaps with counts, costs and uncertainty.
+4. **Investigate** with AI agents that propose falsifiable hypotheses, call allowlisted tools, and cite **evidence IDs** from real tool output.
+5. **Propose a supervisory gate** (allocation multiplier 0 / 0.5 / 1 on top of the unchanged signals), from an allowlisted family only.
+6. **Challenge it** against always-on, cash, a simple rule and a LightGBM gate, with next-bar fills, fees, slippage and switching costs, on a **sealed chronological holdout** tested once.
+7. **Decide:** KEEP / ACTIVATE CONDITIONALLY / REDUCE / COMBINE / MONITOR / KILL / **INCONCLUSIVE**, with hard risk checks a deterministic arbiter applies (not an LLM).
+8. **Paper-test:** freeze champion vs challenger for a 14-day shadow run. Recorded as a plan, never presented as a completed result.
 
-**1. X-ray** — before you trust it. Backtest trades → heatmap of where the bot makes and loses money → the bot's *operating envelope*, validated out-of-sample with multiple-testing correction. *"Works in calm, mildly bullish, no-event days. Dies in the two days around rate decisions."*
+**Agents propose and explain; deterministic code computes every number and makes every decision.**
 
-**2. Kill or Keep** — while it runs. Live trades → three answers:
-- Is this drawdown within what the backtest implied?
-- If not: is it **execution** (costs rose), **signal** (edge faded), or **regime** (the market is in weather the backtest barely saw)?
-- **How many more trades until we know**, with an interval.
-
-Plus an **Override Ledger**: every manual intervention logged and scored afterwards.
-
-## How the agents fit (and why they never decide)
-
-A swarm of agents with different lenses (volatility, macro, sentiment, liquidity, devil's advocate) **proposes** regime hypotheses *before seeing any P&L*. Parallel agents **label** headlines (anonymised, to block memorisation). Agents **explain** verdicts in plain language. **One frozen, deterministic judge decides everything**: tests every hypothesis, corrects for the total number tried, confirms survivors on a sealed held-out window, runs the sequential test for live decay. The LLM has zero power over any number in the output.
-
-This split isn't a hedge, it's the thesis. Three papers published in the last eight weeks show that LLM research agents claim predictability in no-signal worlds 34–44% of the time *when allowed to judge*. We let them do what they're good at and keep them away from the verdict. See [docs/06-agents-and-swarm.md](docs/06-agents-and-swarm.md).
-
-## How we prove it works
-
-We run strategies with **planted truth** on real price history: one with a live edge, one that is pure noise, one whose edge dies at a known time *T*. +EV sees only the trade stream. We measure how much earlier it catches dead bots and how much less often it kills live ones than the "stop at 20% drawdown" rule traders actually use, and whether the X-ray's green regimes stay green out-of-sample after costs. Honest result either way. See [docs/07-evaluation-protocol.md](docs/07-evaluation-protocol.md).
+```text
+existing strategy (immutable) ─► import / validate / hash
+                                        │
+                  market OHLCV ─────────┼───────── sentiment / news (as-of)
+                                        ▼
+                         point-in-time feature store
+                         ┌──────────────┴──────────────┐
+                    quant evaluator               research agents
+                  (regimes, stats, sims)     (diagnose, propose, critique)
+                         └──────────────┬──────────────┘
+                                        ▼
+                 gate candidates: always-on · rule · LightGBM · agent
+                                        ▼
+                  sealed-holdout champion / challenger, after costs
+                                        ▼
+                   decision report + human approval ─► 14-day paper plan
+```
 
 ## Docs
 
-| # | Doc | What's in it |
-|---|---|---|
-| 01 | [Problem and user](docs/01-problem-and-user.md) | Who it's for, the decision they get wrong, evidence from forums |
-| 02 | [Architecture](docs/02-architecture.md) | Components, data flow, what's code vs. what's LLM |
-| 03 | [Tech stack](docs/03-tech-stack.md) | Every library, why it, version, licence |
-| 04 | [Regime engine](docs/04-regime-engine.md) | Regime definitions, pre-registration, no-look-ahead rules |
-| 05 | [Judge and statistics](docs/05-judge-and-stats.md) | The maths: conditional P&L, OOS validation, drift, decomposition, "N more trades", sequential retirement |
-| 06 | [Agents and swarm](docs/06-agents-and-swarm.md) | ADK design, schemas, anonymisation, memorisation guard |
-| 07 | [Evaluation protocol](docs/07-evaluation-protocol.md) | Planted truth, metrics, benchmarks, sealed holdout |
-| 08 | [Risk controls and audit log](docs/08-risk-controls-and-audit-log.md) | Limits in code, hash-chained log, the control shown live |
-| 09 | [Data sources](docs/09-data-sources.md) | Every dataset with licence |
-| 10 | [Build plan](docs/10-build-plan.md) | Hour-by-hour, roles, scope guards |
-| 11 | [Demo and pitch](docs/11-demo-and-pitch.md) | Deck outline mapped to the rubric, 90-second demo script |
-| 12 | [References](docs/12-references.md) | Papers, products, threads |
+| Doc | What |
+|---|---|
+| [`KEEP_OR_KILL_PROJECT_SPEC.md`](KEEP_OR_KILL_PROJECT_SPEC.md) | **Authoritative spec**: idea, maths, data rules, evaluation, agents, API, risk, demo script |
+| [`KEEP_OR_KILL_AGENTS.md`](KEEP_OR_KILL_AGENTS.md) | Handoff brief for the three lanes, shared contracts, collaboration rules, definition of done |
+| [`LANE_B.md`](https://github.com/katrvx/PlusEV/blob/lane-b/LANE_B.md) (branch `lane-b`) | What Lane B built, its interface, guardrails, and what it needs from Lane A |
+| [`archive/`](archive/) | Earlier +EV design notes, kept for reference only |
 
-## Judging rubric → where we score
+## Team and lanes
 
-| Criterion | Weight | +EV |
-|---|---|---|
-| Traceable reasoning | 25% | Every verdict is a chain: raw prices → regime tags (code) → conditional stats (code) → explanation (LLM, quoting the numbers). Hash-chained log. |
-| Testing on unseen data | 25% | Planted-truth strategies, sealed held-out window, real costs, bootstrap intervals, benchmark = the rules traders use today. |
-| Risk controls and oversight | 15% | Size cap and pause enforced in code, human confirms resumption, doubling-down blocked. Shown live. |
-| Relevance and impact | 20% | A named user (retail/small-fund algo trader), the failure on screen: killing a live bot in a bad week. |
-| Ambition and technical quality | 15% | Strategy-conditional regime analysis + anytime-valid sequential decay detection + LLM swarm under a frozen judge. |
+| Lane | Owns | Output interface | Status |
+|---|---|---|---|
+| **A · Quant / Data** | `packages/ingestion`, `feature_store`, `strategies`, `quant`, `evaluation` | `run_experiment(strategy_id, dataset_snapshot_id, policy_spec) -> ExperimentResult` | in progress |
+| **B · Agents / Context** (Kate) | `packages/research_agents`, `meta_policy`, news enrichment | `investigate(experiment_id) -> InvestigationReport` | first version on branch [`lane-b`](https://github.com/katrvx/PlusEV/tree/lane-b): agents, 4 allowlisted tools, evidence store, rule + LightGBM gates, 14 guardrail tests; runs on a labelled synthetic Lane A stand-in |
+| **C · API / UI / Demo** | `apps/api`, `apps/web`, docs, paper-run interface | consumes `ExperimentResult` + `InvestigationReport` | in progress |
 
-## MVP: run it
+Work on branches per lane; don't edit another lane's directories without coordinating. Freeze shared Pydantic contracts before integrating.
 
-Needs Python 3.10+ and the organisers' `agentverse/` kit folder in the repo root (not committed).
+## Target layout
 
-```bash
-pip install -r requirements.txt
-K=agentverse/finance/bench.py
-python3 $K generate --pack markets --cases 600 --seed 101 --output data/kit-train
-python3 $K generate --pack markets --cases 200 --seed 202 --output data/kit-dev
-python3 $K generate --pack markets --cases 200 --seed 303 --output data/kit-holdout
-python3 scripts/build.py        # regimes -> trades -> X-ray envelopes -> dev comparison -> Kill-or-Keep demo
-python3 scripts/kit_check.py    # our simulator vs the organisers' runner, to the penny
-streamlit run app/streamlit_app.py
+```text
+apps/api            FastAPI routes                       (C)
+apps/web            Next.js UI                           (C)
+packages/contracts  shared Pydantic schemas              (all, frozen first)
+packages/ingestion, feature_store, strategies, quant, evaluation   (A)
+packages/research_agents, meta_policy                    (B)
+packages/paper      paper-only shadow runner             (C)
+data/fixtures       tiny reproducible sample
+experiments/        run manifests, hashes, outputs
+tests/              no-future-data, execution lag, switching costs, holdout isolation, baselines
 ```
 
-Real Binance paths instead of synthetic (needs internet on your own machine):
-`python3 $K fetch --cases 400 --seed 101 --output data/real-train` (same for dev/holdout with other seeds), then
-`python3 scripts/build.py --train data/real-train --dev data/real-dev --holdout data/real-holdout --label "real Binance practice paths"`.
+The repo root also still holds the earlier prototype (`plusev/`, `app/`, `scripts/build.py`, `scripts/paired_challenge.py`, `eval/`): regime tagging, a kit-exact simulator and a governor tested in the organisers' challenge mode. Reusable for Lane A; see [`archive/`](archive/).
 
-Hidden test with the organisers' bench:
-`python3 $K challenge --pack real-markets --cases 300 --project . --output eval/challenge/governed --adapter python3 -m plusev.adapter --strategy trend --mode governed`
+## Run (Lane B, from branch `lane-b`)
 
-| Path | What |
-|---|---|
-| `plusev/regime.py` | volatility / shock / trend labels from past prices only |
-| `plusev/strategies.py` | three simple base bots |
-| `plusev/execution.py` | the kit's fill rules, re-implemented; trades tagged with regime |
-| `plusev/judge.py` | X-ray (bootstrap, BH, sealed holdout) and Kill or Keep (drawdown percentile, e-processes) |
-| `plusev/governor.py` | blocks entries / exits in confirmed red regimes |
-| `plusev/adapter.py` | JSONL adapter for `bench.py run / challenge / live` |
-| `app/streamlit_app.py` | the demo |
+```bash
+git checkout lane-b
+pip install -r requirements-lane-b.txt
+python3 -m pytest -q tests/test_lane_b.py           # 14 guardrail tests
+python3 scripts/run_investigation.py --fallback      # deterministic agents -> experiments/investigation_fixture.json
+KOK_AGENT_MODEL=<pydantic-ai model string> python3 scripts/run_investigation.py   # LLM agents
+```
 
-## Team
+## How this maps to the judging rubric
 
-Kate Baitaliuk (lead) and team · AgentVerse 2026
+| Criterion | Weight | Where |
+|---|---:|---|
+| Traceable reasoning | 25% | evidence IDs on every claim, tool-call log, dataset hashes, policy rationale |
+| Testing on unseen data | 25% | sealed chronological holdout tested once, fair baselines, costs, uncertainty, negative results shown |
+| Relevance and impact | 20% | a real capital-allocation decision for systematic traders |
+| Risk controls and oversight | 15% | paper-only, hard limits, deterministic arbiter, human approval, INCONCLUSIVE allowed |
+| Ambition and technical quality | 15% | regime-aware evaluation, agent-assisted meta-policy, LightGBM gate, news as point-in-time context |
+
+Judges' key question: *does the agent add measurable value beyond a simple regime filter?* We answer it by running the same holdout with and without the agent layer and reporting the result either way.
+
+## Data and licences
+
+Binance Vision public data (CC BY-NC-SA 4.0, attribute "Binance Vision"); Alternative.me Fear & Greed (attribution required); news only with source URL, first-seen timestamp and content hash. No real accounts, keys, orders or personal financial data.
 
 ## Licence
 
-MIT. Data licences are listed per source in [docs/09-data-sources.md](docs/09-data-sources.md); some market data is non-commercial only.
+MIT.
