@@ -66,11 +66,13 @@ KOK_AGENT_MODEL=google:gemini-4-argon GEMINI_API_KEY=... python3 scripts/run_inv
 
 `load_for_lane_b` returns train and validation metrics only. `GateRunner.evaluate` refuses `test`. `--frozen` is the one sealed look, and only for the champion the arbiter accepted. The simple-rule competitor is Lane A's own rule when the loader provides `runner.rule_spec` (flat when the condition fails). The arbiter scores it directly, so the fixed momentum threshold of `0` does not have to sit on the agent quantile grid. Lane A's train-selected regime filter (`runner.regime_spec`) is a third competitor. Each agent gate's reasons show its validation delta against that filter, and the verdict basis states the filter's own result. Like the simple rule, the filter is a reference and not a veto, because the selection rule was registered before any run.
 
+Walk-forward: every agent gate and competitor is also scored with Lane A's `GateRunner.evaluate_folds`. It uses the same three expanding train folds and the same 2-bar embargo as Lane A's LightGBM walk-forward. Each fold is logged in the trial log (note `walk-forward fold k`, split `train`) and stored as evidence the critic can cite. The candidate reasons show "beats always-on on k/3". The fallback critic flags a gate that wins on fewer than half the folds. Thresholds come from quantiles of the whole train window, so the folds are a stability check over train sub-periods, not unseen data, and they do not change the pre-registered selection. The fitted LightGBM has seen all of train (fit plus calibration), so it is not re-scored on the folds. Its line uses Lane A's own walk-forward, which refits the model before each fold (on real data: 0/3).
+
 ## Run
 
 ```bash
 pip install "pydantic-ai-slim[google]" lightgbm scikit-learn pandas numpy pytest
-python3 -m pytest -q tests/test_lane_b.py          # 80 guardrail + regression tests
+python3 -m pytest -q tests/test_lane_b.py          # 83 guardrail + regression tests
 python3 scripts/run_investigation.py --fallback     # deterministic agents
 KOK_AGENT_MODEL=google:gemini-3.8-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
 ```

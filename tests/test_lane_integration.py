@@ -46,3 +46,13 @@ def test_fallback_investigation_uses_lane_a_and_leaves_the_holdout_sealed():
 def test_unknown_experiment_id_is_rejected():
     with pytest.raises(KeyError):
         load_for_lane_b("fixture")
+
+
+def test_lane_b_scores_gates_on_lane_a_train_folds_and_keeps_lightgbm_out_of_sample():
+    from packages.research_agents.tools import is_fold
+    loaded = load_for_lane_b(SNAPSHOT_SYNTHETIC)
+    report = investigate(SNAPSHOT_SYNTHETIC, loader=lambda _experiment_id: loaded, force_fallback=True)
+    folds = [trial for trial in report.trial_log if is_fold(trial)]
+    assert folds and all(trial.split == "train" for trial in folds)
+    assert not any(trial.source == "meta_model" for trial in folds)
+    assert report.holdout_accessed is False

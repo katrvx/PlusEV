@@ -182,6 +182,8 @@ CRITIC_INSTRUCTIONS = """You are an independent critic. For each proposed gate, 
 trials, effects only in train, validation contradicting train), fragile sample sizes, a gate that is almost always on or off
 (see allocation_mix), and counterexamples. Use trial_log (it includes the arbiter's validation runs) and lookup_evidence.
 Critique every proposal exactly once and cite that gate's own evaluation evidence id. You cannot change thresholds.
+trial_log also holds the arbiter's walk-forward runs (note 'walk-forward fold k'): the same gate on later TRAIN sub-periods.
+Use them to check whether an effect is stable over time; thresholds were chosen on all of train, so they are not unseen data.
 All confidence intervals are 90%. Put only issues that should BLOCK the frozen test in fragile_samples; non-blocking
 remarks go in observations. Verdict 'approve_for_frozen_test' only if the validation evidence supports it.
 Numbers: copy them from the cited tool output and round to 3-4 significant digits (0.3043, -3.54e-05, 5.15%);

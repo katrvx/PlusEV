@@ -33,6 +33,13 @@ from .models import TrialRecord
 from .news import NewsStore, as_utc
 
 
+FOLD_NOTE = "walk-forward fold"   # TrialRecord.note prefix for arbiter fold runs (split "train")
+
+
+def is_fold(trial) -> bool:
+    return str(getattr(trial, "note", "")).startswith(FOLD_NOTE)
+
+
 class HoldoutAccessError(PermissionError):
     pass
 
@@ -264,6 +271,34 @@ class ToolContext:
                   status="error" if late else "evaluated",
                   note="abandoned: finished after its agent stage had ended (timeout); disclosed, not used" if late else "")
         return {"evidence_id": eid, **payload}
+
+    def arbiter_folds(self, policy_spec: dict, source: str = "arbiter") -> list[dict]:
+        """CODE path (never exposed to agents): score a frozen spec on Lane A's expanding TRAIN folds.
+
+        Uses GateRunner.evaluate_folds when the loader provides it (Lane A does; the stand-in does not).
+        Gate thresholds are quantiles of the whole train window, so folds are a stability check over
+        train sub-periods, not unseen data. Every fold is logged and stored as citable evidence."""
+        fn = getattr(self.gate_runner, "evaluate_folds", None)
+        if fn is None:
+            return []
+        pid, h = str(policy_spec.get("policy_id", "unnamed")), spec_hash(policy_spec)
+        try:
+            evs = fn(policy_spec)
+        except Exception as exc:      # noqa: BLE001 - logged, never silently dropped
+            self._log(policy_id=pid, spec_hash=h, source=source, split="train", delta_net_return_vs_always_on=None,
+                      ci_delta=None, evidence_id=None, status="error", note=f"{FOLD_NOTE}s failed: {type(exc).__name__}: {exc}")
+            return []
+        out = []
+        for ev in evs:
+            k = getattr(ev, "fold", None)
+            payload = {"policy_spec": policy_spec, "spec_hash": h, "fold": k, "evaluation": ev.model_dump()}
+            eid = self.store.add("walk_forward_fold", {"spec_hash": h, "fold": k}, payload)
+            self._log(policy_id=pid, spec_hash=h, source=source, split="train",
+                      delta_net_return_vs_always_on=ev.delta_net_return_vs_always_on, ci_delta=ev.ci_delta,
+                      net_return=ev.metrics.net_return, allocation_mix=ev.allocation_mix, evidence_id=eid,
+                      status="evaluated", note=f"{FOLD_NOTE} {k} (train sub-period; stability check, not unseen data)")
+            out.append({"evidence_id": eid, **payload})
+        return out
 
     def feature_grid(self) -> dict:
         """Allowed thresholds (training-quantile grid) per allowlisted feature, with coverage."""

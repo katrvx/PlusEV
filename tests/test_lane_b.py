@@ -352,7 +352,7 @@ def test_llm_failure_falls_back_and_is_disclosed():
 import math  # noqa: E402
 import time as _time  # noqa: E402
 
-from packages.research_agents.verify import unsupported_numbers, verify_proposals  # noqa: E402
+from packages.research_agents.verify import unsupported_numbers, verify_critiques, verify_proposals  # noqa: E402
 from packages.research_agents.tools import spec_hash  # noqa: E402
 
 
@@ -598,3 +598,56 @@ def test_lane_a_regime_filter_is_a_competitor_and_a_reference_for_agent_gates():
     assert any("Lane A: flat in the top vol tercile" in r for r in comp.reasons)
     assert any("regime filter" in b for b in rep.verdict_basis)
     assert any(t.policy_id == "rule::regime_filter" and t.split == "validation" for t in rep.trial_log)
+
+
+# ------------------------------------------------------------------ walk-forward folds (Lane A GateRunner.evaluate_folds)
+
+class _WithFolds:
+    """Stand-in runner plus evaluate_folds; fold deltas are scripted so stability can be tested."""
+
+    def __init__(self, inner, deltas=(0.01, -0.02, -0.03)):
+        self._inner, self.deltas, self.calls = inner, deltas, []
+
+    def evaluate_folds(self, spec):
+        self.calls.append(spec["policy_id"])
+        base = self._inner.evaluate(spec, "train")
+        return [base.model_copy(update={"fold": k, "delta_net_return_vs_always_on": d}) for k, d in enumerate(self.deltas, 1)]
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+
+def test_folds_are_logged_as_train_evidence_and_reported_without_touching_the_holdout():
+    from packages.research_agents.tools import is_fold
+    exp, runner, tq, _df, lgbm = _built()
+    wf = _WithFolds(runner)
+    rep = investigate("x", model=None, loader=lambda _: (exp, wf, tq, None, lgbm))
+    folds = [t for t in rep.trial_log if is_fold(t)]
+    assert folds and all(t.split == "train" and t.source != "agent" and t.evidence_id for t in folds)
+    assert "meta::lgbm_gate_v1" not in wf.calls          # fitted on all of train -> folds would be in-sample
+    rule = next(c for c in rep.candidates if c.source == "rule_baseline")
+    assert any("beats always-on on 1/3" in r for r in rule.reasons)
+    assert any(l.startswith("Walk-forward: every agent gate") for l in rep.limitations)
+    assert not rep.holdout_accessed
+
+
+def test_fallback_critic_flags_gates_that_are_unstable_across_folds_and_ignores_folds_as_the_train_run():
+    from packages.research_agents import fallback
+    ctx = make_ctx()
+    ctx.gate_runner = _WithFolds(ctx.gate_runner, deltas=(-0.01, -0.02, 0.03))
+    spec = gate(ctx, pid="agent::P1")
+    p = GateProposal(proposal_id="P1", based_on=["H1"], conditions=[ThresholdCondition(**spec["conditions"][0])],
+                     allocation_when_true=0.0, allocation_when_false=1.0, rationale="r",
+                     evidence_ids=[ctx.feature_grid()["evidence_id"]],
+                     falsification_test="reject if the validation delta is not positive")
+    ps = ProposalSet(proposals=[p])
+    ctx.arbiter_folds(p.to_policy_spec())                  # folds first: must not be mistaken for the train run
+    ctx.arbiter_evaluate(p.to_policy_spec(), "validation")
+    c = fallback.critique(ctx, ps).critiques[0]
+    assert any("1 of 3 walk-forward train folds" in r for r in c.overfit_risks)
+    assert not [x for x in verify_critiques(ctx, fallback.critique(ctx, ps), ps) if "not copied" in x]
+
+
+def test_runner_without_folds_is_disclosed():
+    rep = investigate("x", model=None, loader=fixture_loader)
+    assert any("no GateRunner.evaluate_folds" in l for l in rep.limitations)

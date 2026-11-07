@@ -7,7 +7,7 @@ agents must at least match. Like the agents, it reads TRAIN data only.
 from __future__ import annotations
 
 from .models import Critique, CritiqueSet, DiagnosticReport, GateProposal, Hypothesis, ProposalSet, ThresholdCondition
-from .tools import ToolContext, spec_hash
+from .tools import ToolContext, is_fold, spec_hash
 
 MIN_TRADES = 20
 DEGENERATE_SHARE = 0.95   # a gate that keeps one multiplier on >= 95% of decisions is barely a gate
@@ -91,7 +91,10 @@ def critique(ctx: ToolContext, proposals: ProposalSet) -> CritiqueSet:
     out = []
     for p in proposals.proposals:
         h = spec_hash(p.to_policy_spec())
-        train = next((t for t in ctx.trials if t.spec_hash == h and t.split == "train" and t.status == "evaluated"), None)
+        train = next((t for t in ctx.trials if t.spec_hash == h and t.split == "train" and t.status == "evaluated"
+                      and not is_fold(t)), None)
+        folds = [t for t in ctx.trials if t.spec_hash == h and is_fold(t) and t.status == "evaluated"
+                 and t.delta_net_return_vs_always_on is not None]
         val = next((t for t in ctx.trials if t.spec_hash == h and t.split == "validation" and t.status == "evaluated"), None)
         risks, fragile, counter, evs = [], [], [], []
         for t in (train, val):
@@ -110,6 +113,11 @@ def critique(ctx: ToolContext, proposals: ProposalSet) -> CritiqueSet:
             obs = []
             if val.ci_delta and val.ci_delta[0] <= 0:
                 obs.append("validation improvement CI includes zero")
+            if folds:
+                wins = sum(t.delta_net_return_vs_always_on > 0 for t in folds)
+                if 2 * wins < len(folds):
+                    risks.append(f"beats always-on on only {wins} of {len(folds)} walk-forward train folds: unstable over time")
+                evs.append(folds[-1].evidence_id)
             if ctx.agent_tests_used() > 6:
                 risks.append("many agent train tests (see trial log): multiple-comparison risk")
             verdict = "approve_for_frozen_test" if (val.delta_net_return_vs_always_on or 0) > 0 and not fragile and not counter else "reject"

@@ -5,7 +5,8 @@ Flow:
   2. gate proposer     -> allowlisted gates, tested on TRAIN only (own budget, every attempt logged)
   3. arbiter (code)    -> evaluates every proposal on VALIDATION, plus competitors under identical conditions:
                           the simple rule baseline, the LightGBM gate and (when the loader has one) Lane A's
-                          train-selected regime filter; always-on and cash are the references
+                          train-selected regime filter; always-on and cash are the references.
+                          Then all of them on Lane A's expanding TRAIN folds (stability check, not a veto)
   4. critic agent      -> reviews each gate against its own train + validation evidence
   5. arbiter (code)    -> PRE-REGISTERED RULE (written before any run):
        an agent proposal is ELIGIBLE iff, on validation,
@@ -115,6 +116,28 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
         ctx.arbiter_evaluate(regime, "validation", source="rule_baseline")
         competitors.append(("rule_baseline", regime))
 
+    # 3b. walk-forward: the same frozen specs on Lane A's expanding TRAIN folds (stability, not unseen data)
+    # The fitted LightGBM saw all of train (fit + calibration), so scoring it on train folds is in-sample.
+    # For it we report Lane A's own walk-forward, which refits the model before each fold.
+    fold_runs, refit_folds = {}, {}
+    for src, spec in [("arbiter", p.to_policy_spec()) for p in proposals.proposals] + competitors:
+        if src == "meta_model":
+            refit_folds[spec_hash(spec)] = [w.delta_net_return_vs_always_on for w in getattr(exp, "walk_forward", []) or []]
+        else:
+            fold_runs[spec_hash(spec)] = ctx.arbiter_folds(spec, source=src)
+
+    def fold_line(spec):
+        h = spec_hash(spec)
+        refit = h in refit_folds
+        deltas = refit_folds[h] if refit else [f["evaluation"]["delta_net_return_vs_always_on"] for f in fold_runs.get(h, [])]
+        deltas = [d for d in deltas if _finite(d)]
+        if not deltas:
+            return None
+        wins = sum(d > 0 for d in deltas)
+        what = "Lane A refit walk-forward (model refit before each train fold)" if refit else "walk-forward on train folds"
+        return (f"{what}: beats always-on on {wins}/{len(deltas)} "
+                f"({', '.join(f'{d:+.4f}' for d in deltas)}); stability check, not a veto")
+
     def val_trial(spec):
         h = spec_hash(spec)
         return next((t for t in ctx.trials if t.spec_hash == h and t.split == "validation" and t.status == "evaluated"), None)
@@ -163,6 +186,9 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
                     reasons.append("validation CI includes zero; the frozen test decides")
                 if _finite(regime_delta):
                     reasons.append(f"vs Lane A regime filter on validation: {d - regime_delta:+.4f} (reference, not a veto)")
+        fl = fold_line(spec)
+        if fl:
+            reasons.append(fl)
             if mix and max(mix.values()) >= DEGENERATE_SHARE:
                 eligible = False
                 reasons.append(f"degenerate: one multiplier on {max(mix.values()):.0%} of in-position validation decisions")
@@ -205,6 +231,9 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
                 reasons.append(f"degenerate: one multiplier on {max(t.allocation_mix.values()):.0%} of in-position validation decisions")
         else:
             reasons.append("validation evaluation failed or not finite")
+        fl = fold_line(spec)
+        if fl:
+            reasons.append(fl)
         if spec.get("summary"):
             reasons.append(f"Lane A: {spec['summary']}")
         candidates.append(PolicyCandidate(
@@ -243,6 +272,10 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
         f"{len(agent_specs)} distinct agent gate specs attempted ({ctx.agent_tests_used()} agent train tests logged, refused ones included); "
         f"{len(all_specs)} distinct policies evaluated in total. Multiple-comparison risk applies to train and validation results.",
         "The critic can veto a proposal (part of the pre-registered rule); the critic sees validation results.",
+        ("Walk-forward: every agent gate and competitor is also scored on Lane A's expanding train folds (same windows and "
+         "2-bar embargo as the LightGBM walk-forward). Thresholds come from quantiles of the whole train window, so the folds "
+         "are a stability check across train sub-periods, not unseen data, and they do not change the pre-registered selection."
+         if any(fold_runs.values()) else "Walk-forward: the loader has no GateRunner.evaluate_folds, so no fold stability check was run."),
         "Regime effects are associations under lagged features, not causal.",
         "Returns convention: compounded simple returns after costs everywhere (Lane A contract); deltas and CIs use the same convention.",
         "The verdict only says whether an agent gate earned one sealed look; Lane A's arbiter makes the strategy decision.",

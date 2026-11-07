@@ -104,6 +104,7 @@ class GateEvaluation(BaseModel):
     allocation_mix: dict[str, float] = Field(default_factory=dict)   # share of in-position bars at 0 / 0.5 / 1
     n_decisions: int = 0                                             # every bar in the split
     n_in_position: int = 0                                           # bars where the strategy wants exposure; denominator of allocation_mix
+    fold: int | None = None                                          # set by GateRunner.evaluate_folds (expanding train folds)
     audit_id: str
 
 
