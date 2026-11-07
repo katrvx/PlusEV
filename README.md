@@ -67,7 +67,7 @@ existing strategy (immutable) ─► import / validate / hash
 
 | Lane | Owns | Output interface | Status |
 |---|---|---|---|
-| **A · Quant / Data** | `packages/ingestion`, `feature_store`, `strategies`, `quant`, `evaluation` | `run_experiment(strategy_id, dataset_snapshot_id, policy_spec) -> ExperimentResult` | in progress |
+| **A · Quant / Data** | `A/` on this branch (target layout was `packages/ingestion`, `feature_store`, `strategies`, `quant`, `evaluation`) | `run_experiment(...) -> ExperimentResult`, including a deterministic verdict and a recorded 14-day plan | branch `a` |
 | **B · Agents / Context** (Kate) | `packages/research_agents`, `meta_policy`, news enrichment | `investigate(experiment_id) -> InvestigationReport` | first version on branch [`lane-b`](https://github.com/katrvx/PlusEV/tree/lane-b): agents, 4 allowlisted tools, evidence store, rule + LightGBM gates, 14 guardrail tests; runs on a labelled synthetic Lane A stand-in |
 | **C · API / UI / Demo** | `apps/api`, `apps/web`, docs, paper-run interface | consumes `ExperimentResult` + `InvestigationReport` | in progress |
 
@@ -87,7 +87,9 @@ experiments/        run manifests, hashes, outputs
 tests/              no-future-data, execution lag, switching costs, holdout isolation, baselines
 ```
 
-The repo root also still holds the earlier prototype (`plusev/`, `app/`, `scripts/build.py`, `scripts/paired_challenge.py`, `eval/`): regime tagging, a kit-exact simulator and a governor tested in the organisers' challenge mode. Reusable for Lane A; see [`archive/`](archive/).
+Lane A’s code is in [`A/`](A/). The simple rule can allocate 0. A deterministic arbiter returns KEEP, ACTIVATE CONDITIONALLY, REDUCE, MONITOR, KILL, or INCONCLUSIVE from the sealed test, and a 14-day paper plan is stored with `completed=false`. News is still omitted. The lanes are not wired together yet.
+
+The repo root also holds the earlier prototype (`plusev/`, `app/`, `scripts/build.py`, `scripts/paired_challenge.py`, `eval/`): regime tagging, a kit-exact simulator and a governor tested in the organisers' challenge mode. That prototype is unchanged on this branch. See [`archive/`](archive/).
 
 ## Run (Lane B, from branch `lane-b`)
 
