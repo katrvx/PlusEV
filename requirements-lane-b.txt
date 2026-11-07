@@ -1,0 +1,7 @@
+pydantic>=2.7
+pydantic-ai-slim[google]>=1.0
+lightgbm>=4
+scikit-learn>=1.4
+pandas>=2
+numpy>=1.26
+pytest>=8
