@@ -80,7 +80,9 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
     # 3. arbiter: validation runs for every proposal and both competitors (never budgeted)
     for p in proposals.proposals:
         ctx.arbiter_evaluate(p.to_policy_spec(), "validation", source="arbiter")
-    rule = rule_gate_spec(train_quantiles)
+    # Lane A's runner carries the rule it actually scored. The quantile reconstruction
+    # is only for the synthetic stand-in, which has no runner.rule_spec.
+    rule = getattr(runner, "rule_spec", None) or rule_gate_spec(train_quantiles)
     ctx.arbiter_evaluate(rule, "validation", source="rule_baseline")
     competitors = [("rule_baseline", rule)]
     if lgbm is not None:

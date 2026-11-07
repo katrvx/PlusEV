@@ -1,0 +1,739 @@
+{
+  "experiment_id": "exp_demo_btc_trend",
+  "strategy_id": "demo_btc_trend_v1",
+  "status": "completed",
+  "mode": "demo",
+  "progress": 100,
+  "message": "Illustrative fixture complete; replace with Parts A/B measured output before making financial claims.",
+  "created_at": "2026-11-07T17:42:07.877207Z",
+  "policy_id": "gate-v1-illustrative",
+  "dataset_hash": "sha256:fixture-btc-trend-v1",
+  "windows": {
+    "train": "2024-01-01 to 2024-01-18",
+    "validation": "2024-01-19 to 2024-01-27",
+    "test": "2024-01-28 to 2024-02-14"
+  },
+  "metrics": [
+    {
+      "label": "Base net return",
+      "value": -0.021,
+      "format": "percent",
+      "description": "Illustrative, after assumed costs"
+    },
+    {
+      "label": "Proposed gate net return",
+      "value": 0.046,
+      "format": "percent",
+      "description": "Illustrative fixture only"
+    },
+    {
+      "label": "Δ vs always-on",
+      "value": 0.067,
+      "format": "percent",
+      "description": "Illustrative difference; not independently measured"
+    },
+    {
+      "label": "Switches",
+      "value": 23,
+      "format": "integer",
+      "description": "Illustrative count"
+    },
+    {
+      "label": "Holdout coverage",
+      "value": 1.0,
+      "format": "percent",
+      "description": "Fixture coverage"
+    }
+  ],
+  "baselines": [
+    {
+      "id": "always_on",
+      "name": "Always on",
+      "net_return": -0.021,
+      "sharpe": -0.18,
+      "max_drawdown": -0.051989,
+      "exposure": 0.61,
+      "turnover": 1.48,
+      "trades": 92
+    },
+    {
+      "id": "cash",
+      "name": "Cash",
+      "net_return": 0.0,
+      "sharpe": 0.0,
+      "max_drawdown": 0.0,
+      "exposure": 0.0,
+      "turnover": 0.0,
+      "trades": 0
+    },
+    {
+      "id": "simple_rule",
+      "name": "Fixed trend / vol rule",
+      "net_return": 0.018,
+      "sharpe": 0.22,
+      "max_drawdown": -0.014888,
+      "exposure": 0.43,
+      "turnover": 1.12,
+      "trades": 71
+    },
+    {
+      "id": "agent_gate",
+      "name": "Agent-proposed gate",
+      "net_return": 0.046,
+      "sharpe": 0.41,
+      "max_drawdown": -0.005224,
+      "exposure": 0.39,
+      "turnover": 0.96,
+      "trades": 64
+    }
+  ],
+  "equity": [
+    {
+      "date": "2024-01-28T00:00:00Z",
+      "base": 100.0,
+      "rule": 100.0,
+      "proposed": 100.0,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-01-28T09:00:00Z",
+      "base": 100.7,
+      "rule": 100.4148,
+      "proposed": 100.3538,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-01-28T19:00:00Z",
+      "base": 101.2649,
+      "rule": 100.762,
+      "proposed": 100.6625,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-01-29T04:00:00Z",
+      "base": 101.5839,
+      "rule": 100.9863,
+      "proposed": 100.8893,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-01-29T13:00:00Z",
+      "base": 101.5908,
+      "rule": 101.0545,
+      "proposed": 101.0121,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-01-29T22:00:00Z",
+      "base": 101.2756,
+      "rule": 100.9617,
+      "proposed": 101.0275,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-01-30T08:00:00Z",
+      "base": 100.6868,
+      "rule": 100.732,
+      "proposed": 100.9517,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-01-30T17:00:00Z",
+      "base": 99.9221,
+      "rule": 100.4144,
+      "proposed": 100.8172,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-01-31T02:00:00Z",
+      "base": 99.1111,
+      "rule": 100.0737,
+      "proposed": 100.6673,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-01-31T11:00:00Z",
+      "base": 98.3917,
+      "rule": 99.7788,
+      "proposed": 100.548,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-01-31T21:00:00Z",
+      "base": 97.8854,
+      "rule": 99.5904,
+      "proposed": 100.4997,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-01T06:00:00Z",
+      "base": 97.675,
+      "rule": 99.55,
+      "proposed": 100.55,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-01T15:00:00Z",
+      "base": 97.7899,
+      "rule": 99.6722,
+      "proposed": 100.7088,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-02T01:00:00Z",
+      "base": 98.2008,
+      "rule": 99.9424,
+      "proposed": 100.9662,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-02T10:00:00Z",
+      "base": 98.8247,
+      "rule": 100.3192,
+      "proposed": 101.2946,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-02T19:00:00Z",
+      "base": 99.5403,
+      "rule": 100.7417,
+      "proposed": 101.6536,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-03T04:00:00Z",
+      "base": 100.2095,
+      "rule": 101.1411,
+      "proposed": 101.9971,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-03T14:00:00Z",
+      "base": 100.7029,
+      "rule": 101.4526,
+      "proposed": 102.282,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-03T23:00:00Z",
+      "base": 100.9226,
+      "rule": 101.6272,
+      "proposed": 102.4757,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-04T08:00:00Z",
+      "base": 100.8203,
+      "rule": 101.6408,
+      "proposed": 102.5621,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-04T17:00:00Z",
+      "base": 100.4058,
+      "rule": 101.4984,
+      "proposed": 102.5444,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-05T03:00:00Z",
+      "base": 99.7455,
+      "rule": 101.233,
+      "proposed": 102.4447,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-05T12:00:00Z",
+      "base": 98.95,
+      "rule": 100.9,
+      "proposed": 102.3,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-05T21:00:00Z",
+      "base": 98.1545,
+      "rule": 100.567,
+      "proposed": 102.1553,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-06T07:00:00Z",
+      "base": 97.4942,
+      "rule": 100.3016,
+      "proposed": 102.0556,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-06T16:00:00Z",
+      "base": 97.0797,
+      "rule": 100.1592,
+      "proposed": 102.0379,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-07T01:00:00Z",
+      "base": 96.9774,
+      "rule": 100.1728,
+      "proposed": 102.1243,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-07T10:00:00Z",
+      "base": 97.1971,
+      "rule": 100.3474,
+      "proposed": 102.318,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-07T20:00:00Z",
+      "base": 97.6905,
+      "rule": 100.6589,
+      "proposed": 102.6029,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-08T05:00:00Z",
+      "base": 98.3597,
+      "rule": 101.0583,
+      "proposed": 102.9464,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-08T14:00:00Z",
+      "base": 99.0753,
+      "rule": 101.4808,
+      "proposed": 103.3054,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-08T23:00:00Z",
+      "base": 99.6992,
+      "rule": 101.8576,
+      "proposed": 103.6338,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-09T09:00:00Z",
+      "base": 100.1101,
+      "rule": 102.1278,
+      "proposed": 103.8912,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-09T18:00:00Z",
+      "base": 100.225,
+      "rule": 102.25,
+      "proposed": 104.05,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-10T03:00:00Z",
+      "base": 100.0146,
+      "rule": 102.2096,
+      "proposed": 104.1003,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-10T13:00:00Z",
+      "base": 99.5083,
+      "rule": 102.0212,
+      "proposed": 104.052,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-10T22:00:00Z",
+      "base": 98.7889,
+      "rule": 101.7263,
+      "proposed": 103.9327,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-11T07:00:00Z",
+      "base": 97.9779,
+      "rule": 101.3856,
+      "proposed": 103.7828,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-11T16:00:00Z",
+      "base": 97.2132,
+      "rule": 101.068,
+      "proposed": 103.6483,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-12T02:00:00Z",
+      "base": 96.6244,
+      "rule": 100.8383,
+      "proposed": 103.5725,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-12T11:00:00Z",
+      "base": 96.3092,
+      "rule": 100.7455,
+      "proposed": 103.5879,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-12T20:00:00Z",
+      "base": 96.3161,
+      "rule": 100.8137,
+      "proposed": 103.7107,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-13T05:00:00Z",
+      "base": 96.6351,
+      "rule": 101.038,
+      "proposed": 103.9375,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-13T15:00:00Z",
+      "base": 97.2,
+      "rule": 101.3852,
+      "proposed": 104.2462,
+      "cash": 100.0
+    },
+    {
+      "date": "2024-02-14T00:00:00Z",
+      "base": 97.9,
+      "rule": 101.8,
+      "proposed": 104.6,
+      "cash": 100.0
+    }
+  ],
+  "regimes": [
+    {
+      "id": "regime_01",
+      "trend": "positive",
+      "volatility": "falling",
+      "net_return": 0.084,
+      "trades": 19,
+      "confidence_low": 0.021,
+      "confidence_high": 0.142,
+      "evidence_id": "evidence_regime_01"
+    },
+    {
+      "id": "regime_02",
+      "trend": "positive",
+      "volatility": "rising",
+      "net_return": 0.031,
+      "trades": 14,
+      "confidence_low": -0.018,
+      "confidence_high": 0.081,
+      "evidence_id": "evidence_regime_02"
+    },
+    {
+      "id": "regime_03",
+      "trend": "sideways",
+      "volatility": "falling",
+      "net_return": -0.012,
+      "trades": 11,
+      "confidence_low": -0.061,
+      "confidence_high": 0.036,
+      "evidence_id": "evidence_regime_03"
+    },
+    {
+      "id": "regime_04",
+      "trend": "sideways",
+      "volatility": "rising",
+      "net_return": -0.074,
+      "trades": 17,
+      "confidence_low": -0.136,
+      "confidence_high": -0.011,
+      "evidence_id": "evidence_regime_04"
+    },
+    {
+      "id": "regime_05",
+      "trend": "negative",
+      "volatility": "falling",
+      "net_return": -0.026,
+      "trades": 9,
+      "confidence_low": -0.099,
+      "confidence_high": 0.045,
+      "evidence_id": "evidence_regime_05"
+    },
+    {
+      "id": "regime_06",
+      "trend": "negative",
+      "volatility": "rising",
+      "net_return": -0.113,
+      "trades": 22,
+      "confidence_low": -0.175,
+      "confidence_high": -0.049,
+      "evidence_id": "evidence_regime_06"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "evidence_regime_01",
+      "title": "Trend persistence cluster",
+      "kind": "quantitative",
+      "summary": "The fixture’s positive-trend / falling-volatility cohort has the strongest conditional return, with 19 observations.",
+      "source": "deterministic fixture: regime_performance",
+      "window": "training: 2024-01-01 to 2024-01-18",
+      "facts": [
+        {
+          "label": "Net return",
+          "value": "+8.4%"
+        },
+        {
+          "label": "Observations",
+          "value": "19"
+        },
+        {
+          "label": "Interval",
+          "value": "2.1% to 14.2%"
+        }
+      ]
+    },
+    {
+      "id": "evidence_regime_04",
+      "title": "Volatility switch cost",
+      "kind": "quantitative",
+      "summary": "Sideways and rising-volatility periods are negative after the illustrative switching-cost assumption.",
+      "source": "deterministic fixture: cost_attribution",
+      "window": "training: 2024-01-01 to 2024-01-18",
+      "facts": [
+        {
+          "label": "Net return",
+          "value": "-7.4%"
+        },
+        {
+          "label": "Switches",
+          "value": "17"
+        },
+        {
+          "label": "Cost share",
+          "value": "31%"
+        }
+      ]
+    },
+    {
+      "id": "evidence_holdout",
+      "title": "Unseen-period challenge",
+      "kind": "evaluation",
+      "summary": "The proposed gate is evaluated on a sealed chronological test window in the fixture; values are illustrative until the evaluator is connected.",
+      "source": "deterministic fixture: walk_forward",
+      "window": "test: 2024-01-28 to 2024-02-14",
+      "facts": [
+        {
+          "label": "Policy",
+          "value": "gate-v1"
+        },
+        {
+          "label": "Access",
+          "value": "sealed"
+        },
+        {
+          "label": "Status",
+          "value": "illustrative"
+        }
+      ]
+    },
+    {
+      "id": "evidence_regime_02",
+      "title": "Positive trend / rising volatility",
+      "kind": "quantitative",
+      "summary": "Illustrative training-cohort evidence. Uncertainty intervals and counts are fixture values.",
+      "source": "deterministic fixture: regime_performance",
+      "window": "training: 2024-01-01 to 2024-01-18",
+      "facts": [
+        {
+          "label": "Net return",
+          "value": "+3.1%"
+        },
+        {
+          "label": "Trades",
+          "value": "14"
+        },
+        {
+          "label": "Interval",
+          "value": "-1.8% to 8.1%"
+        }
+      ]
+    },
+    {
+      "id": "evidence_regime_03",
+      "title": "Sideways trend / falling volatility",
+      "kind": "quantitative",
+      "summary": "Illustrative training-cohort evidence. Uncertainty intervals and counts are fixture values.",
+      "source": "deterministic fixture: regime_performance",
+      "window": "training: 2024-01-01 to 2024-01-18",
+      "facts": [
+        {
+          "label": "Net return",
+          "value": "-1.2%"
+        },
+        {
+          "label": "Trades",
+          "value": "11"
+        },
+        {
+          "label": "Interval",
+          "value": "-6.1% to 3.6%"
+        }
+      ]
+    },
+    {
+      "id": "evidence_regime_05",
+      "title": "Negative trend / falling volatility",
+      "kind": "quantitative",
+      "summary": "Illustrative training-cohort evidence. Uncertainty intervals and counts are fixture values.",
+      "source": "deterministic fixture: regime_performance",
+      "window": "training: 2024-01-01 to 2024-01-18",
+      "facts": [
+        {
+          "label": "Net return",
+          "value": "-2.6%"
+        },
+        {
+          "label": "Trades",
+          "value": "9"
+        },
+        {
+          "label": "Interval",
+          "value": "-9.9% to 4.5%"
+        }
+      ]
+    },
+    {
+      "id": "evidence_regime_06",
+      "title": "Negative trend / rising volatility",
+      "kind": "quantitative",
+      "summary": "Illustrative training-cohort evidence. Uncertainty intervals and counts are fixture values.",
+      "source": "deterministic fixture: regime_performance",
+      "window": "training: 2024-01-01 to 2024-01-18",
+      "facts": [
+        {
+          "label": "Net return",
+          "value": "-11.3%"
+        },
+        {
+          "label": "Trades",
+          "value": "22"
+        },
+        {
+          "label": "Interval",
+          "value": "-17.5% to -4.9%"
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "id": "step_01",
+      "role": "Diagnostic Analyst",
+      "action": "called_tool",
+      "title": "Mapped conditional performance",
+      "body": "Requested regime_performance and ranked cohorts by after-cost return and sample count.",
+      "status": "complete",
+      "tool": "regime_performance",
+      "evidence_ids": [
+        "evidence_regime_01",
+        "evidence_regime_04"
+      ],
+      "timestamp": "2026-11-07T17:42:07.877207Z"
+    },
+    {
+      "id": "step_02",
+      "role": "Diagnostic Analyst",
+      "action": "proposed",
+      "title": "Hypothesis: gate rising volatility",
+      "body": "Proposed reducing activation when volatility is rising and trend is sideways or negative.",
+      "status": "complete",
+      "tool": "cost_attribution",
+      "evidence_ids": [
+        "evidence_regime_04",
+        "evidence_regime_06"
+      ],
+      "timestamp": "2026-11-07T17:42:07.877207Z"
+    },
+    {
+      "id": "step_03",
+      "role": "Independent Critic",
+      "action": "rejected",
+      "title": "Rejected news-causality claim",
+      "body": "No dated news evidence is included in this fixture, so a causal explanation was rejected rather than narrated.",
+      "status": "rejected",
+      "tool": "news_context",
+      "evidence_ids": [],
+      "timestamp": "2026-11-07T17:42:07.877207Z"
+    },
+    {
+      "id": "step_04",
+      "role": "Deterministic evaluator",
+      "action": "tested",
+      "title": "Challenged the frozen policy",
+      "body": "A constrained rule gate was frozen before the illustrative test window; the real evaluator is supplied by Part A.",
+      "status": "complete",
+      "tool": "test_gate_train",
+      "evidence_ids": [
+        "evidence_holdout"
+      ],
+      "timestamp": "2026-11-07T17:42:07.877207Z"
+    },
+    {
+      "id": "step_05",
+      "role": "Independent Critic",
+      "action": "qualified",
+      "title": "Recommendation remains conditional",
+      "body": "The evidence is not sufficient to claim live profitability; use a paper-only test after the real evaluator is connected.",
+      "status": "complete",
+      "tool": "risk_arbiter",
+      "evidence_ids": [
+        "evidence_holdout"
+      ],
+      "timestamp": "2026-11-07T17:42:07.877207Z"
+    }
+  ],
+  "hypotheses": [
+    {
+      "id": "hyp_01",
+      "title": "Falling volatility supports trend persistence",
+      "status": "supported",
+      "finding": "Supported in the fixture’s conditional cohort; requires measured evaluator confirmation.",
+      "evidence_ids": [
+        "evidence_regime_01"
+      ]
+    },
+    {
+      "id": "hyp_02",
+      "title": "Rising volatility explains all losses",
+      "status": "inconclusive",
+      "finding": "The cohort is negative but the fixture does not establish causality.",
+      "evidence_ids": [
+        "evidence_regime_04",
+        "evidence_regime_06"
+      ]
+    },
+    {
+      "id": "hyp_03",
+      "title": "News caused the drawdown",
+      "status": "rejected",
+      "finding": "Rejected because no point-in-time dated news records were available in this run.",
+      "evidence_ids": []
+    }
+  ],
+  "verdict": "CONDITIONAL",
+  "recommendation": "Illustrative result: activate only under the frozen trend / volatility conditions, then run the measured evaluator and a paper-only champion–challenger test.",
+  "limitations": [
+    "All numbers in this demo are deterministic fixture values, not measured market performance.",
+    "The base strategy is not rewritten; only an allocation overlay is illustrated.",
+    "No causal news claim is made.",
+    "No real orders or accounts are connected."
+  ],
+  "policy": {
+    "description": "Use full exposure in positive trend with falling volatility, half exposure in positive trend with rising volatility, and cash otherwise.",
+    "conditions": [
+      "features must be known by decision time",
+      "next-bar execution",
+      "fees and slippage must be supplied by evaluator",
+      "human approval required before paper test"
+    ],
+    "holdout_frozen": true,
+    "test_evaluated": true
+  }
+}

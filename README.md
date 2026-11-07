@@ -61,15 +61,17 @@ existing strategy (immutable) ─► import / validate / hash
 | [`KEEP_OR_KILL_PROJECT_SPEC.md`](KEEP_OR_KILL_PROJECT_SPEC.md) | **Authoritative spec**: idea, maths, data rules, evaluation, agents, API, risk, demo script |
 | [`KEEP_OR_KILL_AGENTS.md`](KEEP_OR_KILL_AGENTS.md) | Handoff brief for the three lanes, shared contracts, collaboration rules, definition of done |
 | [`LANE_B.md`](LANE_B.md) | What Lane B built, its interface, guardrails, adversarial review, and what it needs from Lane A |
+| [`LANE_C.md`](LANE_C.md) | Web workspace, shared route constants and types, and the teammate integration guide |
+| [`docs/INTEGRATION_DECISIONS.md`](docs/INTEGRATION_DECISIONS.md) | Choices made while putting Lane A, current Lane B, and Lane C on one branch |
 | [`archive/`](archive/) | Earlier +EV design notes, kept for reference only |
 
 ## Team and lanes
 
 | Lane | Owns | Output interface | Status |
 |---|---|---|---|
-| **A · Quant / Data** | `packages/ingestion`, `feature_store`, `strategies`, `quant`, `evaluation` | `run_experiment(strategy_id, dataset_snapshot_id, policy_spec) -> ExperimentResult` | in progress |
-| **B · Agents / Context** (Kate) | `packages/research_agents`, `meta_policy`, news enrichment | `investigate(experiment_id) -> InvestigationReport` | in `main`: diagnostic / proposer / critic agents, 4 allowlisted tools, evidence store, rule + LightGBM gates, deterministic fallback, adversarially reviewed, 38 tests; runs on a labelled synthetic Lane A stand-in until Lane A lands |
-| **C · API / UI / Demo** | `apps/api`, `apps/web`, docs, paper-run interface | consumes `ExperimentResult` + `InvestigationReport` | in progress |
+| **A · Quant / Data** | `A/` (target layout was `packages/ingestion`, `feature_store`, `strategies`, `quant`, `evaluation`) | `run_experiment(...) -> ExperimentResult`, including a deterministic verdict and a recorded 14-day plan | on this branch |
+| **B · Agents / Context** (Kate) | `packages/research_agents`, `meta_policy`, news enrichment | `investigate(experiment_id) -> InvestigationReport` | current `main` agents. Default loader is the synthetic stand-in. `--lane-a` uses Lane A's development view |
+| **C · API / UI / Demo** | `apps/api`, `apps/web`, docs, practice-plan interface | consumes native Lane B reports; adapts Lane A results into UI contracts | on this branch. BTCUSDT 1h position imports are scored by A and B. Start at [`LANE_C.md`](LANE_C.md). |
 
 Work on branches per lane; don't edit another lane's directories without coordinating. Freeze shared Pydantic contracts before integrating.
 
@@ -78,7 +80,8 @@ Work on branches per lane; don't edit another lane's directories without coordin
 ```text
 apps/api            FastAPI routes                       (C)
 apps/web            Next.js UI                           (C)
-packages/contracts  shared Pydantic schemas              (all, frozen first)
+packages/contracts  Part C TypeScript types + API constants (C)
+packages/contracts_lane_b  native Python research contracts (B)
 packages/ingestion, feature_store, strategies, quant, evaluation   (A)
 packages/research_agents, meta_policy                    (B)
 packages/paper      paper-only shadow runner             (C)
@@ -87,7 +90,11 @@ experiments/        run manifests, hashes, outputs
 tests/              no-future-data, execution lag, switching costs, holdout isolation, baselines
 ```
 
-The repo root also still holds the earlier prototype (`plusev/`, `app/`, `scripts/build.py`, `scripts/paired_challenge.py`, `eval/`): regime tagging, a kit-exact simulator and a governor tested in the organisers' challenge mode. Reusable for Lane A; see [`archive/`](archive/).
+Lane A’s code is in [`A/`](A/). The simple rule can allocate 0. A deterministic arbiter returns KEEP, ACTIVATE CONDITIONALLY, REDUCE, MONITOR, KILL, or INCONCLUSIVE from the sealed test, and a 14-day paper plan is stored with `completed=false`. News is still omitted.
+
+`python3 scripts/run_investigation.py --lane-a --fallback` runs Lane B's deterministic agents on Lane A's loader. That view keeps the test window's dates and drops its metrics, the verdict, and the paper plan. `--frozen` then scores the accepted champion once. `plusev/` and the Streamlit app are the earlier kit and do not call this path.
+
+The repo root also holds the earlier prototype (`plusev/`, `app/`, `scripts/build.py`, `scripts/paired_challenge.py`, `eval/`): regime tagging, a kit-exact simulator and a governor tested in the organisers' challenge mode. That prototype is unchanged on this branch. See [`archive/`](archive/).
 
 ## Run (Lane B)
 

@@ -43,6 +43,18 @@ report = investigate(experiment_id)        # -> InvestigationReport (pydantic), 
 
 An independent agent attacked Lane B on 7 Nov (18 findings, 17 reproduced). All critical and high findings are fixed and each has a regression test (38 tests total). Remaining known gaps: no Context/News agent yet, no `get_strategy_health` / `run_bootstrap` tools, no news data, the LLM path has only been exercised with scripted models, and the Lane A stand-in is synthetic.
 
+## Run on Lane A
+
+The default loader is still `fixtures/lane_a_stub.py`, so `tests/test_lane_b.py` does not need the Binance snapshot.
+
+```bash
+python3 scripts/run_investigation.py --lane-a --fallback
+python3 scripts/run_investigation.py --lane-a --fallback --experiment-id synthetic-btcusdt-1h-v1
+python3 scripts/run_investigation.py --lane-a --fallback --frozen
+```
+
+`load_for_lane_b` returns train and validation metrics only. `GateRunner.evaluate` refuses `test`. `--frozen` is the one sealed look, and only for the champion the arbiter accepted. The simple-rule competitor is Lane A's own rule when the loader provides `runner.rule_spec` (flat when the condition fails). The arbiter scores it directly, so the fixed momentum threshold of `0` does not have to sit on the agent quantile grid.
+
 ## Run
 
 ```bash

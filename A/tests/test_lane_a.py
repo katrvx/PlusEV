@@ -1,0 +1,456 @@
+"""The checks Lane A is not allowed to skip: fill lag, no future inputs, switching costs, sealed holdout, missingness."""
+
+from __future__ import annotations
+
+import json
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from kok_a.binance import normalize_binance_epoch, read_binance_klines
+from kok_a.experiment import GateRunner, agent_view, assemble, fit_regime_labels
+from kok_a.features import (
+    MARKET_FEATURES,
+    TemporalLeakError,
+    asof_fear_greed,
+    asof_news,
+    assert_point_in_time,
+    build_frame,
+    market_features,
+    with_execution,
+)
+from kok_a.arbiter import DRAWDOWN_CAP, MIN_TEST_DECISIONS, decide
+from kok_a.contracts import GateEvaluation, Metrics
+from kok_a.gates import allocation, rule_gate_spec
+from kok_a.lgbm_gate import LGBMGate
+from kok_a.market import hash_ohlcv, synthetic_ohlcv
+from kok_a.snapshot import (
+    FEAR_GREED_PATH,
+    MANIFEST_PATH,
+    OHLCV_PATH,
+    SNAPSHOT_READY,
+    read_fear_greed,
+)
+from kok_a.simulate import COST_PER_UNIT, simulate
+from kok_a.strategies import positions
+
+
+def _bars(opens: list[float], closes: list[float]) -> pd.DataFrame:
+    start = pd.Timestamp("2024-01-01", tz="UTC")
+    n = len(opens)
+    return pd.DataFrame(
+        {
+            "open_time": start + pd.to_timedelta(np.arange(n), unit="h"),
+            "open": opens,
+            "high": np.maximum(opens, closes),
+            "low": np.minimum(opens, closes),
+            "close": closes,
+            "volume": np.ones(n),
+            "symbol": "BTCUSDT",
+            "venue": "fixture",
+        }
+    )
+
+
+def test_binance_timestamps_normalise_seconds_milliseconds_microseconds():
+    ms = 1_700_000_000_000
+    assert normalize_binance_epoch(1_700_000_000) == ms
+    assert normalize_binance_epoch(ms) == ms
+    assert normalize_binance_epoch(ms * 1000) == ms
+
+
+def test_binance_csv_reader_accepts_both_archive_units(tmp_path):
+    ms = 1_700_000_000_000
+    expected = pd.Timestamp(ms, unit="ms", tz="UTC")
+    for stamp in (ms, ms * 1000):
+        path = tmp_path / f"{stamp}.csv"
+        path.write_text(f"{stamp},100,110,90,105,12\n")
+        frame = read_binance_klines(path)
+        assert frame.loc[0, "open_time"] == expected
+        assert frame.loc[0, "close"] == 105
+
+
+def test_fill_uses_next_open_not_the_same_bar_close():
+    # Bar 2 closes at 500. The position decided there fills at the next open, 110,
+    # and earns the move to the open after that, which is also 110.
+    bars = _bars(
+        opens=[100, 100, 100, 110, 110, 121],
+        closes=[100, 100, 500, 110, 110, 121],
+    )
+    executed = with_execution(bars)
+    spike = executed.loc[executed["bar_index"] == 2].iloc[0]
+    assert spike["close"] == 500
+    assert spike["fill_open"] == 110
+    assert spike["fill_open"] != spike["close"]
+    assert spike["ret_next"] == pytest.approx(0.0)
+    later = executed.loc[executed["bar_index"] == 3].iloc[0]
+    assert later["ret_next"] == pytest.approx(121 / 110 - 1)
+
+
+def test_features_do_not_move_when_a_future_close_does():
+    bars = synthetic_ohlcv(300, seed=1)
+    original = market_features(bars)
+    bumped = bars.copy()
+    bumped.loc[bumped.index[-1], "close"] *= 5
+    changed = market_features(bumped)
+    for column in MARKET_FEATURES:
+        assert original.iloc[-2][column] == pytest.approx(changed.iloc[-2][column])
+    assert original.iloc[-1]["momentum_24h"] != pytest.approx(changed.iloc[-1]["momentum_24h"])
+    close = bars["close"]
+    by_hand = float(np.log(close.iloc[200] / close.iloc[176]))
+    assert original.iloc[200]["momentum_24h"] == pytest.approx(by_hand)
+
+
+def test_a_feature_timestamped_after_the_decision_is_rejected():
+    frame = build_frame(synthetic_ohlcv(220, seed=2))
+    leaked = frame.copy()
+    leaked.loc[0, "data_max_available_at"] = leaked.loc[0, "decision_time"] + pd.Timedelta(hours=1)
+    with pytest.raises(TemporalLeakError):
+        assert_point_in_time(leaked)
+
+
+def test_fear_greed_is_not_visible_before_its_publication():
+    decisions = pd.to_datetime(["2023-01-02 12:00", "2023-01-03 00:00"], utc=True)
+    daily = pd.DataFrame(
+        {
+            "available_at": pd.to_datetime(["2023-01-03 00:00"], utc=True),
+            "value": [99.0],
+        }
+    )
+    joined = asof_fear_greed(decisions, daily)
+    assert pd.isna(joined["value"].iloc[0])
+    assert joined["value"].iloc[1] == 99.0
+
+
+def test_news_is_not_filled_in_before_it_is_first_seen():
+    decisions = pd.to_datetime(["2023-01-02 00:00", "2023-01-03 00:00", "2023-01-05 00:00"], utc=True)
+    items = pd.DataFrame(
+        {
+            "first_seen_at": pd.to_datetime(["2023-01-03 00:00"], utc=True),
+            "sentiment": [0.8],
+        }
+    )
+    sentiment, _available = asof_news(decisions, items)
+    assert np.isnan(sentiment[0])
+    assert sentiment[1] == pytest.approx(0.8)
+    assert np.isnan(sentiment[2])  # older than the 24h window; left missing, not carried forward
+
+
+def test_a_policy_that_flips_pays_more_than_one_that_holds():
+    n = 12
+    frame = pd.DataFrame(
+        {
+            "target_position": np.ones(n),
+            "ret_next": np.zeros(n),
+            "split": ["train"] * n,
+        }
+    )
+    held = simulate(frame, pd.Series(1.0, index=frame.index))
+    flipped = simulate(frame, pd.Series([1.0, 0.0] * (n // 2)))
+    assert held["cost"].sum() == pytest.approx(COST_PER_UNIT)
+    assert flipped["fees"].sum() > held["fees"].sum()
+
+
+def test_snapshot_and_both_demo_strategies_are_deterministic():
+    first = synthetic_ohlcv(400, seed=7)
+    second = synthetic_ohlcv(400, seed=7)
+    assert hash_ohlcv(first) == hash_ohlcv(second)
+    _, trend = positions("btc-trend-24-72-demo", first["close"])
+    _, trend_again = positions("btc-trend-24-72-demo", first["close"])
+    _, meanrev = positions("btc-meanrev-48-demo", first["close"])
+    assert trend.equals(trend_again)
+    assert not np.allclose(trend.fillna(0), meanrev.fillna(0))
+    assert meanrev.dropna().isin([0.0, 1.0]).all()
+
+
+def test_runner_refuses_the_sealed_split_and_train_ignores_test_labels(bundle):
+    spec = {"policy_id": "always_on", "family": "always_on"}
+    with pytest.raises(PermissionError):
+        bundle.runner.evaluate(spec, "test")
+    runner = GateRunner(
+        bundle.frame.copy(),
+        bundle.lgbm,
+        seed=1,
+        n_boot=10,
+        snapshot_id="x",
+        thresholds=bundle.thresholds,
+    )
+    before = runner.evaluate(spec, "train")
+    runner.frame.loc[runner.frame["split"] == "test", "ret_next"] = 123.0
+    after = runner.evaluate(spec, "train")
+    assert after.metrics.net_return == pytest.approx(before.metrics.net_return)
+
+
+def test_lightgbm_refuses_to_fit_or_calibrate_on_test():
+    gate = LGBMGate()
+    with pytest.raises(PermissionError):
+        gate.fit(pd.DataFrame(), pd.Series(dtype=float), split="test")
+    with pytest.raises(PermissionError):
+        gate.calibrate(pd.DataFrame(), pd.Series(dtype=float), split="test")
+
+
+def test_frozen_holdout_is_cached_and_a_changed_policy_is_refused(bundle):
+    runner = GateRunner(
+        bundle.frame.copy(),
+        bundle.lgbm,
+        seed=3,
+        n_boot=10,
+        snapshot_id="x",
+        thresholds=bundle.thresholds,
+    )
+    spec = {"policy_id": "frozen::always", "family": "always_on"}
+    first = runner.evaluate_frozen(spec)
+    assert first.metrics.net_return != pytest.approx(0.0)
+    runner.frame.loc[runner.frame["split"] == "test", "ret_next"] = 0.0
+    second = runner.evaluate_frozen(spec)
+    assert second.metrics.net_return == pytest.approx(first.metrics.net_return)
+    changed = {"policy_id": "frozen::always", "family": "cash"}
+    with pytest.raises(PermissionError):
+        runner.evaluate_frozen(changed)
+
+
+def test_rule_threshold_and_regime_cuts_come_from_train_only(bundle):
+    train = bundle.frame[bundle.frame["split"] == "train"]
+    spec = rule_gate_spec(train)
+    vol_cut = spec["conditions"][1]["threshold"]
+    assert vol_cut == pytest.approx(float(train["realized_vol_7d"].median()))
+    assert spec["conditions"][0]["threshold"] == 0.0
+    poisoned = bundle.frame.copy()
+    poisoned.loc[poisoned["split"] == "test", "realized_vol_7d"] *= 10
+    poisoned.loc[poisoned["split"] == "test", "momentum_24h"] += 1
+    assert rule_gate_spec(poisoned[poisoned["split"] == "train"])["conditions"][1]["threshold"] == pytest.approx(vol_cut)
+    _, cuts = fit_regime_labels(poisoned)
+    assert cuts["momentum_terciles"] == pytest.approx(bundle.thresholds["momentum_terciles"])
+    assert cuts["vol_median"] == pytest.approx(bundle.thresholds["vol_median"])
+
+
+def test_splits_are_chronological_and_do_not_overlap(bundle):
+    windows = {window.split: window for window in bundle.result.windows}
+    assert windows["train"].end < windows["validation"].start
+    assert windows["validation"].end < windows["test"].start
+    stamps = bundle.frame["decision_time"]
+    train = set(stamps[bundle.frame["split"] == "train"])
+    valid = set(stamps[bundle.frame["split"] == "validation"])
+    test = set(stamps[bundle.frame["split"] == "test"])
+    assert train.isdisjoint(valid)
+    assert valid.isdisjoint(test)
+    assert train.isdisjoint(test)
+
+
+def test_missingness_report_matches_the_frame_and_news_is_not_complete(bundle):
+    result = bundle.result
+    train = bundle.frame[bundle.frame["split"] == "train"]
+    for name, share in result.missingness["train"].items():
+        assert share == pytest.approx(float(train[name].notna().mean()))
+    assert result.coverage == result.missingness["train"]
+    assert result.coverage["momentum_24h"] == 1.0
+    assert result.coverage["news_sentiment"] == 0.0
+    assert result.coverage["fear_greed"] == 1.0
+    assert result.provenance["prices"] == "synthetic"
+    assert result.provenance["news"] == "omitted"
+    assert train["news_sentiment"].isna().all()
+    assert (bundle.frame["fill_open"] != bundle.frame["close"]).mean() > 0.99
+
+
+def test_preregistered_baselines_exist_on_every_split_including_holdout(bundle):
+    result = bundle.result
+    present = {(row.split, row.policy) for row in result.baselines}
+    for split in ("train", "validation", "test"):
+        for policy in ("always_on", "cash", "simple_rule", "lgbm_gate"):
+            assert (split, policy) in present
+    cash = next(row for row in result.baselines if row.split == "test" and row.policy == "cash")
+    assert cash.metrics.net_return == pytest.approx(0.0, abs=1e-12)
+    assert cash.metrics.exposure == pytest.approx(0.0)
+    always = next(row for row in result.baselines if row.split == "train" and row.policy == "always_on")
+    assert 0.0 < always.metrics.exposure <= 1.0
+    assert always.metrics.n_switches > 1
+    assert bundle.lgbm.fitted_on == "train"
+    assert bundle.lgbm.calibrated_on == "validation"
+    assert any(row.regime_feature == "trend_regime" and row.bucket == "bull" for row in result.per_regime)
+    assert {row.bucket for row in result.per_regime if row.regime_feature == "trend_regime"} >= {"bull", "bear", "sideways"}
+
+
+def test_ready_snapshot_is_real_binance_and_fear_greed_with_no_invented_news():
+    manifest = json.loads(MANIFEST_PATH.read_text())
+    bars = read_binance_klines(OHLCV_PATH)
+    fear = read_fear_greed(FEAR_GREED_PATH)
+    assert manifest["id"] == SNAPSHOT_READY
+    assert manifest["n_bars"] == 17520
+    assert manifest["n_gaps_over_1h"] == 0
+    assert bars["venue"].iloc[0] == "binance_spot"
+    assert hash_ohlcv(bars) == manifest["market_hash"]
+    assert bars["open_time"].iloc[0] == pd.Timestamp("2024-11-01", tz="UTC")
+    assert bars["open_time"].iloc[-1] == pd.Timestamp("2026-10-31 23:00", tz="UTC")
+    spacing = bars["open_time"].diff().dropna()
+    assert (spacing == pd.Timedelta(hours=1)).all()
+    assert (fear["value"] == fear["value"].round()).all()
+    assert fear["source"].str.contains("Alternative.me").all()
+
+    frame = build_frame(bars, fear_greed=fear)
+    noon = frame.loc[frame["decision_time"] == pd.Timestamp("2024-11-01 12:00", tz="UTC")].iloc[0]
+    published_yesterday = fear.loc[fear["as_of_day"] == pd.Timestamp("2024-10-31", tz="UTC")].iloc[0]
+    published_today = fear.loc[fear["as_of_day"] == pd.Timestamp("2024-11-01", tz="UTC")].iloc[0]
+    assert noon["fear_greed"] == published_yesterday["value"]
+    assert noon["fear_greed_available_at"] == published_yesterday["available_at"]
+    assert published_today["available_at"] > noon["decision_time"]
+    assert frame["news_sentiment"].isna().all()
+
+    ready = assemble("btc-trend-24-72-demo", SNAPSHOT_READY, n_estimators=30, n_boot=8)
+    assert ready.result.provenance["prices"] == "binance_spot_btcusdt_1h"
+    assert ready.result.provenance["news"] == "omitted"
+    assert ready.result.provenance["strategies"] == "demo_generator"
+    assert ready.result.provenance["costs"].startswith("assumed_")
+    assert ready.result.dataset_hashes["market"] == manifest["market_hash"]
+    assert ready.lgbm.fitted_on == "train"
+    assert ready.lgbm.calibrated_on == "validation"
+    assert ready.result.coverage["news_sentiment"] == 0.0
+    assert ready.result.coverage["fear_greed"] > 0.99
+    with pytest.raises(PermissionError):
+        ready.runner.evaluate({"policy_id": "cash", "family": "cash"}, "test")
+    assert ready.result.decision is not None
+    assert ready.result.decision.verdict in {
+        "KEEP",
+        "ACTIVATE CONDITIONALLY",
+        "REDUCE",
+        "MONITOR",
+        "KILL",
+        "INCONCLUSIVE",
+    }
+    assert ready.result.paper_plan is not None
+    assert ready.result.paper_plan.completed is False
+    assert ready.result.paper_plan.approved is False
+    assert ready.result.paper_plan.horizon_days == 14
+
+
+def test_simple_rule_goes_flat_when_the_condition_fails():
+    train = pd.DataFrame({"momentum_24h": [0.1, -0.1], "realized_vol_7d": [0.01, 0.01]})
+    spec = rule_gate_spec(train)
+    assert spec["allocation_when_true"] == 1.0
+    assert spec["allocation_when_false"] == 0.0
+    context = pd.DataFrame(
+        {
+            "momentum_24h": [-0.2, 0.2, 0.2],
+            "realized_vol_7d": [0.01, 0.01, 0.05],
+        }
+    )
+    assert allocation(spec, context).tolist() == [0.0, 1.0, 0.0]
+
+
+def _evaluation(policy: str, net: float, drawdown: float, exposure: float, ci_net, ci_delta, delta: float) -> GateEvaluation:
+    metrics = Metrics(
+        net_return=net,
+        max_drawdown=drawdown,
+        turnover=1.0,
+        n_switches=4,
+        exposure=exposure,
+        ci_net_return=ci_net,
+    )
+    return GateEvaluation(
+        policy_id=policy,
+        split="test",
+        metrics=metrics,
+        always_on=metrics,
+        delta_net_return_vs_always_on=delta,
+        ci_delta=ci_delta,
+        audit_id=f"audit_{policy}",
+    )
+
+
+def _panel(always, rule, model, cash=None) -> dict[str, GateEvaluation]:
+    if cash is None:
+        cash = _evaluation("cash", 0.0, 0.0, 0.0, (0.0, 0.0), (0.0, 0.0), 0.0)
+    return {"always_on": always, "cash": cash, "simple_rule": rule, "lgbm_gate": model}
+
+
+def test_arbiter_abstains_when_the_interval_contains_zero():
+    always = _evaluation("always_on", -0.02, 0.12, 0.6, (-0.04, 0.03), (0.0, 0.0), 0.0)
+    rule = _evaluation("simple_rule", 0.01, 0.10, 0.3, (-0.02, 0.04), (-0.01, 0.03), 0.03)
+    model = _evaluation("lgbm_gate", -0.01, 0.11, 0.4, (-0.05, 0.02), (-0.04, 0.02), 0.01)
+    decision = decide(_panel(always, rule, model), n_test=MIN_TEST_DECISIONS)
+    assert decision.verdict == "INCONCLUSIVE"
+    assert decision.risk_override is False
+
+
+def test_arbiter_abstains_when_the_test_is_too_short():
+    always = _evaluation("always_on", 0.2, 0.05, 0.6, (0.1, 0.3), (0.0, 0.0), 0.0)
+    rule = _evaluation("simple_rule", 0.4, 0.05, 0.4, (0.2, 0.5), (0.05, 0.2), 0.2)
+    model = _evaluation("lgbm_gate", 0.1, 0.05, 0.4, (0.0, 0.2), (-0.02, 0.04), -0.1)
+    decision = decide(_panel(always, rule, model), n_test=MIN_TEST_DECISIONS - 1)
+    assert decision.verdict == "INCONCLUSIVE"
+
+
+def test_arbiter_activates_when_the_gate_interval_is_above_zero():
+    always = _evaluation("always_on", 0.02, 0.10, 0.7, (-0.01, 0.05), (0.0, 0.0), 0.0)
+    rule = _evaluation("simple_rule", 0.08, 0.11, 0.4, (0.02, 0.12), (0.01, 0.08), 0.06)
+    model = _evaluation("lgbm_gate", 0.03, 0.10, 0.5, (-0.01, 0.06), (-0.02, 0.03), 0.01)
+    decision = decide(_panel(always, rule, model), n_test=400)
+    assert decision.verdict == "ACTIVATE CONDITIONALLY"
+    assert decision.policy_id == "simple_rule"
+
+
+def test_drawdown_cap_blocks_an_otherwise_winning_gate():
+    always = _evaluation("always_on", 0.02, 0.50, 0.7, (-0.01, 0.05), (0.0, 0.0), 0.0)
+    rule = _evaluation("simple_rule", 0.10, DRAWDOWN_CAP + 0.05, 0.4, (0.04, 0.16), (0.02, 0.10), 0.08)
+    model = _evaluation("lgbm_gate", 0.01, 0.20, 0.5, (-0.02, 0.04), (-0.03, 0.02), -0.01)
+    decision = decide(_panel(always, rule, model), n_test=400)
+    assert decision.verdict == "MONITOR"
+    assert decision.risk_override is True
+
+
+def test_arbiter_kills_when_always_on_is_reliably_below_zero_and_past_the_cap():
+    always = _evaluation("always_on", -0.30, DRAWDOWN_CAP + 0.10, 0.8, (-0.40, -0.05), (0.0, 0.0), 0.0)
+    rule = _evaluation("simple_rule", -0.10, 0.20, 0.3, (-0.20, 0.02), (-0.05, 0.20), 0.20)
+    model = _evaluation("lgbm_gate", -0.12, 0.25, 0.4, (-0.22, 0.01), (-0.04, 0.15), 0.18)
+    decision = decide(_panel(always, rule, model), n_test=400)
+    assert decision.verdict == "KILL"
+    assert decision.policy_id == "cash"
+    assert decision.risk_override is True
+
+
+def test_arbiter_reduces_when_full_size_breaks_the_drawdown_cap():
+    always = _evaluation("always_on", -0.04, DRAWDOWN_CAP + 0.08, 0.8, (-0.10, 0.02), (0.0, 0.0), 0.0)
+    rule = _evaluation("simple_rule", -0.01, 0.20, 0.3, (-0.06, 0.04), (-0.04, 0.08), 0.03)
+    model = _evaluation("lgbm_gate", -0.02, 0.22, 0.5, (-0.08, 0.03), (-0.05, 0.06), 0.02)
+    decision = decide(_panel(always, rule, model), n_test=400)
+    assert decision.verdict == "REDUCE"
+    assert decision.policy_id == "simple_rule"
+    assert decision.risk_override is True
+
+
+def test_arbiter_keeps_a_strategy_whose_interval_is_above_zero():
+    always = _evaluation("always_on", 0.15, 0.08, 0.6, (0.04, 0.22), (0.0, 0.0), 0.0)
+    rule = _evaluation("simple_rule", 0.12, 0.09, 0.4, (0.01, 0.20), (-0.08, 0.04), -0.03)
+    model = _evaluation("lgbm_gate", 0.10, 0.09, 0.5, (-0.01, 0.18), (-0.10, 0.02), -0.05)
+    decision = decide(_panel(always, rule, model), n_test=400)
+    assert decision.verdict == "KEEP"
+    assert decision.policy_id == "always_on"
+
+
+def test_agent_view_drops_sealed_test_numbers_and_keeps_the_window(bundle):
+    view = agent_view(bundle.result)
+    assert any(window.split == "test" for window in view.windows)
+    assert view.decision is None and view.paper_plan is None
+    assert all(row.split != "test" for row in view.baselines)
+    assert all(row.split != "test" for row in view.per_regime)
+    assert all(row.split != "test" for row in view.costs)
+    assert all(point.split != "test" for point in view.equity)
+    assert any(row.split == "test" for row in bundle.result.baselines)
+    assert bundle.result.decision is not None
+
+
+def test_experiment_records_an_unstarted_paper_plan(bundle):
+    decision = bundle.result.decision
+    plan = bundle.result.paper_plan
+    assert decision is not None and plan is not None
+    assert decision.verdict != "COMBINE"
+    assert plan.completed is False
+    assert plan.approved is False
+    assert plan.horizon_days == 14
+    assert plan.status == "recorded_not_started"
+    assert plan.champion_policy_id == "always_on"
+    assert plan.frozen_at_experiment == bundle.result.experiment_id
+    assert "not a result" in " ".join(plan.notes)
+    rule = next(row for row in bundle.result.baselines if row.policy == "simple_rule" and row.split == "test")
+    assert rule.metrics.cvar_05 is not None
+    assert rule.metrics.avg_holding_bars is not None
