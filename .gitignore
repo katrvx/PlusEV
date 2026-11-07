@@ -41,6 +41,9 @@ eval/challenge/*/revealed-cases/
 # lane B
 .pytest_cache/
 
+# measured reports written by the API; the checked-in stand-in stays
+experiments/investigation_exp_*.json
+
 # Isolated Lane C test scratch directories
 .pytest_api_*/
 .pytest-tmp*/

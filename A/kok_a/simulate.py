@@ -17,15 +17,27 @@ FEE_SHARE = FEE_BPS / (FEE_BPS + SLIPPAGE_BPS)
 ANNUALIZATION = float(np.sqrt(24 * 365))
 
 
-def simulate(frame: pd.DataFrame, multiplier: pd.Series, visible: np.ndarray | None = None) -> pd.DataFrame:
+def simulate(
+    frame: pd.DataFrame,
+    multiplier: pd.Series,
+    visible: np.ndarray | None = None,
+    *,
+    fee_bps: float | None = None,
+    slippage_bps: float | None = None,
+) -> pd.DataFrame:
     """Exposure q = multiplier * target_position.
 
     `visible` selects rows whose forward returns may be read. Costs depend only
     on the position path, so a train-split score does not have to touch test labels.
     The position path itself is continuous across the visible mask: the first
     bar of a split is charged against the previous bar's exposure.
+    Fees default to the Binance spot assumption. An import can pass its own.
     """
 
+    fee = FEE_BPS if fee_bps is None else float(fee_bps)
+    slip = SLIPPAGE_BPS if slippage_bps is None else float(slippage_bps)
+    cost_per_unit = (fee + slip) / 10_000
+    fee_share = fee / (fee + slip) if fee + slip else 0.0
     q = multiplier.to_numpy(dtype=float) * frame["target_position"].to_numpy(dtype=float)
     previous = np.concatenate([[0.0], q[:-1]])
     turnover = np.abs(q - previous)
@@ -36,7 +48,7 @@ def simulate(frame: pd.DataFrame, multiplier: pd.Series, visible: np.ndarray | N
     gross = np.full(len(frame), np.nan)
     idx = np.flatnonzero(visible)
     gross[idx] = q[idx] * frame["ret_next"].to_numpy(dtype=float)[idx]
-    cost = COST_PER_UNIT * turnover
+    cost = cost_per_unit * turnover
     visible_cost = np.where(visible, cost, np.nan)
     return pd.DataFrame(
         {
@@ -45,8 +57,8 @@ def simulate(frame: pd.DataFrame, multiplier: pd.Series, visible: np.ndarray | N
             "dq_signed": q - previous,
             "gross": gross,
             "cost": visible_cost,
-            "fees": visible_cost * FEE_SHARE,
-            "slippage": visible_cost * (1.0 - FEE_SHARE),
+            "fees": visible_cost * fee_share,
+            "slippage": visible_cost * (1.0 - fee_share),
             "net": gross - visible_cost,
             "switch": turnover > 1e-12,
         },

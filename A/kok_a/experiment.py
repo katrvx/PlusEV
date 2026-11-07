@@ -30,7 +30,7 @@ from kok_a.features import FEATURE_COLUMNS, build_frame, coverage_table
 from kok_a.gates import allocation, rule_gate_spec
 from kok_a.lgbm_gate import LGBMGate
 from kok_a.market import hash_ohlcv
-from kok_a.simulate import ANNUALIZATION, COST_PER_UNIT, FEE_BPS, SLIPPAGE_BPS, block_ci, simulate
+from kok_a.simulate import ANNUALIZATION, FEE_BPS, SLIPPAGE_BPS, block_ci, simulate
 from kok_a.snapshot import SNAPSHOT_READY, SNAPSHOT_SYNTHETIC, load_inputs
 from kok_a.strategies import positions
 
@@ -51,13 +51,25 @@ class Bundle:
 class GateRunner:
     """Scores a policy. `evaluate` is development-only; `evaluate_frozen` may read the test split once per policy id."""
 
-    def __init__(self, frame: pd.DataFrame, lgbm: LGBMGate, seed: int, n_boot: int, snapshot_id: str, thresholds: dict):
+    def __init__(
+        self,
+        frame: pd.DataFrame,
+        lgbm: LGBMGate,
+        seed: int,
+        n_boot: int,
+        snapshot_id: str,
+        thresholds: dict,
+        fee_bps: float = FEE_BPS,
+        slippage_bps: float = SLIPPAGE_BPS,
+    ):
         self.frame = frame
         self.lgbm = lgbm
         self.seed = seed
         self.n_boot = n_boot
         self.snapshot_id = snapshot_id
         self.thresholds = thresholds
+        self.fee_bps = fee_bps
+        self.slippage_bps = slippage_bps
         self.holdout_log: list[str] = []
         self._frozen: dict[str, tuple[str, GateEvaluation]] = {}
 
@@ -88,8 +100,14 @@ class GateRunner:
     def _score(self, policy_spec: dict, split: str, reveal: tuple[str, ...]) -> GateEvaluation:
         multiplier = allocation(policy_spec, self.frame, lgbm=self.lgbm)
         visible = self.frame["split"].isin(reveal).to_numpy()
-        scored = simulate(self.frame, multiplier, visible=visible)
-        baseline = simulate(self.frame, pd.Series(1.0, index=self.frame.index), visible=visible)
+        scored = simulate(self.frame, multiplier, visible=visible, fee_bps=self.fee_bps, slippage_bps=self.slippage_bps)
+        baseline = simulate(
+            self.frame,
+            pd.Series(1.0, index=self.frame.index),
+            visible=visible,
+            fee_bps=self.fee_bps,
+            slippage_bps=self.slippage_bps,
+        )
         mask = self.frame["split"] == split
         part = scored.loc[mask]
         base = baseline.loc[mask]
@@ -200,10 +218,15 @@ def assemble(
     seed: int = 7,
     n_boot: int = 200,
     n_estimators: int = 120,
+    external_positions: pd.DataFrame | None = None,
+    fee_bps: float | None = None,
+    slippage_bps: float | None = None,
 ) -> Bundle:
+    fee = FEE_BPS if fee_bps is None else float(fee_bps)
+    slip = SLIPPAGE_BPS if slippage_bps is None else float(slippage_bps)
     ohlcv, fear_greed, provenance = load_inputs(dataset_snapshot_id, n=n, seed=seed)
     frame = build_frame(ohlcv, fear_greed=fear_greed)
-    version, sample = _analysis_sample(frame, strategy_id)
+    version, sample = _analysis_sample(frame, strategy_id, external_positions)
     labels, thresholds = fit_regime_labels(sample)
     sample = sample.copy()
     sample["trend_regime"] = labels["trend_regime"]
@@ -212,7 +235,16 @@ def assemble(
     quantiles = _train_quantiles(sample)
     market_hash = hash_ohlcv(ohlcv)
     signal_hash = _hash_signals(sample)
-    runner = GateRunner(sample, model, seed=seed, n_boot=n_boot, snapshot_id=market_hash, thresholds=thresholds)
+    runner = GateRunner(
+        sample,
+        model,
+        seed=seed,
+        n_boot=n_boot,
+        snapshot_id=market_hash,
+        thresholds=thresholds,
+        fee_bps=fee,
+        slippage_bps=slip,
+    )
     rule = rule_gate_spec(sample[sample["split"] == "train"])
     runner.rule_spec = rule
 
@@ -239,7 +271,7 @@ def assemble(
             scored[(name, split)] = evaluation
             baselines.append(BaselineRow(split=split, policy=name, metrics=evaluation.metrics))  # type: ignore[arg-type]
 
-    always = simulate(sample, pd.Series(1.0, index=sample.index))
+    always = simulate(sample, pd.Series(1.0, index=sample.index), fee_bps=fee, slippage_bps=slip)
     experiment_id = f"exp_{signal_hash[:12]}"
     n_test = int((sample["split"] == "test").sum())
     decision = decide({name: scored[(name, "test")] for name in ("always_on", "cash", "simple_rule", "lgbm_gate")}, n_test)
@@ -248,7 +280,7 @@ def assemble(
         strategy_id,
         version,
         decision,
-        f"{FEE_BPS:.0f} bps fee + {SLIPPAGE_BPS:.0f} bp slippage on |change in exposure|",
+        f"{fee:.0f} bps fee + {slip:.0f} bp slippage on |change in exposure|",
     )
     result = ExperimentResult(
         experiment_id=experiment_id,
@@ -270,7 +302,7 @@ def assemble(
         ],
         equity=_equity(sample, always),
         provenance=provenance,
-        notes=_notes(thresholds, provenance, decision.verdict),
+        notes=_notes(thresholds, provenance, decision.verdict, fee, slip, imported=external_positions is not None),
         decision=decision,
         paper_plan=plan,
     )
@@ -321,13 +353,28 @@ def summarize(result: ExperimentResult) -> str:
     return "\n".join(lines)
 
 
-def _analysis_sample(frame: pd.DataFrame, strategy_id: str) -> tuple[str, pd.DataFrame]:
-    version, target = positions(strategy_id, frame["close"])
+def _analysis_sample(
+    frame: pd.DataFrame,
+    strategy_id: str,
+    external_positions: pd.DataFrame | None = None,
+) -> tuple[str, pd.DataFrame]:
     sample = frame.copy()
-    sample["target_position"] = target.to_numpy()
+    if external_positions is None:
+        version, target = positions(strategy_id, frame["close"])
+        sample["target_position"] = target.to_numpy()
+    else:
+        version = "imported-positions"
+        sample["target_position"] = _overlay_positions(sample, external_positions)
     sample = sample.dropna(subset=["momentum_24h", "realized_vol_7d", "volume_zscore", "target_position", "ret_next"])
     sample = sample.reset_index(drop=True)
+    if external_positions is not None:
+        sample = _longest_hourly_run(sample)
     if len(sample) < 30:
+        if external_positions is not None:
+            raise RuntimeError(
+                f"only {len(sample)} imported decisions overlap the Binance spot BTCUSDT 1h snapshot "
+                "(2024-11-01 through 2026-10-31) after feature warm-up. Need at least 30 consecutive hours."
+            )
         raise RuntimeError(f"only {len(sample)} usable decisions after warm-up")
     cut_train = int(len(sample) * 0.6)
     cut_test = int(len(sample) * 0.8)
@@ -521,14 +568,51 @@ def _holding_bars(exposure: np.ndarray) -> float:
     return float(np.mean(lengths))
 
 
-def _notes(thresholds: dict, provenance: dict[str, str], verdict: str) -> list[str]:
+def _overlay_positions(frame: pd.DataFrame, external: pd.DataFrame) -> np.ndarray:
+    """Place imported targets on this snapshot's decision times. Unmatched bars stay missing."""
+
+    table = external.copy()
+    table["decision_time"] = pd.to_datetime(table["decision_time"], utc=True)
+    table = table.drop_duplicates("decision_time", keep="last")
+    lookup = pd.Series(table["target_position"].to_numpy(dtype=float), index=table["decision_time"])
+    times = pd.to_datetime(frame["decision_time"], utc=True)
+    return times.map(lookup).to_numpy(dtype=float)
+
+
+def _longest_hourly_run(sample: pd.DataFrame) -> pd.DataFrame:
+    """Keep the longest stretch of consecutive hours. A gap is not a continuous position path."""
+
+    if sample.empty:
+        return sample
+    times = pd.to_datetime(sample["decision_time"], utc=True)
+    gap = times.diff().ne(pd.Timedelta(hours=1))
+    run_id = gap.cumsum()
+    best = run_id.value_counts().idxmax()
+    return sample.loc[run_id == best].reset_index(drop=True)
+
+
+def _notes(
+    thresholds: dict,
+    provenance: dict[str, str],
+    verdict: str,
+    fee_bps: float,
+    slippage_bps: float,
+    imported: bool,
+) -> list[str]:
     lo, hi = thresholds["momentum_terciles"]
+    cost_per_unit = (fee_bps + slippage_bps) / 10_000
+    origin = (
+        "Positions are the imported target_position series, aligned to this snapshot's hourly decision times. "
+        "Hours without an imported position are left out, and only the longest contiguous run is scored."
+        if imported
+        else "Strategies are demo generators run on these prices. They are not an imported live strategy and are not claimed as alpha."
+    )
     return [
         "Decision at bar close; fill at the next bar's open; PnL is that open to the following open.",
         f"Prices: {provenance['prices']}. Fear & Greed: {provenance['fear_greed']}. News: {provenance['news']}.",
-        "Strategies are demo generators run on these prices. They are not an imported live strategy and are not claimed as alpha.",
-        f"Cost is assumed, not measured: {FEE_BPS:.0f} bps fee + {SLIPPAGE_BPS:.0f} bp slippage "
-        f"({COST_PER_UNIT:.4%} of notional per unit of exposure change). No funding.",
+        origin,
+        f"Cost is assumed, not measured: {fee_bps:.0f} bps fee + {slippage_bps:.0f} bp slippage "
+        f"({cost_per_unit:.4%} of notional per unit of exposure change). No funding.",
         f"Trend regimes are train terciles of lagged 24h momentum ({lo:.5f}, {hi:.5f}); "
         f"vol regime splits at the train median {thresholds['vol_median']:.5f}.",
         "The simple rule allocates 1 when 24h momentum is positive and 7d vol is at or below "

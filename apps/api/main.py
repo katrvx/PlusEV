@@ -1,8 +1,8 @@
 """Part C API for Keep or Kill.
 
-Uploaded strategy data is validated and stored, but does not receive fabricated
-research results. The demo uses a clearly labelled deterministic fixture until
-Parts A and B connect their real point-in-time evaluator and research agents.
+Uploaded strategy data is validated and stored. Seeded demos keep the labelled
+fixture. A BTCUSDT hourly position import is scored by Lane A and Lane B.
+Trade logs and other markets stay pending, with no fixture numbers attached.
 """
 from __future__ import annotations
 
@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from .engine import ENGINE_CONNECTED, refusal_reason, run_measured_experiment
 from .team_reports import router as team_reports_router
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -478,7 +479,7 @@ def startup() -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "research_engine": False, "version": "0.1.0-part-c"}
+    return {"status": "ok", "research_engine": ENGINE_CONNECTED, "version": "0.1.0-part-c"}
 
 
 @app.get("/api/strategies")
@@ -589,10 +590,17 @@ def create_experiment(request: ExperimentRequest, background_tasks: BackgroundTa
             return db_get("experiments", "experiment_id", experiment_id) or experiment
         background_tasks.add_task(run_demo_experiment, experiment_id, strategy["strategy_id"], strategy["dataset_hash"])
         return experiment
-    else:
-        now = iso(utc_now())
-        experiment = {"experiment_id": experiment_id, "strategy_id": strategy["strategy_id"], "status": "awaiting_engine", "mode": "pending", "progress": 0, "message": "Imported strategy validated and queued. Parts A/B must supply the point-in-time evaluator before metrics or agent findings can be shown.", "created_at": now, "policy_id": "pending", "dataset_hash": strategy["dataset_hash"], "windows": {"train": "pending", "validation": "pending", "test": "pending"}, "metrics": [], "baselines": [], "equity": [], "regimes": [], "evidence": [], "steps": [], "hypotheses": [], "verdict": "INCONCLUSIVE", "recommendation": "Awaiting the deterministic research engine. No illustrative metrics have been assigned to this upload.", "limitations": ["Parts A/B evaluator is not connected.", "No financial performance claim is made.", "Trade-only imports support diagnosis but not faithful alternate gate simulation."], "policy": {"description": "Pending evaluator", "conditions": [], "holdout_frozen": False, "test_evaluated": False}}
+    reason = refusal_reason(strategy)
+    now = iso(utc_now())
+    if reason:
+        experiment = {"experiment_id": experiment_id, "strategy_id": strategy["strategy_id"], "status": "awaiting_engine", "mode": "pending", "progress": 0, "message": reason, "created_at": now, "policy_id": "pending", "dataset_hash": strategy["dataset_hash"], "windows": {"train": "pending", "validation": "pending", "test": "pending"}, "metrics": [], "baselines": [], "equity": [], "regimes": [], "evidence": [], "steps": [], "hypotheses": [], "verdict": "INCONCLUSIVE", "recommendation": "No illustrative metrics have been assigned to this upload.", "limitations": [reason, "No financial performance claim is made."], "policy": {"description": "Pending evaluator", "conditions": [], "holdout_frozen": False, "test_evaluated": False}}
+        db_insert("experiments", experiment_id, experiment)
+        return experiment
+    experiment = {"experiment_id": experiment_id, "strategy_id": strategy["strategy_id"], "status": "queued", "mode": "pending", "progress": 0, "message": "Imported BTCUSDT hourly positions queued for the Binance spot snapshot.", "created_at": now, "policy_id": "pending", "dataset_hash": strategy["dataset_hash"], "windows": {"train": "pending", "validation": "pending", "test": "pending"}, "metrics": [], "baselines": [], "equity": [], "regimes": [], "evidence": [], "steps": [], "hypotheses": [], "verdict": "INCONCLUSIVE", "recommendation": "Scoring has not finished.", "limitations": ["Results appear after Lane A finishes. Demo fixtures are not copied onto this upload."], "policy": {"description": "Pending measured run", "conditions": [], "holdout_frozen": False, "test_evaluated": False}}
     db_insert("experiments", experiment_id, experiment)
+    if background_tasks is None:
+        return run_measured_experiment(experiment_id, strategy)
+    background_tasks.add_task(run_measured_experiment, experiment_id, strategy)
     return experiment
 
 

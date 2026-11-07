@@ -70,7 +70,7 @@ existing strategy (immutable) ─► import / validate / hash
 |---|---|---|---|
 | **A · Quant / Data** | `A/` (target layout was `packages/ingestion`, `feature_store`, `strategies`, `quant`, `evaluation`) | `run_experiment(...) -> ExperimentResult`, including a deterministic verdict and a recorded 14-day plan | on this branch |
 | **B · Agents / Context** (Kate) | `packages/research_agents`, `meta_policy`, news enrichment | `investigate(experiment_id) -> InvestigationReport` | current `main` agents. Default loader is the synthetic stand-in. `--lane-a` uses Lane A's development view |
-| **C · API / UI / Demo** | `apps/api`, `apps/web`, docs, practice-plan interface | consumes native Lane B reports; adapts Lane A results into UI contracts | on this branch, from `lane-c`. Start at [`LANE_C.md`](LANE_C.md). |
+| **C · API / UI / Demo** | `apps/api`, `apps/web`, docs, practice-plan interface | consumes native Lane B reports; adapts Lane A results into UI contracts | on this branch. BTCUSDT 1h position imports are scored by A and B. Start at [`LANE_C.md`](LANE_C.md). |
 
 Work on branches per lane; don't edit another lane's directories without coordinating. Freeze shared Pydantic contracts before integrating.
 
