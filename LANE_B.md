@@ -9,7 +9,7 @@ from packages.research_agents.investigate import investigate
 report = investigate(experiment_id)        # -> InvestigationReport (pydantic), JSON via report.model_dump_json()
 ```
 
-`InvestigationReport` contains: ranked hypotheses with evidence ids, gate proposals, critiques, the full trial log (every policy attempted, including refused ones), candidates accepted/rejected for the frozen test with reasons, test requests for Lane A, limitations, every piece of evidence (raw tool output), `n_policies_tried`, `holdout_accessed`, and `agent_mode` (`llm` or `deterministic_fallback`).
+`InvestigationReport` contains: `verdict` (`candidate_for_frozen_test` or `INCONCLUSIVE`), `champion_policy_id` (at most ONE agent policy), ranked hypotheses with evidence ids, gate proposals, critiques, the full trial log (every attempt incl. refused ones, keyed by spec hash), candidates with validation delta vs always-on AND vs the simple rule, CI and allocation mix, test requests for Lane A, limitations, every piece of evidence (raw tool output), `agent_failures`, `n_distinct_agent_policies`, `n_policies_tried`, `holdout_accessed`, and `agent_mode` (`llm`, `llm_with_fallback`, `deterministic_fallback`).
 
 ## What's built
 
@@ -28,10 +28,20 @@ report = investigate(experiment_id)        # -> InvestigationReport (pydantic), 
 - **No held-out labels.** Every tool refuses the test split; a news window that reaches into the test period is refused; LightGBM refuses to fit/calibrate on test; any attempt sets `holdout_accessed=True` in the report.
 - **Claims link to evidence.** Every tool output is stored with a content-addressed `evidence_id`. Output validators make the LLM retry if it cites an id no tool produced.
 - **Allowlisted gates only.** `threshold_gate`, 1–2 conditions, features `momentum_24h / realized_vol_7d / volume_zscore / fear_greed / news_sentiment`, allocations `{0, 0.5, 1}`, thresholds must be training-quantile values, features need ≥90% coverage. Anything else is refused and logged.
-- **Budget.** At most 12 gate tests per investigation; all attempts disclosed (multiple-comparison honesty).
+- **Budget.** At most 12 agent train tests per investigation; the arbiter's validation runs never consume it. All attempts disclosed.
+- **Agents see train only.** Validation is used only by the arbiter (code); the critic sees validation results through the trial log.
+- **Claims are checked, not just ids.** Numbers in hypotheses/summary must match the cited tool output; regime conditions must be buckets that exist in the cited rows; critiques must cover exactly the real proposals and cite each gate's own evaluation.
+- **Results keyed by spec hash**, so two proposals with the same name can never share a result; duplicate ids are rejected.
+- **Robust to LLM failure.** Bad tool arguments become retries; any LLM stage failure falls back to the deterministic agent and is listed in `agent_failures`.
+- **Missing data is conservative**: a row with a missing gate feature gets min(allocation_when_true, allocation_when_false).
 - **No strategy changes, no code execution, no orders.** Gates output multipliers only.
 - **News is point-in-time.** Visible only if `first_seen_at <= decision cutoff`; coverage reported; never used in a gate unless coverage ≥ 90%.
-- **The arbiter is code.** A pre-registered rule decides which candidates go to the frozen test (validation delta > 0, critic approves, not fragile). The LightGBM gate is always carried as a competitor. LLM confidence cannot override it.
+- **The arbiter is code.** Pre-registered rule: among agent proposals with validation delta > 0, critic approval and a non-degenerate allocation mix (no multiplier on >= 95% of decisions), the ONE with the highest validation delta is the champion. Only it plus the competitors (simple rule, LightGBM) go to the single frozen test. No champion -> `INCONCLUSIVE`. LLM confidence cannot override it.
+- **LightGBM is out-of-sample on validation**: fitted on early train, calibrated on late train, band preselected around the calibration base rate.
+
+## Adversarial review
+
+An independent agent attacked Lane B on 7 Nov (18 findings, 17 reproduced). All critical and high findings are fixed and each has a regression test (38 tests total). Remaining known gaps: no Context/News agent yet, no `get_strategy_health` / `run_bootstrap` tools, no news data, the LLM path has only been exercised with scripted models, and the Lane A stand-in is synthetic.
 
 ## Run on Lane A
 
@@ -43,22 +53,22 @@ python3 scripts/run_investigation.py --lane-a --fallback --experiment-id synthet
 python3 scripts/run_investigation.py --lane-a --fallback --frozen
 ```
 
-`load_for_lane_b` returns train and validation metrics only. `GateRunner.evaluate` refuses `test`. `--frozen` is the one sealed look, and only for candidates the arbiter already accepted. The pre-registered simple rule is scored as a competitor with the allowlist skipped: its momentum threshold is the fixed sign `0`, not a training quantile.
+`load_for_lane_b` returns train and validation metrics only. `GateRunner.evaluate` refuses `test`. `--frozen` is the one sealed look, and only for the champion the arbiter accepted. The simple-rule competitor is Lane A's own rule when the loader provides `runner.rule_spec` (flat when the condition fails). The arbiter scores it directly, so the fixed momentum threshold of `0` does not have to sit on the agent quantile grid.
 
 ## Run
 
 ```bash
 pip install "pydantic-ai-slim[google]" lightgbm scikit-learn pandas numpy pytest
-python3 -m pytest -q tests/test_lane_b.py          # 14 guardrail tests
+python3 -m pytest -q tests/test_lane_b.py          # 38 guardrail + regression tests
 python3 scripts/run_investigation.py --fallback     # deterministic agents
-KOK_AGENT_MODEL=google-gla:gemini-2.5-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
+KOK_AGENT_MODEL=google:gemini-3.8-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
 ```
 
 ## What Lane A needs to provide (to replace the stand-in)
 
 See `packages/contracts_lane_b/__init__.py`:
 1. `ExperimentResult` with `per_regime` rows (split, regime_feature, bucket, counts, mean net return, block-bootstrap CI, costs), `costs`, `baselines`, `coverage`, `windows`.
-2. A `GateRunner.evaluate(policy_spec, split) -> GateEvaluation` that simulates the gate on train/validation with next-bar fills and switching costs, and refuses `split="test"`.
+2. A `GateRunner.evaluate(policy_spec, split) -> GateEvaluation` that simulates the gate on train/validation with next-bar fills and switching costs, returns compounded net returns, a paired block-bootstrap CI of the delta and the allocation mix, is deterministic for the same input, and refuses `split="test"`.
 3. Training-window quantiles for the allowlisted features (the threshold grid).
 4. A loader `experiment_id -> (ExperimentResult, GateRunner, train_quantiles, NewsStore|None, LGBMGate|None)` passed to `investigate(..., loader=...)`.
 

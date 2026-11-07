@@ -100,6 +100,7 @@ class GateEvaluation(BaseModel):
     always_on: Metrics
     delta_net_return_vs_always_on: float
     ci_delta: tuple[float, float] | None = None
+    allocation_mix: dict[str, float] = Field(default_factory=dict)
     audit_id: str
 
 

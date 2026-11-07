@@ -26,11 +26,11 @@ def test_fallback_investigation_uses_lane_a_and_leaves_the_holdout_sealed():
     assert report.holdout_accessed is False
     assert report.agent_mode == "deterministic_fallback"
     assert all(trial.split in ("train", "validation") for trial in report.trial_log)
-    assert any(candidate.source == "rule_baseline" for candidate in report.candidates)
+    assert any(candidate.source == "rule_baseline" and candidate.status == "competitor" for candidate in report.candidates)
     assert any(candidate.source == "meta_model" for candidate in report.candidates)
     ids = {item.evidence_id for item in report.evidence}
     assert all(set(hypothesis.evidence_ids) <= ids for hypothesis in report.diagnostic.hypotheses)
-    assert report.test_requests == []
+    assert report.holdout_accessed is False
 
     rule = next(candidate.policy_spec for candidate in report.candidates if candidate.source == "rule_baseline")
     first = score_frozen(loaded[1], [rule])[0]

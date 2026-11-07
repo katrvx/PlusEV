@@ -2,7 +2,8 @@
 
     python3 scripts/run_investigation.py                         # deterministic fallback on the Lane A stand-in
     python3 scripts/run_investigation.py --lane-a --fallback    # same agents, Lane A's development view
-    python3 scripts/run_investigation.py --lane-a --fallback --frozen   # then one sealed-test look at accepted candidates
+    python3 scripts/run_investigation.py --lane-a --fallback --frozen   # one sealed look at the accepted champion
+    KOK_AGENT_MODEL=google:gemini-3.8-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
 """
 
 from __future__ import annotations

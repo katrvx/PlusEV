@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from .allowlist import ALLOCATIONS, GATE_FAMILIES, GATE_FEATURES
 
@@ -25,9 +25,10 @@ class Evidence(BaseModel):
 
 class Hypothesis(BaseModel):
     hypothesis_id: str = Field(description="short id like H1, H2")
-    statement: str = Field(max_length=400, description="falsifiable statement about WHEN the strategy works or fails")
+    statement: str = Field(max_length=400, description="falsifiable statement about WHEN the strategy works or fails; "
+                                                       "any number must be copied from cited evidence")
     direction: Literal["works_better", "works_worse"]
-    conditions: list[str] = Field(description="regime buckets involved, e.g. ['trend_regime=bull', 'vol_regime=low']")
+    conditions: list[str] = Field(description="regime buckets from regime_performance rows, e.g. ['vol_regime=high']")
     evidence_ids: list[str] = Field(min_length=1, description="ids of tool outputs supporting this; must exist")
     confidence: Literal["low", "medium", "high"]
     caveats: list[str] = Field(default_factory=list)
@@ -39,6 +40,13 @@ class DiagnosticReport(BaseModel):
     hypotheses: list[Hypothesis] = Field(min_length=1, max_length=6)
     rejected_explanations: list[str] = Field(default_factory=list, description="explanations considered and why rejected")
     limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique(self):
+        ids = [h.hypothesis_id for h in self.hypotheses]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"duplicate hypothesis_id in {ids}")
+        return self
 
 
 class ThresholdCondition(BaseModel):
@@ -71,7 +79,14 @@ class GateProposal(BaseModel):
 
 
 class ProposalSet(BaseModel):
-    proposals: list[GateProposal] = Field(min_length=1, max_length=4)
+    proposals: list[GateProposal] = Field(default_factory=list, max_length=4)
+
+    @model_validator(mode="after")
+    def _unique(self):
+        ids = [p.proposal_id for p in self.proposals]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"duplicate proposal_id in {ids}")
+        return self
 
 
 class Critique(BaseModel):
@@ -79,22 +94,36 @@ class Critique(BaseModel):
     verdict: Literal["approve_for_frozen_test", "reject", "needs_change"]
     leakage_concerns: list[str] = Field(default_factory=list)
     overfit_risks: list[str] = Field(default_factory=list)
-    fragile_samples: list[str] = Field(default_factory=list)
+    fragile_samples: list[str] = Field(default_factory=list, description="BLOCKING sample-size/fragility issues only; "
+                                                                         "the arbiter treats any entry as disqualifying")
     counterexamples: list[str] = Field(default_factory=list)
-    evidence_ids: list[str] = Field(min_length=1)
+    observations: list[str] = Field(default_factory=list, description="non-blocking remarks")
+    evidence_ids: list[str] = Field(min_length=1, description="must include the gate's own evaluation evidence")
 
 
 class CritiqueSet(BaseModel):
     critiques: list[Critique] = Field(min_length=1)
 
+    @model_validator(mode="after")
+    def _unique(self):
+        ids = [c.proposal_id for c in self.critiques]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"duplicate critique for {ids}")
+        return self
+
+
+TrialSource = Literal["agent", "arbiter", "rule_baseline", "meta_model"]
+
 
 class TrialRecord(BaseModel):
     """Every attempted policy is logged, not only the winner (multiple-comparison honesty)."""
     policy_id: str
-    source: Literal["agent", "rule_baseline", "meta_model"]
-    split: Literal["train", "validation"]
+    spec_hash: str | None = None
+    source: TrialSource
+    split: Literal["train", "validation", "test"]
     delta_net_return_vs_always_on: float | None
     ci_delta: tuple[float, float] | None
+    allocation_mix: dict[str, float] = Field(default_factory=dict)
     evidence_id: str | None
     status: Literal["evaluated", "refused", "error"]
     note: str = ""
@@ -102,9 +131,15 @@ class TrialRecord(BaseModel):
 
 class PolicyCandidate(BaseModel):
     policy_id: str
+    spec_hash: str | None = None
     source: Literal["agent", "rule_baseline", "meta_model"]
+    role: Literal["agent_champion", "agent_not_selected", "competitor"]
     policy_spec: dict
-    status: Literal["accepted_for_frozen_test", "rejected"]
+    status: Literal["accepted_for_frozen_test", "rejected", "competitor"]
+    validation_delta_vs_always_on: float | None = None
+    validation_ci: tuple[float, float] | None = None
+    validation_delta_vs_simple_rule: float | None = None
+    allocation_mix: dict[str, float] = Field(default_factory=dict)
     reasons: list[str]
     evidence_ids: list[str]
 
@@ -113,8 +148,11 @@ class InvestigationReport(BaseModel):
     experiment_id: str
     strategy_id: str
     generated_at: datetime
-    agent_mode: Literal["llm", "deterministic_fallback"]
+    agent_mode: Literal["llm", "deterministic_fallback", "llm_with_fallback"]
     model_id: str | None
+    agent_failures: list[str] = Field(default_factory=list)
+    verdict: Literal["candidate_for_frozen_test", "INCONCLUSIVE"]
+    champion_policy_id: str | None
     diagnostic: DiagnosticReport
     proposals: list[GateProposal]
     critiques: list[Critique]
@@ -123,6 +161,7 @@ class InvestigationReport(BaseModel):
     test_requests: list[str]
     limitations: list[str]
     evidence: list[Evidence]
+    n_distinct_agent_policies: int
     n_policies_tried: int
     holdout_accessed: bool = False
 

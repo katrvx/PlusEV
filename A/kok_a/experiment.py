@@ -94,15 +94,18 @@ class GateRunner:
         part = scored.loc[mask]
         base = baseline.loc[mask]
         policy_id = str(policy_spec.get("policy_id", "unnamed"))
-        diff = part["net"].to_numpy(dtype=float) - base["net"].to_numpy(dtype=float)
-        lo, hi = block_ci(diff, _rng(self.seed, policy_id, split, "delta"), n_boot=self.n_boot)
+        policy_metrics = _metrics(part, _rng(self.seed, policy_id, split, "net"), self.n_boot)
+        always_metrics = _metrics(base, _rng(self.seed, "always_on", split, "net"), self.n_boot)
+        policy_net = part["net"].to_numpy(dtype=float)
+        base_net = base["net"].to_numpy(dtype=float)
         return GateEvaluation(
             policy_id=policy_id,
             split=split,  # type: ignore[arg-type]
-            metrics=_metrics(part, _rng(self.seed, policy_id, split, "net"), self.n_boot),
-            always_on=_metrics(base, _rng(self.seed, "always_on", split, "net"), self.n_boot),
-            delta_net_return_vs_always_on=float(np.nansum(diff)),
-            ci_delta=(lo * len(diff), hi * len(diff)),
+            metrics=policy_metrics,
+            always_on=always_metrics,
+            delta_net_return_vs_always_on=policy_metrics.net_return - always_metrics.net_return,
+            ci_delta=_paired_compound_ci(policy_net, base_net, _rng(self.seed, policy_id, split, "delta"), self.n_boot),
+            allocation_mix=_allocation_mix(multiplier.loc[mask]),
             audit_id=_audit(policy_spec, split, self.snapshot_id),
         )
 
@@ -366,7 +369,7 @@ def _metrics(sim: pd.DataFrame, rng: np.random.Generator, n_boot: int) -> Metric
     deviation = float(net.std(ddof=0))
     downside = net[net < 0]
     downside_deviation = float(downside.std(ddof=0)) if len(downside) else float("nan")
-    lo, hi = block_ci(net, rng, n_boot=n_boot)
+    lo, hi = _compound_ci(net, rng, n_boot=n_boot)
     exposure = sim["q"].to_numpy(dtype=float)
     sharpe = float(net.mean() / deviation * ANNUALIZATION) if deviation > 0 else None
     sortino = float(net.mean() / downside_deviation * ANNUALIZATION) if downside_deviation and downside_deviation > 0 else None
@@ -378,7 +381,7 @@ def _metrics(sim: pd.DataFrame, rng: np.random.Generator, n_boot: int) -> Metric
         turnover=float(sim["dq"].sum()),
         n_switches=int((sim["dq"] > 1e-12).sum()),
         exposure=float(exposure.mean()),
-        ci_net_return=(lo * len(net), hi * len(net)),
+        ci_net_return=(lo, hi),
         cvar_05=_cvar(net),
         avg_holding_bars=_holding_bars(exposure),
     )
@@ -450,6 +453,44 @@ def _equity(frame: pd.DataFrame, always: pd.DataFrame) -> list[EquityPoint]:
         )
         for i in range(len(frame))
     ]
+
+
+def _compound(values: np.ndarray) -> float:
+    return float(np.prod(1.0 + values) - 1.0)
+
+
+def _block_indices(n: int, rng: np.random.Generator, block: int = 24) -> np.ndarray:
+    starts = rng.integers(0, n - block + 1, size=n // block + 1)
+    return np.concatenate([np.arange(start, start + block) for start in starts])[:n]
+
+
+def _compound_ci(net: np.ndarray, rng: np.random.Generator, n_boot: int, block: int = 24) -> tuple[float, float]:
+    """90% interval for the compounded return, resampling the same bars together."""
+
+    if len(net) < block * 2:
+        return (float("nan"), float("nan"))
+    draws = np.empty(n_boot)
+    for i in range(n_boot):
+        draws[i] = _compound(net[_block_indices(len(net), rng, block)])
+    return float(np.quantile(draws, 0.05)), float(np.quantile(draws, 0.95))
+
+
+def _paired_compound_ci(policy: np.ndarray, base: np.ndarray, rng: np.random.Generator, n_boot: int, block: int = 24) -> tuple[float, float]:
+    """90% interval for the difference of compounded returns. Both series share each draw."""
+
+    n = len(policy)
+    if n < block * 2 or len(base) != n:
+        return (float("nan"), float("nan"))
+    draws = np.empty(n_boot)
+    for i in range(n_boot):
+        idx = _block_indices(n, rng, block)
+        draws[i] = _compound(policy[idx]) - _compound(base[idx])
+    return float(np.quantile(draws, 0.05)), float(np.quantile(draws, 0.95))
+
+
+def _allocation_mix(multiplier: pd.Series) -> dict[str, float]:
+    values = multiplier.to_numpy(dtype=float)
+    return {str(level): float(np.isclose(values, level).mean()) if len(values) else 0.0 for level in (0.0, 0.5, 1.0)}
 
 
 def _cvar(net: np.ndarray, alpha: float = 0.05) -> float | None:
