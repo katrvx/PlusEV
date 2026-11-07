@@ -40,6 +40,12 @@ class RegimeRow(BaseModel):
 
 
 class CostBreakdown(BaseModel):
+    """Compounded over the split. gross - fees - slippage - switching = net.
+
+    switching is gate-driven extra turnover only. On the unchanged strategy it is 0;
+    fees and slippage hold that strategy's own turnover.
+    """
+
     split: Split
     gross_return: float
     fees: float
@@ -94,7 +100,9 @@ class GateEvaluation(BaseModel):
     always_on: Metrics
     delta_net_return_vs_always_on: float
     ci_delta: tuple[float, float] | None = None
-    allocation_mix: dict[str, float] = Field(default_factory=dict)   # share of decisions at 0 / 0.5 / 1
+    allocation_mix: dict[str, float] = Field(default_factory=dict)   # share of in-position bars at 0 / 0.5 / 1
+    n_decisions: int = 0          # every bar in the split
+    n_in_position: int = 0        # bars whose frozen target is not flat; denominator of allocation_mix
     audit_id: str
 
 

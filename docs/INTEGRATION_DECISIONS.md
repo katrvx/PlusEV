@@ -19,7 +19,10 @@ The arbiter scores this competitor through `arbiter_evaluate`. That path does no
 - `delta_net_return_vs_always_on` is the difference of compounded returns, not the sum of bar differences.
 - `ci_delta` is a 90% moving-block bootstrap of that same difference. Both series share each draw. Block length is 24 hours.
 - `ci_net_return` is a 90% moving-block bootstrap of the compounded return.
-- `allocation_mix` is the share of decisions at 0, 0.5, and 1.
+- `allocation_mix` is the share of in-position bars at 0, 0.5, and 1. Flat targets are not in the mix. `n_decisions` is every bar in the split and `n_in_position` is the denominator.
+- Cost rows use the same compounded return as the always-on baseline. `switching` is only the extra turnover a gate adds, so on the unchanged strategy it is 0, and gross − fees − slippage − switching equals net.
+- Bootstrap draws are seeded from the policy body, not its name. The ready path uses 2000 resamples.
+- The LightGBM gate fits on early train and calibrates on the last 25% of train. Validation is left out of that fit. `spec()` carries the seed and a hash of the fitted model.
 
 `load_for_lane_b` returns the development view. Test-window dates stay, so a news request that crosses the holdout can still be refused. Test metrics, the verdict, and the paper plan are removed. `GateRunner.evaluate` refuses `split="test"`. `score_frozen` is the one sealed look, and a changed body under an id that was already scored is refused.
 

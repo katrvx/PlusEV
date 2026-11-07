@@ -33,6 +33,13 @@ class RegimeRow(BaseModel):
 
 
 class CostBreakdown(BaseModel):
+    """Compounded returns. gross − fees − slippage − switching = net.
+
+    fees and slippage are the unchanged strategy's own turnover. switching is
+    only the extra turnover a gate adds on top of that path, so it is 0 when
+    the row is the strategy itself.
+    """
+
     split: Split
     gross_return: float
     fees: float
@@ -128,7 +135,13 @@ class ExperimentResult(BaseModel):
 
 
 class GateEvaluation(BaseModel):
-    """One policy, one split. Lane A computes every number."""
+    """One policy, one split. Lane A computes every number.
+
+    allocation_mix is the share of in-position bars at 0, 0.5, and 1.
+    A flat target is not a decision the gate can change, so those bars are
+    left out of the mix. n_decisions counts every bar in the split.
+    n_in_position is the mix denominator.
+    """
 
     policy_id: str
     split: Split
@@ -137,6 +150,8 @@ class GateEvaluation(BaseModel):
     delta_net_return_vs_always_on: float
     ci_delta: tuple[float, float] | None = None
     allocation_mix: dict[str, float] = Field(default_factory=dict)
+    n_decisions: int = 0
+    n_in_position: int = 0
     audit_id: str
 
 

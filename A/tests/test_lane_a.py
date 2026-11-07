@@ -9,7 +9,16 @@ import pandas as pd
 import pytest
 
 from kok_a.binance import normalize_binance_epoch, read_binance_klines
-from kok_a.experiment import GateRunner, agent_view, assemble, fit_regime_labels
+from kok_a.experiment import (
+    N_BOOT,
+    GateRunner,
+    _compound,
+    _cost_row,
+    _fit_lgbm,
+    agent_view,
+    assemble,
+    fit_regime_labels,
+)
 from kok_a.features import (
     MARKET_FEATURES,
     TemporalLeakError,
@@ -182,12 +191,13 @@ def test_runner_refuses_the_sealed_split_and_train_ignores_test_labels(bundle):
     assert after.metrics.net_return == pytest.approx(before.metrics.net_return)
 
 
-def test_lightgbm_refuses_to_fit_or_calibrate_on_test():
+def test_lightgbm_refuses_to_fit_or_calibrate_outside_train():
     gate = LGBMGate()
-    with pytest.raises(PermissionError):
-        gate.fit(pd.DataFrame(), pd.Series(dtype=float), split="test")
-    with pytest.raises(PermissionError):
-        gate.calibrate(pd.DataFrame(), pd.Series(dtype=float), split="test")
+    for split in ("validation", "test"):
+        with pytest.raises(PermissionError):
+            gate.fit(pd.DataFrame(), pd.Series(dtype=float), split=split)
+        with pytest.raises(PermissionError):
+            gate.calibrate(pd.DataFrame(), pd.Series(dtype=float), split=split)
 
 
 def test_frozen_holdout_is_cached_and_a_changed_policy_is_refused(bundle):
@@ -266,9 +276,21 @@ def test_preregistered_baselines_exist_on_every_split_including_holdout(bundle):
     assert 0.0 < always.metrics.exposure <= 1.0
     assert always.metrics.n_switches > 1
     assert bundle.lgbm.fitted_on == "train"
-    assert bundle.lgbm.calibrated_on == "validation"
+    assert bundle.lgbm.calibrated_on == "train_tail"
     assert any(row.regime_feature == "trend_regime" and row.bucket == "bull" for row in result.per_regime)
     assert {row.bucket for row in result.per_regime if row.regime_feature == "trend_regime"} >= {"bull", "bear", "sideways"}
+
+
+def test_market_hash_does_not_depend_on_pandas_datetime_resolution():
+    bars = read_binance_klines(OHLCV_PATH)
+    manifest = json.loads(MANIFEST_PATH.read_text())
+    as_us = bars.copy()
+    as_ns = bars.copy()
+    stamps = pd.to_datetime(bars["open_time"], utc=True)
+    as_us["open_time"] = stamps.dt.as_unit("us")
+    as_ns["open_time"] = stamps.dt.as_unit("ns")
+    assert str(as_us["open_time"].dtype) != str(as_ns["open_time"].dtype)
+    assert hash_ohlcv(as_us) == hash_ohlcv(as_ns) == manifest["market_hash"]
 
 
 def test_ready_snapshot_is_real_binance_and_fear_greed_with_no_invented_news():
@@ -303,7 +325,7 @@ def test_ready_snapshot_is_real_binance_and_fear_greed_with_no_invented_news():
     assert ready.result.provenance["costs"].startswith("assumed_")
     assert ready.result.dataset_hashes["market"] == manifest["market_hash"]
     assert ready.lgbm.fitted_on == "train"
-    assert ready.lgbm.calibrated_on == "validation"
+    assert ready.lgbm.calibrated_on == "train_tail"
     assert ready.result.coverage["news_sentiment"] == 0.0
     assert ready.result.coverage["fear_greed"] > 0.99
     with pytest.raises(PermissionError):
@@ -321,6 +343,84 @@ def test_ready_snapshot_is_real_binance_and_fear_greed_with_no_invented_news():
     assert ready.result.paper_plan.completed is False
     assert ready.result.paper_plan.approved is False
     assert ready.result.paper_plan.horizon_days == 14
+
+
+def test_cost_rows_match_the_compounded_baseline_and_do_not_double_count(bundle):
+    for split in ("train", "validation", "test"):
+        cost = next(row for row in bundle.result.costs if row.split == split)
+        always = next(row for row in bundle.result.baselines if row.split == split and row.policy == "always_on")
+        assert cost.net_return == pytest.approx(always.metrics.net_return)
+        assert cost.gross_return - cost.fees - cost.slippage - cost.switching == pytest.approx(cost.net_return)
+        assert cost.switching == pytest.approx(0.0)
+        assert cost.fees > 0 and cost.slippage > 0
+        assert cost.fees / cost.slippage == pytest.approx(10.0)
+
+
+def test_switching_is_only_the_turnover_a_gate_adds():
+    n = 8
+    frame = pd.DataFrame(
+        {
+            "target_position": np.ones(n),
+            "ret_next": np.full(n, 0.01),
+            "split": ["train"] * n,
+        }
+    )
+    held = simulate(frame, pd.Series(1.0, index=frame.index))
+    flipped = simulate(frame, pd.Series([1.0, 0.0] * (n // 2)))
+    held_cost = _cost_row(frame, held, "train")
+    flipped_cost = _cost_row(frame, flipped, "train")
+    assert held_cost.switching == pytest.approx(0.0)
+    assert held_cost.net_return == pytest.approx(_compound(held["net"].to_numpy(dtype=float)))
+    assert held_cost.gross_return - held_cost.fees - held_cost.slippage - held_cost.switching == pytest.approx(held_cost.net_return)
+    assert flipped_cost.switching > 0
+    assert flipped_cost.gross_return - flipped_cost.fees - flipped_cost.slippage - flipped_cost.switching == pytest.approx(
+        flipped_cost.net_return
+    )
+
+
+def test_renamed_policy_keeps_the_same_interval(bundle):
+    assert N_BOOT == 2000
+    runner = bundle.runner
+    original = dict(runner.rule_spec)
+    renamed = dict(original)
+    renamed["policy_id"] = original["policy_id"] + "-renamed"
+    first = runner.evaluate(original, "validation")
+    second = runner.evaluate(renamed, "validation")
+    assert first.ci_delta[0] != first.ci_delta[1]
+    assert first.ci_delta == second.ci_delta
+    assert first.metrics.ci_net_return == second.metrics.ci_net_return
+    # Same decisions, different body: the interval follows the body.
+    changed = dict(original)
+    changed["thresholds_selected_on"] = "renamed-only"
+    third = runner.evaluate(changed, "validation")
+    assert third.metrics.net_return == pytest.approx(first.metrics.net_return)
+    assert third.ci_delta != first.ci_delta
+
+
+def test_allocation_mix_counts_in_position_bars_only(bundle):
+    spec = bundle.runner.rule_spec
+    evaluation = bundle.runner.evaluate(spec, "validation")
+    part = bundle.frame[bundle.frame["split"] == "validation"]
+    in_position = part["target_position"].abs() > 1e-12
+    assert evaluation.n_decisions == len(part)
+    assert evaluation.n_in_position == int(in_position.sum())
+    assert evaluation.n_in_position < evaluation.n_decisions
+    chosen = allocation(spec, part, lgbm=bundle.lgbm).to_numpy(dtype=float)[in_position.to_numpy()]
+    for level in (0.0, 0.5, 1.0):
+        expected = float(np.isclose(chosen, level).mean())
+        assert evaluation.allocation_mix[str(level)] == pytest.approx(expected)
+    assert sum(evaluation.allocation_mix.values()) == pytest.approx(1.0)
+
+
+def test_lightgbm_spec_records_seed_and_a_stable_model_hash(bundle):
+    first = _fit_lgbm(bundle.frame, seed=7, n_estimators=40)
+    second = _fit_lgbm(bundle.frame, seed=7, n_estimators=40)
+    other = _fit_lgbm(bundle.frame, seed=9, n_estimators=40)
+    assert first.calibrated_on == "train_tail"
+    assert first.spec()["seed"] == 7
+    assert first.spec()["model_hash"] == second.spec()["model_hash"]
+    assert first.spec()["model_hash"] != other.spec()["model_hash"]
+    assert len(first.spec()["model_hash"]) == 16
 
 
 def test_simple_rule_goes_flat_when_the_condition_fails():

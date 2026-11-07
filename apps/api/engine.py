@@ -71,7 +71,7 @@ def run_measured_experiment(
     experiment_id: str,
     strategy: dict[str, Any],
     *,
-    n_boot: int = 200,
+    n_boot: int = 2000,
     n_estimators: int = 120,
     force_fallback: bool | None = None,
 ) -> dict[str, Any]:
@@ -106,7 +106,7 @@ def measure(
     experiment_id: str,
     strategy: dict[str, Any],
     *,
-    n_boot: int = 200,
+    n_boot: int = 2000,
     n_estimators: int = 120,
     force_fallback: bool | None = None,
 ) -> dict[str, Any]:

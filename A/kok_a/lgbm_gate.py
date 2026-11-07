@@ -1,11 +1,14 @@
-"""LightGBM gate. Fit on train, calibrate on validation, never on the sealed test.
+"""LightGBM gate. Fit on early train, calibrate on the last 25% of train.
 
-Thresholds that map probability to {0, 0.5, 1} are preselected, not searched.
-Only bars where the frozen strategy wants exposure are training rows: a flat
-signal has nothing to gate.
+Validation stays untouched, so a validation score is not an in-sample
+calibration. Thresholds that map probability to {0, 0.5, 1} are preselected,
+not searched. Only bars where the frozen strategy wants exposure are training
+rows: a flat signal has nothing to gate.
 """
 
 from __future__ import annotations
+
+import hashlib
 
 import lightgbm as lgb
 import numpy as np
@@ -27,6 +30,7 @@ LOW, HIGH = 0.45, 0.55
 class LGBMGate:
     def __init__(self, features=DEFAULT_FEATURES, seed: int = 7, n_estimators: int = 200):
         self.features = list(features)
+        self.seed = int(seed)
         self.model = lgb.LGBMClassifier(
             n_estimators=n_estimators,
             learning_rate=0.05,
@@ -36,7 +40,7 @@ class LGBMGate:
             subsample_freq=1,
             colsample_bytree=0.8,
             reg_lambda=1.0,
-            random_state=seed,
+            random_state=self.seed,
             verbose=-1,
         )
         self.calibrator: IsotonicRegression | None = None
@@ -46,8 +50,8 @@ class LGBMGate:
 
     @staticmethod
     def _check(split: str) -> None:
-        if split == "test":
-            raise PermissionError("LGBMGate may never fit or calibrate on the sealed test split")
+        if split != "train":
+            raise PermissionError(f"LGBMGate fits and calibrates on train only (got {split!r})")
 
     def fit(self, context: pd.DataFrame, opportunity_return: pd.Series, split: str = "train") -> "LGBMGate":
         self._check(split)
@@ -58,14 +62,14 @@ class LGBMGate:
         self.calibrated_on = None
         return self
 
-    def calibrate(self, context: pd.DataFrame, opportunity_return: pd.Series, split: str = "validation") -> "LGBMGate":
+    def calibrate(self, context: pd.DataFrame, opportunity_return: pd.Series, split: str = "train") -> "LGBMGate":
         self._check(split)
         if self.fitted_on is None:
             raise RuntimeError("calibrate() called before fit()")
         raw = self.model.predict_proba(context[self.features])[:, 1]
         self.calibrator = IsotonicRegression(out_of_bounds="clip", y_min=0.0, y_max=1.0)
         self.calibrator.fit(raw, (opportunity_return > 0).astype(int))
-        self.calibrated_on = split
+        self.calibrated_on = "train_tail"
         return self
 
     def proba(self, context: pd.DataFrame) -> np.ndarray:
@@ -79,6 +83,18 @@ class LGBMGate:
         out = np.where(probability > HIGH, 1.0, np.where(probability < LOW, 0.0, 0.5))
         return pd.Series(out, index=context.index, dtype=float)
 
+    def model_hash(self) -> str | None:
+        """Hash of the fitted trees and the isotonic map. None before fit."""
+
+        booster = getattr(self.model, "booster_", None)
+        if booster is None:
+            return None
+        blob = booster.model_to_string().encode()
+        if self.calibrator is not None:
+            blob += np.asarray(self.calibrator.X_thresholds_, dtype=np.float64).tobytes()
+            blob += np.asarray(self.calibrator.y_thresholds_, dtype=np.float64).tobytes()
+        return hashlib.sha256(blob).hexdigest()[:16]
+
     def spec(self) -> dict:
         return {
             "policy_id": "meta::lgbm_gate_v1",
@@ -87,4 +103,6 @@ class LGBMGate:
             "thresholds": [LOW, HIGH],
             "fitted_on": self.fitted_on,
             "calibrated_on": self.calibrated_on,
+            "seed": self.seed,
+            "model_hash": self.model_hash(),
         }
