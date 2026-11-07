@@ -97,7 +97,7 @@ Python 3.10+ (on macOS: `uv venv --python 3.12 && source .venv/bin/activate`; Li
 pip install -r requirements-lane-b.txt
 python3 -m pytest -q tests/test_lane_b.py           # 38 guardrail + regression tests
 python3 scripts/run_investigation.py --fallback      # deterministic agents -> experiments/investigation_fixture.json
-KOK_AGENT_MODEL=google:gemini-2.5-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
+KOK_AGENT_MODEL=google:gemini-3.8-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
 ```
 
 ## How this maps to the judging rubric

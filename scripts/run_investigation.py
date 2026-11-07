@@ -1,7 +1,7 @@
 """Run a Lane B investigation and write the InvestigationReport JSON (what Lane C's UI reads).
 
     python3 scripts/run_investigation.py                         # deterministic fallback on the Lane A stand-in
-    KOK_AGENT_MODEL=google:gemini-2.5-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
+    KOK_AGENT_MODEL=google:gemini-3.8-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
 """
 
 from __future__ import annotations

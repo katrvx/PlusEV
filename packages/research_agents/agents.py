@@ -13,7 +13,7 @@ Agents see TRAIN data only; validation results reach the critic only through the
 trial log after the arbiter (code) has run them. Agents never see the test split.
 
 Model is configured with KOK_AGENT_MODEL (any PydanticAI model string, e.g.
-"google:gemini-2.5-flash" with GEMINI_API_KEY set). Unset -> deterministic fallback.
+"google:gemini-3.8-flash" with GEMINI_API_KEY set). Unset -> deterministic fallback.
 """
 
 from __future__ import annotations
