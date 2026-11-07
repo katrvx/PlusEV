@@ -4,9 +4,9 @@ Rubric: *"Limits enforced in code, every action logged, one control shown live."
 
 ## Paper only
 
-Barometer never connects to an exchange or broker with live credentials. The "live" tab consumes a trade CSV, a paper-trading feed, or a replay. There is no order-sending code path in the repository. This is a rule, not a setting.
++EV never connects to an exchange or broker with live credentials. The "live" tab consumes a trade CSV, a paper-trading feed, or a replay. There is no order-sending code path in the repository. This is a rule, not a setting.
 
-## Controls, all in `barometer/risk/controls.py`
+## Controls, all in `plusev/risk/controls.py`
 
 | Control | Rule | Enforced where | Logged |
 |---|---|---|---|
@@ -20,11 +20,11 @@ Barometer never connects to an exchange or broker with live credentials. The "li
 
 ## The control shown live (demo)
 
-The trader, mid-drawdown, tries to double size "to make it back faster". The UI shows: *"Refused: 3 consecutive losses and drawdown at the 94th percentile. Rule: no size increase under these conditions. Logged."* Then they try to stop the bot; Barometer shows the verdict (within expectation, 78% alive, 35 trades to a 90% answer) and the **override ledger** entry that will be scored later. They can still stop it. The human decides; the system makes the decision honest and recorded.
+The trader, mid-drawdown, tries to double size "to make it back faster". The UI shows: *"Refused: 3 consecutive losses and drawdown at the 94th percentile. Rule: no size increase under these conditions. Logged."* Then they try to stop the bot; +EV shows the verdict (within expectation, 78% alive, 35 trades to a 90% answer) and the **override ledger** entry that will be scored later. They can still stop it. The human decides; the system makes the decision honest and recorded.
 
 ## Override Ledger
 
-Every manual action: `{ts, strategy_id, action, size_before, size_after, judge_verdict_at_time, reason}`. After the fact, the ledger scores each override: P&L of the path taken vs. the path Barometer recommended, over the next *k* trades. The UI shows the running tally: *"Your overrides: 7. Net effect vs. recommendation: −2.1%."* This is the feature the practitioner team built by hand in a spreadsheet.
+Every manual action: `{ts, strategy_id, action, size_before, size_after, judge_verdict_at_time, reason}`. After the fact, the ledger scores each override: P&L of the path taken vs. the path +EV recommended, over the next *k* trades. The UI shows the running tally: *"Your overrides: 7. Net effect vs. recommendation: −2.1%."* This is the feature the practitioner team built by hand in a spreadsheet.
 
 ## Audit log
 

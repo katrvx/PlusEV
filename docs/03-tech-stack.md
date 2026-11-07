@@ -88,7 +88,7 @@ Alternative if ADK fights us: **pydantic-ai** (typed agents, model-agnostic). De
 
 ```toml
 [project]
-name = "barometer"
+name = "plusev"
 requires-python = ">=3.12,<3.15"
 dependencies = [
   "polars>=1.0", "duckdb>=1.0", "pydantic>=2.7",

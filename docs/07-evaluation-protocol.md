@@ -4,11 +4,11 @@
 
 ## Principle: planted truth on real prices
 
-We cannot know whether a real trader's bot "really" died. So we build strategies where we **know**, run them on **real price history** (so noise, fat tails, vol clustering, event days are all real), and feed Barometer only what a trader would have: the trade stream and a description.
+We cannot know whether a real trader's bot "really" died. So we build strategies where we **know**, run them on **real price history** (so noise, fat tails, vol clustering, event days are all real), and feed +EV only what a trader would have: the trade stream and a description.
 
 Because the trade stream is generated *after* the strategy is fixed, this is a genuine forward stream and the sequential-test guarantees in [05 B4](05-judge-and-stats.md) hold here exactly.
 
-## The strategy zoo (`barometer/sim/`)
+## The strategy zoo (`plusev/sim/`)
 
 Built on `vectorbt.Portfolio.from_signals` with fees 5 bp + slippage 5 bp (equities) / 10 bp + 10 bp (crypto). Each strategy is a signal generator plus an **edge injector** that controls the truth.
 
@@ -50,7 +50,7 @@ Stream live trades. Compare three decision rules:
 |---|---|
 | **DD-20** | stop when drawdown > 20% |
 | **3-loss** | stop after 3 consecutive losses, restart after 1 win |
-| **Barometer** | stop when the retirement e-detector alarms *or* the judge's recommendation is "stop" |
+| **+EV** | stop when the retirement e-detector alarms *or* the judge's recommendation is "stop" |
 
 Metrics, per rule, across runs:
 - **Detection delay** on `dies at T`: trades between *T* and stop. Median, 80% interval.
@@ -74,7 +74,7 @@ Inject known execution degradation (double slippage from a date) and known regim
 
 ### E6 · Override Ledger (qualitative)
 
-On replay of a `dies at T` and an `alive` run, simulate a nervous trader who overrides at every DD-20 trigger. Report the P&L cost of overrides vs. following Barometer. This is the on-screen failure for the demo.
+On replay of a `dies at T` and an `alive` run, simulate a nervous trader who overrides at every DD-20 trigger. Report the P&L cost of overrides vs. following +EV. This is the on-screen failure for the demo.
 
 ## Benchmarks (the "fitting benchmark" criterion)
 
@@ -82,7 +82,7 @@ On replay of a `dies at T` and an `alive` run, simulate a nervous trader who ove
 - For the envelope: **run-always**, because the alternative to a filter is no filter.
 - For the e-detector: **plain CUSUM on P&L** with a tuned threshold, because Algo Studio uses it.
 
-We do not benchmark against buy-and-hold: Barometer doesn't trade.
+We do not benchmark against buy-and-hold: +EV doesn't trade.
 
 ## Costs
 
@@ -94,7 +94,7 @@ Every reported number carries a bootstrap or across-run interval. Where a number
 
 ## Honest-result clause
 
-If Barometer does not beat DD-20 on P&L preserved, the deck says: "Barometer did not beat the 20% drawdown rule on preserved P&L (x% vs y%, CI […]). It did reduce false kills from a% to b%. Here is why we think that is." The brief says this can still score top marks. We believe it.
+If +EV does not beat DD-20 on P&L preserved, the deck says: "+EV did not beat the 20% drawdown rule on preserved P&L (x% vs y%, CI […]). It did reduce false kills from a% to b%. Here is why we think that is." The brief says this can still score top marks. We believe it.
 
 ## Reproducibility
 

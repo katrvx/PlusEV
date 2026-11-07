@@ -21,7 +21,7 @@ Rule: nobody blocks on anybody. Every module has a fake-data fixture so it can b
 
 **15:30 – 16:30 · Scaffold and contracts**
 - `uv init`, `pyproject.toml` from [03](03-tech-stack.md), ruff, pytest, GitHub Actions.
-- Freeze two schemas in `barometer/schemas.py`: `Trade`, `JudgeVerdict` (X-ray and Kill-or-Keep variants). Everyone codes against them.
+- Freeze two schemas in `plusev/schemas.py`: `Trade`, `JudgeVerdict` (X-ray and Kill-or-Keep variants). Everyone codes against them.
 - Owner 1 starts the Yahoo + Binance pull. Owner 4 gets Gemini keys working with a structured-output hello-world.
 - Kate: `audit/log.py` (hash chain + verify), `risk/controls.py` stubs.
 
@@ -43,7 +43,7 @@ Rule: nobody blocks on anybody. Every module has a fake-data fixture so it can b
 
 **22:00 – 02:00 · Kill or Keep + UI**
 - Owner 3: B2 conditional drift, B3 decomposition, B4 e-process via `ville` + fallback, B5 e-detector. Calibrate ARL on alive runs.
-- Owner 2: E2 harness (DD-20, 3-loss, Barometer rules); E3 logging of predicted vs. actual N.
+- Owner 2: E2 harness (DD-20, 3-loss, +EV rules); E3 logging of predicted vs. actual N.
 - Owners 1 + 4: UI. Price chart with regime bands and trade markers (lightweight-charts), heatmap (ECharts), live feed + verdict panel, override ledger panel.
 - Kate: risk controls wired to UI; override ledger scoring; deck slides for problem, user, architecture.
 - **Sleep in shifts from 00:00.** Two people down at a time, 3 hours each. Nobody pulls an all-nighter; a tired judge-coder ships a wrong bootstrap.
@@ -85,7 +85,7 @@ Rule: nobody blocks on anybody. Every module has a fake-data fixture so it can b
 
 ## Definition of done
 
-- `uv sync && uv run barometer demo` on a clean clone produces the X-ray heatmap and a Kill-or-Keep verdict for the demo bots.
+- `uv sync && uv run plusev demo` on a clean clone produces the X-ray heatmap and a Kill-or-Keep verdict for the demo bots.
 - `eval/results/` contains E1–E3 tables with intervals from the evaluation set, with the commit hash.
 - Deck has: user, failure on screen, architecture with code/LLM split, the three counts, E1–E3 numbers, limitations, data licences.
 - Audit log verifies.

@@ -119,9 +119,9 @@ Deterministic, versioned, no LLM calls inside. Maths in [05-judge-and-stats.md](
 ## Repository layout (planned)
 
 ```
-barometer/
+plusev/
   docs/                 ← you are here
-  barometer/
+  plusev/
     data/               loaders: prices, gdelt, calendar, trades
     regime/             labeller (code), sentiment (LLM), tagging
     swarm/              ADK agents, schemas, pre-registration ledger

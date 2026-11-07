@@ -40,7 +40,7 @@ From r/algotrading, r/quant, r/Trading and practitioner write-ups, 2024–2026 (
 
 **The pattern:** everyone classifies the *market*. Nobody classifies *your strategy against the market*. The regime tools don't know your bot; the drift tools don't know the regime.
 
-## What Barometer answers
+## What +EV answers
 
 1. **Where does this bot work?** P&L by regime, validated out-of-sample. (X-ray)
 2. **Is this drawdown normal?** Compared to the backtest's own drawdown distribution. (Kill or Keep)
@@ -50,7 +50,7 @@ From r/algotrading, r/quant, r/Trading and practitioner write-ups, 2024–2026 (
 
 ## The failure handled on screen (rubric: relevance and impact, 20%)
 
-A bot is down 15% over two weeks. The trader opens the kill switch. Barometer: *"This drawdown is 1.2σ from your backtest's drawdown distribution. 30 of your 40 losing trades fell in the three sessions after the 29 Oct rate decision; your strategy's envelope shows it loses in every event window in the backtest too. Conditional on regime, live performance matches backtest. Probability the edge is alive: 78%. Trades until a 90% answer: ≈35. Historically, intervening here would have cost you 2.3%."* The trader keeps the bot. Second case: a bot whose edge genuinely died; Barometer flags it 25 trades before the drawdown rule would have.
+A bot is down 15% over two weeks. The trader opens the kill switch. +EV: *"This drawdown is 1.2σ from your backtest's drawdown distribution. 30 of your 40 losing trades fell in the three sessions after the 29 Oct rate decision; your strategy's envelope shows it loses in every event window in the backtest too. Conditional on regime, live performance matches backtest. Probability the edge is alive: 78%. Trades until a 90% answer: ≈35. Historically, intervening here would have cost you 2.3%."* The trader keeps the bot. Second case: a bot whose edge genuinely died; +EV flags it 25 trades before the drawdown rule would have.
 
 ## Impact, honestly stated
 
@@ -58,6 +58,6 @@ We will not claim a dollar figure for the retail market. What we can show: on st
 
 ## Out of scope
 
-- Generating strategies or alpha. Barometer judges, it does not invent.
+- Generating strategies or alpha. +EV judges, it does not invent.
 - Executing trades. Paper mode only; the human presses every button that moves money.
 - High-frequency strategies (sub-second). Our regime tags are daily/hourly.

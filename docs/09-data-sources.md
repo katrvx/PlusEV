@@ -4,7 +4,7 @@ Track rule: *"Reference every dataset and check its licence."* Some free market 
 
 | Dataset | Use | How we get it | Licence / terms | Notes |
 |---|---|---|---|---|
-| **AgentVerse finance kit** | Real price history; "hidden test mode" | From organisers | Per kit terms | Preferred source. Ask at the mentor desk for the hidden-test protocol; if it fits, we report Barometer on it as an extra holdout. |
+| **AgentVerse finance kit** | Real price history; "hidden test mode" | From organisers | Per kit terms | Preferred source. Ask at the mentor desk for the hidden-test protocol; if it fits, we report +EV on it as an extra holdout. |
 | **Yahoo Finance via `yfinance`** | Daily OHLCV for 20 US large caps + SPY, 2015–2025 | `yfinance.download` once, cached to Parquet | Yahoo terms: personal/non-commercial use | Adjusted closes for returns; raw for liquidity proxies. |
 | **Binance Vision** | Daily/hourly OHLCV for BTC, ETH, SOL, BNB, XRP vs USDT | `data.binance.vision` monthly zips | **CC BY-NC-SA 4.0** (non-commercial, share-alike) | Explicitly flagged non-commercial in the deck. |
 | **GDELT 2.0 DOC API** | Headlines with publication timestamps, 2015–2025 | `gdeltdoc` client, pulled once, cached | Free; GDELT terms of use (attribution) | Pull by keyword themes per symbol/market; respect rate limits; never called from the app. |

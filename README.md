@@ -1,4 +1,6 @@
-# Barometer
+# +EV
+
+> **+EV** = positive expected value: the only reason to keep a trading bot running. We tell you whether yours still is.
 
 **Before you run a trading bot, we show you where it works. While it runs, we tell you whether it's broken or just in bad weather, and how long until you'd know.**
 
@@ -16,9 +18,9 @@ Existing tools solve half of it each:
 |---|---|---|---|---|
 | Regime APIs (getregime, TradingView scripts) | ✅ | ❌ | ❌ | ❌ |
 | Drift monitors (Algo Studio, AlgoTradingHub) | ❌ | ✅ | ❌ | ❌ |
-| **Barometer** | ✅ | ✅ | ✅ | ✅ |
+| **+EV** | ✅ | ✅ | ✅ | ✅ |
 
-Regime tools tell you what the market is doing. Drift tools tell you your bot changed. Barometer is the first to put your bot and the market in the same table.
+Regime tools tell you what the market is doing. Drift tools tell you your bot changed. +EV is the first to put your bot and the market in the same table.
 
 ## What it does
 
@@ -41,7 +43,7 @@ This split isn't a hedge, it's the thesis. Three papers published in the last ei
 
 ## How we prove it works
 
-We run strategies with **planted truth** on real price history: one with a live edge, one that is pure noise, one whose edge dies at a known time *T*. Barometer sees only the trade stream. We measure how much earlier it catches dead bots and how much less often it kills live ones than the "stop at 20% drawdown" rule traders actually use, and whether the X-ray's green regimes stay green out-of-sample after costs. Honest result either way. See [docs/07-evaluation-protocol.md](docs/07-evaluation-protocol.md).
+We run strategies with **planted truth** on real price history: one with a live edge, one that is pure noise, one whose edge dies at a known time *T*. +EV sees only the trade stream. We measure how much earlier it catches dead bots and how much less often it kills live ones than the "stop at 20% drawdown" rule traders actually use, and whether the X-ray's green regimes stay green out-of-sample after costs. Honest result either way. See [docs/07-evaluation-protocol.md](docs/07-evaluation-protocol.md).
 
 ## Docs
 
@@ -62,7 +64,7 @@ We run strategies with **planted truth** on real price history: one with a live 
 
 ## Judging rubric → where we score
 
-| Criterion | Weight | Barometer |
+| Criterion | Weight | +EV |
 |---|---|---|
 | Traceable reasoning | 25% | Every verdict is a chain: raw prices → regime tags (code) → conditional stats (code) → explanation (LLM, quoting the numbers). Hash-chained log. |
 | Testing on unseen data | 25% | Planted-truth strategies, sealed held-out window, real costs, bootstrap intervals, benchmark = the rules traders use today. |

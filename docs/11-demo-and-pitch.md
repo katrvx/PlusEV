@@ -8,16 +8,16 @@
 
 ## Deck outline (12 slides, each with its rubric tag)
 
-1. **Title.** Barometer. One-liner. Team. Repo link, commit hash.
+1. **Title.** +EV. One-liner. Team. Repo link, commit hash.
 2. **The user and the decision.** *[Relevance 20%]* A trader, a bot, a 15% drawdown, three buttons. The forum thread: "how many live trades?" with the spread of answers. The practitioner stat: 8 of 11 interventions made it worse.
 3. **What exists and where it stops.** *[Relevance / Ambition]* The table: regime tools know the market, drift tools know your bot, nobody joins them.
-4. **What Barometer does.** Two views on one tagged-trade table. Screenshot of the heatmap and of the verdict panel.
+4. **What +EV does.** Two views on one tagged-trade table. Screenshot of the heatmap and of the verdict panel.
 5. **Architecture: code vs. LLM.** *[Traceable reasoning 25%]* The diagram from [02](02-architecture.md) with every box marked. One sentence: the LLM never produces a number in a verdict. Why (three papers, one line each).
 6. **The regime engine.** *[Traceable]* Features, all as-of bar open, no look-ahead test. Anonymised sentiment with lexicon baseline.
 7. **The judge.** *[Traceable / Testing]* Conditional P&L → BH over *m* registered hypotheses → sealed holdout (receipt). Drawdown percentile, decomposition, e-process, "N more trades" as a labelled projection. One formula per method, no more.
 8. **The swarm and the counts.** *[Ambition 15%]* "5 agents proposed 31, 4 refused as duplicates, 9 survived training, 6 confirmed on holdout." Pre-registration ledger screenshot.
 9. **Evidence 1: X-ray out-of-sample.** *[Testing 25%]* E1 table: power on planted regime, false-confirmation rate vs. *q*, filter-vs-always with CI, at 1× and 2× costs.
-10. **Evidence 2: Kill or Keep vs. the rules traders use.** *[Testing 25%]* E2 table: detection delay, false-kill rate, P&L preserved for DD-20, 3-loss, CUSUM, Barometer, with intervals. E3: "N more trades" coverage. Honest-result clause if needed.
+10. **Evidence 2: Kill or Keep vs. the rules traders use.** *[Testing 25%]* E2 table: detection delay, false-kill rate, P&L preserved for DD-20, 3-loss, CUSUM, +EV, with intervals. E3: "N more trades" coverage. Honest-result clause if needed.
 11. **Risk controls, shown.** *[Risk 15%]* The refused doubling-down, the pause, the override ledger tally, the hash-chained log with `verify` output. Paper only.
 12. **Limits and next.** What we assume ([05 Part C](05-judge-and-stats.md)), memorisation-guard result, data licences (Binance non-commercial), what we'd do with a week.
 
