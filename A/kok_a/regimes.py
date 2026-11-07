@@ -82,6 +82,11 @@ def discover_regime_filter(
 
     A bucket needs enough bars for the block bootstrap. Buckets that still
     contain zero are left alone. With no such bucket the filter stays fully on.
+
+    The returned spec is `runner.regime_spec`. Lane B may treat it as a competitor.
+    The keys are stable: policy_id, family, flat_buckets, full_buckets,
+    allocation_flat, allocation_full, allocation_else, selected_on, summary.
+    Each bucket entry is {"axis", "bucket"}.
     """
 
     train = frame["split"] == "train"

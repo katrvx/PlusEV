@@ -21,7 +21,7 @@ A gate only multiplies a strategy's target position by 0, 0.5, or 1.
 | Fees and slippage | Assumed: 10 bps Binance spot regular-user taker fee, plus 1 bp slippage. Not a measured fill. |
 | Regimes, splits, Sharpe, drawdown, block-bootstrap intervals | Computed. Cutpoints are fit on the train window only. |
 | LightGBM gate | Fit on the early in-market train rows, calibrated on the last 25% of those rows. The allocation band is that tail's base rate ± 2 points, fixed before validation. It is not the old 0.45/0.55 cut. `spec()` includes the seed, the band, and a hash of the fitted model. It never fits on the test window. |
-| Walk-forward | Four expanding folds inside train only. They do not choose the sealed-test policy. If the gate loses on every scored fold, that loss is written into the run notes. |
+| Walk-forward | Four expanding folds inside train only. `GateRunner.evaluate_folds` scores any frozen spec on those same windows. They do not choose the sealed-test policy. If the LightGBM gate loses on every scored fold, that loss is written into the run notes. |
 | 14-day range | A block-bootstrap range from training returns, stored on the unstarted paper plan. A later result inside it is a plausible draw, not proof the strategy broke. |
 | Fee check | Always-on on validation at half, one, and double the assumed cost. The arbiter does not read it. |
 | Holdout | The last 20% of the real timeline. `run_experiment` scores the pre-registered policies there once. `GateRunner.evaluate` refuses that split. |

@@ -482,6 +482,87 @@ def test_paper_plan_champion_is_the_policy_the_verdict_chose():
     assert kept.champion_policy_id == "always_on"
 
 
+def test_fold_score_keeps_the_open_position_and_ignores_embargo_returns():
+    n = 160
+    frame = pd.DataFrame(
+        {
+            "decision_time": pd.date_range("2024-01-01", periods=n, freq="h", tz="UTC"),
+            "split": ["train"] * n,
+            "target_position": np.ones(n),
+            "ret_next": np.zeros(n),
+            "momentum_24h": np.zeros(n),
+            "realized_vol_7d": np.zeros(n),
+        }
+    )
+    runner = GateRunner(frame, None, seed=1, n_boot=8, snapshot_id="x", thresholds={})  # type: ignore[arg-type]
+    spec = {"policy_id": "always_on", "family": "always_on"}
+    held = runner.evaluate_folds(spec)
+    # Already in the market, so the fold does not pay a fresh entry. A slice restarted at
+    # zero would charge one entry on the first scored bar.
+    assert [item.fold for item in held] == [1, 2, 3]
+    assert held[0].n_decisions == 40
+    assert held[0].metrics.turnover == pytest.approx(0.0)
+    assert held[0].metrics.net_return == pytest.approx(0.0)
+    frame.loc[38:39, "ret_next"] = 0.5
+    untouched = runner.evaluate_folds(spec)
+    assert untouched[0].metrics.net_return == pytest.approx(0.0)
+    frame.loc[40, "ret_next"] = 0.01
+    moved = runner.evaluate_folds(spec)
+    assert moved[0].metrics.net_return == pytest.approx(0.01)
+    assert moved[0].n_decisions == 40
+
+
+def test_feature_series_refuses_the_forward_label(bundle):
+    with pytest.raises(PermissionError):
+        bundle.runner.feature_series("ret_next", split="train")
+    train_times = set(bundle.runner.feature_series("fear_greed", split="train"))
+    valid = bundle.runner.feature_series("fear_greed", split="validation")
+    assert valid
+    assert set(valid).isdisjoint(train_times)
+
+
+def test_evaluate_folds_stays_inside_train_and_matches_the_walk_forward_windows(bundle):
+    spec = dict(bundle.runner.rule_spec)
+    renamed = dict(spec)
+    renamed["policy_id"] = spec["policy_id"] + "-renamed"
+    first = bundle.runner.evaluate_folds(spec)
+    second = bundle.runner.evaluate_folds(renamed)
+    assert [item.fold for item in first] == [1, 2, 3]
+    assert all(item.split == "train" for item in first)
+    assert [item.ci_delta for item in first] == [item.ci_delta for item in second]
+    assert bundle.runner.holdout_log == []
+    by_fold = {item.fold: item for item in first}
+    scored = [fold for fold in bundle.result.walk_forward if fold.delta_net_return_vs_always_on is not None]
+    assert scored
+    for fold in scored:
+        assert by_fold[fold.fold].n_decisions == fold.n_score
+    before = [item.metrics.net_return for item in first]
+    poisoned = GateRunner(
+        bundle.frame.copy(),
+        bundle.lgbm,
+        seed=bundle.runner.seed,
+        n_boot=bundle.runner.n_boot,
+        snapshot_id=bundle.runner.snapshot_id,
+        thresholds=bundle.thresholds,
+    )
+    poisoned.frame.loc[poisoned.frame["split"] == "test", "ret_next"] = -0.2
+    poisoned.frame.loc[poisoned.frame["split"] == "validation", "ret_next"] = 0.4
+    after = poisoned.evaluate_folds(spec)
+    assert [item.metrics.net_return for item in after] == pytest.approx(before)
+
+
+def test_feature_series_is_the_train_column_and_refuses_the_holdout(bundle):
+    series = bundle.runner.feature_series("fear_greed", split="train")
+    train = bundle.frame[bundle.frame["split"] == "train"]
+    assert len(series) == len(train)
+    assert series[0][0] == train["decision_time"].iloc[0].to_pydatetime()
+    assert series[0][1] == pytest.approx(float(train["fear_greed"].iloc[0]))
+    with pytest.raises(PermissionError):
+        bundle.runner.feature_series("fear_greed", split="test")
+    with pytest.raises(KeyError):
+        bundle.runner.feature_series("not_a_feature", split="train")
+
+
 def test_simple_rule_goes_flat_when_the_condition_fails():
     train = pd.DataFrame({"momentum_24h": [0.1, -0.1], "realized_vol_7d": [0.01, 0.01]})
     spec = rule_gate_spec(train)
@@ -598,6 +679,12 @@ def test_agent_view_drops_sealed_test_numbers_and_keeps_the_window(bundle):
     assert any(point.split == "test" for point in bundle.result.comparison_equity)
     assert any(row.split == "test" for row in bundle.result.baselines)
     assert bundle.result.decision is not None
+    view_range = view.train_predictive_range
+    full_range = bundle.result.train_predictive_range
+    assert view_range is not None and full_range is not None
+    assert view_range.low == full_range.low
+    assert view_range.high == full_range.high
+    assert view_range.horizon_bars == full_range.horizon_bars
 
 
 def test_experiment_records_an_unstarted_paper_plan(bundle):
@@ -622,6 +709,17 @@ def test_experiment_records_an_unstarted_paper_plan(bundle):
     assert plan.predictive_range_low is not None and plan.predictive_range_high is not None
     assert plan.predictive_range_low < plan.predictive_range_high
     assert plan.predictive_horizon_bars == 14 * 24
+    stored = bundle.result.train_predictive_range
+    assert stored is not None
+    assert stored.low == plan.predictive_range_low
+    assert stored.high == plan.predictive_range_high
+    assert stored.horizon_bars == plan.predictive_horizon_bars
+    poisoned = bundle.frame.copy()
+    poisoned.loc[poisoned["split"] != "train", "ret_next"] = 0.25
+    original = simulate(bundle.frame, pd.Series(1.0, index=bundle.frame.index))
+    changed = simulate(poisoned, pd.Series(1.0, index=poisoned.index))
+    train = bundle.frame["split"] == "train"
+    assert np.allclose(original.loc[train, "net"], changed.loc[train, "net"])
     scored = [fold for fold in bundle.result.walk_forward if fold.delta_net_return_vs_always_on is not None]
     assert scored and all("sealed-test" in fold.note for fold in scored)
     train_end = next(window.end for window in bundle.result.windows if window.split == "train")

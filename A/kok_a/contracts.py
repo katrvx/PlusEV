@@ -105,6 +105,14 @@ class WalkForwardFold(BaseModel):
     note: str
 
 
+class PredictiveRange(BaseModel):
+    """14-day range drawn from training returns only. A later paper result inside it is a plausible draw."""
+
+    low: float
+    high: float
+    horizon_bars: int
+
+
 class FeeCheck(BaseModel):
     """Always-on validation return at a pre-registered cost multiple. Not used to pick a policy."""
 
@@ -133,6 +141,7 @@ class ExperimentResult(BaseModel):
     comparison_equity: list[ComparisonPoint] = Field(default_factory=list)
     walk_forward: list[WalkForwardFold] = Field(default_factory=list)
     fee_checks: list[FeeCheck] = Field(default_factory=list)
+    train_predictive_range: PredictiveRange | None = None
     provenance: dict[str, str] = Field(default_factory=dict)
     notes: list[str] = Field(default_factory=list)
     decision: Decision | None = None
@@ -157,6 +166,7 @@ class GateEvaluation(BaseModel):
     allocation_mix: dict[str, float] = Field(default_factory=dict)
     n_decisions: int = 0
     n_in_position: int = 0
+    fold: int | None = None
     audit_id: str
 
 

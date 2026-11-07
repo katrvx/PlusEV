@@ -25,6 +25,7 @@ from kok_a.contracts import (
     FeeCheck,
     GateEvaluation,
     Metrics,
+    PredictiveRange,
     RegimeRow,
     WalkForwardFold,
     Window,
@@ -102,6 +103,36 @@ class GateRunner:
             raise ValueError(f"unknown split {split}")
         return self._score(policy_spec, split, reveal=(split,))
 
+    def evaluate_folds(self, policy_spec: dict) -> list[GateEvaluation]:
+        """Score one frozen spec on the expanding train folds. The test split is not read.
+
+        The windows are the same four blocks as the LightGBM walk-forward, with the
+        same 2-bar embargo gap. Fold 0 is the first fit block and is not scored.
+        Costs, the bootstrap, and the seed follow evaluate(). The seed also includes
+        the fold number, so two folds do not share draws.
+        """
+
+        windows = _fold_windows(self.frame)
+        return [self._score(policy_spec, "train", reveal=("train",), row_index=index, fold=fold) for fold, index in windows]
+
+    def feature_series(self, name: str, split: str = "train") -> list[tuple[datetime, float | None]]:
+        """Point-in-time values for one column. Missing values stay None. The test split is refused."""
+
+        if split == "test":
+            raise PermissionError("sealed test split; GateRunner.feature_series refuses it")
+        if split not in ("train", "validation"):
+            raise ValueError(f"unknown split {split}")
+        if name == "ret_next":
+            raise PermissionError("ret_next is the forward label; feature_series does not return it")
+        if name not in self.frame.columns:
+            raise KeyError(name)
+        part = self.frame.loc[self.frame["split"] == split, ["decision_time", name]]
+        series: list[tuple[datetime, float | None]] = []
+        for stamp, value in zip(part["decision_time"], part[name], strict=True):
+            number = None if pd.isna(value) else float(value)
+            series.append((_py(stamp), number))
+        return series
+
     def evaluate_frozen(self, policy_spec: dict) -> GateEvaluation:
         """One look at the test split for this exact policy. A changed body under the same id is refused."""
 
@@ -119,9 +150,23 @@ class GateRunner:
         self.holdout_log.append(policy_id)
         return evaluation
 
-    def _score(self, policy_spec: dict, split: str, reveal: tuple[str, ...]) -> GateEvaluation:
+    def _score(
+        self,
+        policy_spec: dict,
+        split: str,
+        reveal: tuple[str, ...],
+        row_index: pd.Index | None = None,
+        fold: int | None = None,
+    ) -> GateEvaluation:
         multiplier = allocation(policy_spec, self.frame, lgbm=self.lgbm)
-        visible = self.frame["split"].isin(reveal).to_numpy()
+        if row_index is None:
+            visible = self.frame["split"].isin(reveal).to_numpy()
+            mask = self.frame["split"] == split
+        else:
+            if self.frame.loc[row_index, "split"].eq("test").any():
+                raise PermissionError("sealed test split; GateRunner.evaluate_folds refuses it")
+            visible = self.frame.index.isin(row_index)
+            mask = visible
         scored = simulate(self.frame, multiplier, visible=visible, fee_bps=self.fee_bps, slippage_bps=self.slippage_bps)
         baseline = simulate(
             self.frame,
@@ -130,14 +175,14 @@ class GateRunner:
             fee_bps=self.fee_bps,
             slippage_bps=self.slippage_bps,
         )
-        mask = self.frame["split"] == split
         part = scored.loc[mask]
         base = baseline.loc[mask]
         policy_id = str(policy_spec.get("policy_id", "unnamed"))
         # The name is not part of the draw. Renaming one rule must not move its interval.
         content = _policy_content(policy_spec)
-        policy_metrics = _metrics(part, _rng(self.seed, content, split, "net"), self.n_boot)
-        always_metrics = _metrics(base, _rng(self.seed, "always_on", split, "net"), self.n_boot)
+        seed_label = split if fold is None else f"{split}-fold-{fold}"
+        policy_metrics = _metrics(part, _rng(self.seed, content, seed_label, "net"), self.n_boot)
+        always_metrics = _metrics(base, _rng(self.seed, "always_on", seed_label, "net"), self.n_boot)
         policy_net = part["net"].to_numpy(dtype=float)
         base_net = base["net"].to_numpy(dtype=float)
         mix, n_decisions, n_in_position = _allocation_mix(multiplier.loc[mask], self.frame.loc[mask, "target_position"])
@@ -147,11 +192,12 @@ class GateRunner:
             metrics=policy_metrics,
             always_on=always_metrics,
             delta_net_return_vs_always_on=policy_metrics.net_return - always_metrics.net_return,
-            ci_delta=_paired_compound_ci(policy_net, base_net, _rng(self.seed, content, split, "delta"), self.n_boot),
+            ci_delta=_paired_compound_ci(policy_net, base_net, _rng(self.seed, content, seed_label, "delta"), self.n_boot),
             allocation_mix=mix,
             n_decisions=n_decisions,
             n_in_position=n_in_position,
-            audit_id=_audit(policy_spec, split, self.snapshot_id),
+            fold=fold,
+            audit_id=_audit(policy_spec, seed_label, self.snapshot_id),
         )
 
 
@@ -306,6 +352,7 @@ def assemble(
     always = always_path
     train_net = always.loc[sample["split"] == "train", "net"].to_numpy(dtype=float)
     horizon_range = _predictive_range(train_net, _rng(seed, "paper", "range"), n_boot)
+    predictive = None if horizon_range is None else PredictiveRange(low=horizon_range[0], high=horizon_range[1], horizon_bars=horizon_range[2])
     experiment_id = f"exp_{signal_hash[:12]}"
     n_test = int((sample["split"] == "test").sum())
     decision = decide({name: scored[(name, "test")] for name in SCORED}, n_test)
@@ -340,6 +387,7 @@ def assemble(
         comparison_equity=_comparison_equity(sample, runner, fee, slip),
         walk_forward=folds,
         fee_checks=_fee_checks(sample, fee, slip),
+        train_predictive_range=predictive,
         provenance=provenance,
         notes=_notes(
             thresholds,
@@ -628,12 +676,33 @@ def _comparison_equity(frame: pd.DataFrame, runner: GateRunner, fee_bps: float, 
     ]
 
 
+def _fold_windows(frame: pd.DataFrame) -> list[tuple[int, pd.Index]]:
+    """Score windows inside train. Fold 0 is the first fit block and is not returned.
+
+    Each later block starts EMBARGO_BARS after the previous fit end, which is
+    `fold * block`. The last window runs through the end of train.
+    """
+
+    train_index = frame.index[frame["split"] == "train"]
+    block = len(train_index) // WALK_FORWARD_FOLDS
+    if block < 40:
+        return []
+    windows: list[tuple[int, pd.Index]] = []
+    for fold in range(1, WALK_FORWARD_FOLDS):
+        score_start = fold * block
+        score_end = (fold + 1) * block if fold < WALK_FORWARD_FOLDS - 1 else len(train_index)
+        if score_end <= score_start:
+            continue
+        windows.append((fold, train_index[score_start:score_end]))
+    return windows
+
+
 def _walk_forward(frame: pd.DataFrame, seed: int, n_estimators: int, fee_bps: float, slippage_bps: float) -> list[WalkForwardFold]:
     """Expanding folds inside train. The embargo keeps a fold's labels out of the next block."""
 
-    train = frame[frame["split"] == "train"].reset_index(drop=True)
-    block = len(train) // WALK_FORWARD_FOLDS
-    if block < 40:
+    train = frame[frame["split"] == "train"]
+    windows = _fold_windows(frame)
+    if not windows:
         start = _py(train["decision_time"].iloc[0]) if len(train) else datetime.now()
         end = _py(train["decision_time"].iloc[-1]) if len(train) else start
         return [
@@ -647,16 +716,14 @@ def _walk_forward(frame: pd.DataFrame, seed: int, n_estimators: int, fee_bps: fl
             )
         ]
     folds: list[WalkForwardFold] = []
-    for fold in range(1, WALK_FORWARD_FOLDS):
-        fit_end = fold * block - EMBARGO_BARS
-        score_start = fold * block
-        score_end = (fold + 1) * block if fold < WALK_FORWARD_FOLDS - 1 else len(train)
-        fit_rows = train.iloc[: max(fit_end, 0)]
-        score_rows = train.iloc[score_start:score_end]
+    for fold, index in windows:
+        score_rows = frame.loc[index]
         if score_rows.empty:
             continue
         window_start = _py(score_rows["decision_time"].iloc[0])
         window_end = _py(score_rows["decision_time"].iloc[-1])
+        before_score = train[train["decision_time"] < score_rows["decision_time"].iloc[0]]
+        fit_rows = before_score.iloc[:-EMBARGO_BARS] if len(before_score) > EMBARGO_BARS else before_score.iloc[:0]
         in_market = fit_rows[fit_rows["target_position"] > 0]
         if len(score_rows) < 20:
             folds.append(
@@ -684,10 +751,15 @@ def _walk_forward(frame: pd.DataFrame, seed: int, n_estimators: int, fee_bps: fl
                 )
             )
             continue
-        multiplier = model.allocation(score_rows)
-        gated = simulate(score_rows, multiplier, fee_bps=fee_bps, slippage_bps=slippage_bps)
-        base = simulate(score_rows, pd.Series(1.0, index=score_rows.index), fee_bps=fee_bps, slippage_bps=slippage_bps)
-        delta = _compound(gated["net"].to_numpy(dtype=float)) - _compound(base["net"].to_numpy(dtype=float))
+        # Same simulator as evaluate_folds: the position path is continuous, and only
+        # the score window's forward returns are read. Restarting the slice at zero
+        # would charge an entry the strategy did not make.
+        multiplier = model.allocation(frame)
+        visible = frame.index.isin(index)
+        ones = pd.Series(1.0, index=frame.index)
+        gated = simulate(frame, multiplier, visible=visible, fee_bps=fee_bps, slippage_bps=slippage_bps)
+        base = simulate(frame, ones, visible=visible, fee_bps=fee_bps, slippage_bps=slippage_bps)
+        delta = _compound(gated.loc[index, "net"].to_numpy(dtype=float)) - _compound(base.loc[index, "net"].to_numpy(dtype=float))
         folds.append(
             WalkForwardFold(
                 fold=fold,
