@@ -1,0 +1,36 @@
+{
+  "pack": "markets",
+  "strategy": "trend",
+  "paths_paired": 300,
+  "same_cases_check": "raw replay rebuilt from the revealed challenge seed; case ids match",
+  "governed_minus_raw_return": {
+    "mean": 0.0,
+    "ci90": [
+      0.0,
+      0.0
+    ]
+  },
+  "governed_minus_raw_max_drawdown": {
+    "mean": 0.0,
+    "ci90": [
+      0.0,
+      0.0
+    ]
+  },
+  "governed_better": 0,
+  "raw_better": 0,
+  "identical": 300,
+  "challenge_market_stats_governed": {
+    "paths": 300,
+    "wins_vs_buy_and_hold": 183,
+    "losses_vs_buy_and_hold": 117,
+    "ties": 0,
+    "beat_cash": 124,
+    "median_excess_vs_buy_and_hold_bps_of_capital": 59,
+    "mean_max_drawdown_bps": 580,
+    "sign_test_p_value": 0.0001654516839868748,
+    "verdict": "Beat buy-and-hold more often than chance would explain on these paths."
+  },
+  "challenge_commitment": "f99cd89d0696190c51c692d2630c3aea0d1c44fc21532abfd08c5cd92481612f",
+  "provenance_warnings": []
+}

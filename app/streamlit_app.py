@@ -162,6 +162,26 @@ with tab2:
 
 # ------------------------------------------------------------------ does it help
 with tab3:
+    paired = sorted((ROOT / "eval/challenge").glob("*/paired.json"))
+    if paired:
+        st.subheader("Hidden test (organisers' bench, challenge mode)")
+        st.caption("Governed bot run in challenge mode: secret seed committed before the run, cases built in memory only, zero provenance warnings. "
+                   "Then the raw bot replayed on exactly the same hidden paths from the revealed seed, so the comparison is path by path.")
+        prow = []
+        for p in paired:
+            d = json.loads(p.read_text())
+            m = d.get("challenge_market_stats_governed") or {}
+            prow.append({
+                "pack": d["pack"], "bot": d["strategy"].replace("_", " "), "hidden paths": d["paths_paired"],
+                "governed − raw return (90% CI)": f"{pct(d['governed_minus_raw_return']['mean'])} [{pct(d['governed_minus_raw_return']['ci90'][0])}, {pct(d['governed_minus_raw_return']['ci90'][1])}]",
+                "governed − raw max drawdown (90% CI)": f"{pct(d['governed_minus_raw_max_drawdown']['mean'])} [{pct(d['governed_minus_raw_max_drawdown']['ci90'][0])}, {pct(d['governed_minus_raw_max_drawdown']['ci90'][1])}]",
+                "governed better / worse / identical": f"{d['governed_better']} / {d['raw_better']} / {d['identical']}",
+                "governed vs buy & hold (wins–losses, p)": f"{m.get('wins_vs_buy_and_hold')}–{m.get('losses_vs_buy_and_hold')}, p={m.get('sign_test_p_value', float('nan')):.2g}",
+                "provenance warnings": len(d.get("provenance_warnings") or []),
+            })
+        st.dataframe(pd.DataFrame(prow), use_container_width=True, hide_index=True)
+        st.markdown("Read it like this: where the bot has a confirmed bad regime, +EV changes the outcome; where it has none, +EV changes **nothing**, path for path.")
+        st.divider()
     st.subheader("Across all dev paths: raw bot vs governed vs buy-and-hold")
     st.caption("Practice data. Quote only challenge-mode results from the organisers' bench as evidence.")
     table = []

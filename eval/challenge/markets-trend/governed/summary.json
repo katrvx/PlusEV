@@ -1,0 +1,60 @@
+{
+  "label": "CHALLENGE (self-serve): hidden markets cases",
+  "dataset": {
+    "version": 2,
+    "mode": "challenge",
+    "source": "AgentVerse seeded generator v2 (hidden challenge)",
+    "seed": null,
+    "pack": "markets",
+    "case_count": 300,
+    "tasks": {
+      "markets": 300
+    }
+  },
+  "dataset_cases": 300,
+  "attempted": 300,
+  "passed": 0,
+  "failed": 0,
+  "errors": 0,
+  "strategy_runs_completed": 300,
+  "not_run": 0,
+  "cycle_record_metrics": {
+    "cycle_precision": null,
+    "cycle_recall": null,
+    "cycle_f1": null
+  },
+  "market_summary": {
+    "paths": 300,
+    "wins_vs_buy_and_hold": 183,
+    "losses_vs_buy_and_hold": 117,
+    "ties": 0,
+    "beat_cash": 124,
+    "median_excess_vs_buy_and_hold_bps_of_capital": 59,
+    "mean_max_drawdown_bps": 580,
+    "sign_test_p_value": 0.0001654516839868748,
+    "verdict": "Beat buy-and-hold more often than chance would explain on these paths."
+  },
+  "challenge": {
+    "commitment": "f99cd89d0696190c51c692d2630c3aea0d1c44fc21532abfd08c5cd92481612f",
+    "seed_status": "fresh random; revealed in SEED-REVEAL.txt after this run",
+    "kit_fingerprint": "5c90bf815848f4edd85bb2446e00382a24f003d936b3bad72f297a3b7885dad9",
+    "provenance": {
+      "project": "/home/claude/barometer",
+      "files_scanned": 12,
+      "adapter_command": [
+        "/usr/local/bin/python3",
+        "-m",
+        "plusev.adapter",
+        "--strategy",
+        "trend",
+        "--mode",
+        "governed"
+      ],
+      "adapter_file_sha256": {},
+      "git_head": "1cec3c7a099f072c197dd36d57dc2bdf83158279",
+      "git_dirty_files": 1,
+      "warnings": []
+    }
+  },
+  "limits": "Passing defined checks does not validate an entire product. Market completion is not profitability. Synthetic data is not a real-world benchmark. This runner is not an OS security sandbox."
+}

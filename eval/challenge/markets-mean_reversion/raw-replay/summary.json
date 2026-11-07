@@ -1,0 +1,51 @@
+{
+  "label": "Participant adapter",
+  "dataset": {
+    "version": 1,
+    "source": "AgentVerse seeded generator v2",
+    "synthetic": true,
+    "seed": 3801400848860824678,
+    "pack": "markets",
+    "case_count": 300,
+    "input_record_count": 13781,
+    "record_count_method": "first list among events/rows/prices_pence/items/lines; otherwise one per case",
+    "tasks": {
+      "markets": 300
+    },
+    "families": {
+      "rising": 50,
+      "falling": 50,
+      "flat": 50,
+      "volatile": 50,
+      "regime_change": 50,
+      "jump": 50
+    },
+    "input_sha256": "9d700c10b0b89a04be5c0a9a6754f1a274ec2c8720f521bd6b063014f33f5068",
+    "answer_sha256": "e8fb3f7fde4b1ecacd2676c5dd501c987df2ef90352e5c214a4eb4e611565e07",
+    "limits": "Local visible synthetic practice, not hidden judging or proof of real-world financial performance. Inputs only go to adapters; answers stay with the evaluator."
+  },
+  "dataset_cases": 300,
+  "attempted": 300,
+  "passed": 0,
+  "failed": 0,
+  "errors": 0,
+  "strategy_runs_completed": 300,
+  "not_run": 0,
+  "cycle_record_metrics": {
+    "cycle_precision": null,
+    "cycle_recall": null,
+    "cycle_f1": null
+  },
+  "market_summary": {
+    "paths": 300,
+    "wins_vs_buy_and_hold": 158,
+    "losses_vs_buy_and_hold": 142,
+    "ties": 0,
+    "beat_cash": 48,
+    "median_excess_vs_buy_and_hold_bps_of_capital": 28,
+    "mean_max_drawdown_bps": 976,
+    "sign_test_p_value": 0.38650982711273835,
+    "verdict": "Not distinguishable from buy-and-hold on these paths; more paths or a better edge is needed."
+  },
+  "limits": "Passing defined checks does not validate an entire product. Market completion is not profitability. Synthetic data is not a real-world benchmark. This runner is not an OS security sandbox."
+}

@@ -27,3 +27,4 @@ agentverse/
 
 # practice datasets are regenerated from the kit with fixed seeds (see README)
 data/
+eval/challenge/*/revealed-cases/

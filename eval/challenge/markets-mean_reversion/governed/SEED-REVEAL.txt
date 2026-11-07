@@ -1,0 +1,5 @@
+{
+  "seed": 3801400848860824678,
+  "commitment_check": "eb9cebc007bc5747f337c61b725f771bdcf09cf8050d5a8adb4c57c9db9531b1",
+  "real_months": null
+}
