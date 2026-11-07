@@ -18,24 +18,44 @@ import pandas as pd
 from kok_a.arbiter import build_paper_plan, decide
 from kok_a.contracts import (
     BaselineRow,
+    ComparisonPoint,
     CostBreakdown,
     EquityPoint,
     ExperimentResult,
+    FeeCheck,
     GateEvaluation,
     Metrics,
     RegimeRow,
+    WalkForwardFold,
     Window,
 )
 from kok_a.features import FEATURE_COLUMNS, build_frame, coverage_table
 from kok_a.gates import allocation, rule_gate_spec
 from kok_a.lgbm_gate import LGBMGate
-from kok_a.market import hash_ohlcv
+from kok_a.market import epoch_microseconds, hash_ohlcv
 from kok_a.simulate import ANNUALIZATION, FEE_BPS, SLIPPAGE_BPS, block_ci, simulate
 from kok_a.snapshot import SNAPSHOT_READY, SNAPSHOT_SYNTHETIC, load_inputs
 from kok_a.strategies import positions
 
 QUANTILES = (0.2, 0.33, 0.5, 0.67, 0.8)
 SPLITS = ("train", "validation", "test")
+EMBARGO_BARS = 2
+WALK_FORWARD_FOLDS = 4
+PAPER_HORIZON_BARS = 14 * 24
+N_BOOT = 2000
+CALIBRATION_SHARE = 0.25
+MIN_FIT_ROWS = 40
+MIN_CALIBRATION_ROWS = 10
+REQUIRED_FEATURES = (
+    "momentum_24h",
+    "momentum_7d",
+    "realized_vol_7d",
+    "atr_14",
+    "price_drawdown",
+    "volume_zscore",
+    "target_position",
+    "ret_next",
+)
 
 
 @dataclass
@@ -112,18 +132,23 @@ class GateRunner:
         part = scored.loc[mask]
         base = baseline.loc[mask]
         policy_id = str(policy_spec.get("policy_id", "unnamed"))
-        policy_metrics = _metrics(part, _rng(self.seed, policy_id, split, "net"), self.n_boot)
+        # The name is not part of the draw. Renaming one rule must not move its interval.
+        content = _policy_content(policy_spec)
+        policy_metrics = _metrics(part, _rng(self.seed, content, split, "net"), self.n_boot)
         always_metrics = _metrics(base, _rng(self.seed, "always_on", split, "net"), self.n_boot)
         policy_net = part["net"].to_numpy(dtype=float)
         base_net = base["net"].to_numpy(dtype=float)
+        mix, n_decisions, n_in_position = _allocation_mix(multiplier.loc[mask], self.frame.loc[mask, "target_position"])
         return GateEvaluation(
             policy_id=policy_id,
             split=split,  # type: ignore[arg-type]
             metrics=policy_metrics,
             always_on=always_metrics,
             delta_net_return_vs_always_on=policy_metrics.net_return - always_metrics.net_return,
-            ci_delta=_paired_compound_ci(policy_net, base_net, _rng(self.seed, policy_id, split, "delta"), self.n_boot),
-            allocation_mix=_allocation_mix(multiplier.loc[mask]),
+            ci_delta=_paired_compound_ci(policy_net, base_net, _rng(self.seed, content, split, "delta"), self.n_boot),
+            allocation_mix=mix,
+            n_decisions=n_decisions,
+            n_in_position=n_in_position,
             audit_id=_audit(policy_spec, split, self.snapshot_id),
         )
 
@@ -135,7 +160,7 @@ def run_experiment(
     *,
     n: int = 1600,
     seed: int = 7,
-    n_boot: int = 200,
+    n_boot: int = N_BOOT,
     n_estimators: int = 120,
 ) -> ExperimentResult:
     return assemble(
@@ -196,6 +221,7 @@ def agent_view(result: ExperimentResult) -> ExperimentResult:
             "per_regime": [row for row in result.per_regime if row.split != "test"],
             "costs": [row for row in result.costs if row.split != "test"],
             "equity": [point for point in result.equity if point.split != "test"],
+            "comparison_equity": [point for point in result.comparison_equity if point.split != "test"],
             "decision": None,
             "paper_plan": None,
             "notes": notes,
@@ -216,7 +242,7 @@ def assemble(
     *,
     n: int = 1600,
     seed: int = 7,
-    n_boot: int = 200,
+    n_boot: int = N_BOOT,
     n_estimators: int = 120,
     external_positions: pd.DataFrame | None = None,
     fee_bps: float | None = None,
@@ -272,6 +298,8 @@ def assemble(
             baselines.append(BaselineRow(split=split, policy=name, metrics=evaluation.metrics))  # type: ignore[arg-type]
 
     always = simulate(sample, pd.Series(1.0, index=sample.index), fee_bps=fee, slippage_bps=slip)
+    train_net = always.loc[sample["split"] == "train", "net"].to_numpy(dtype=float)
+    horizon_range = _predictive_range(train_net, _rng(seed, "paper", "range"), n_boot)
     experiment_id = f"exp_{signal_hash[:12]}"
     n_test = int((sample["split"] == "test").sum())
     decision = decide({name: scored[(name, "test")] for name in ("always_on", "cash", "simple_rule", "lgbm_gate")}, n_test)
@@ -281,6 +309,7 @@ def assemble(
         version,
         decision,
         f"{fee:.0f} bps fee + {slip:.0f} bp slippage on |change in exposure|",
+        horizon_range,
     )
     result = ExperimentResult(
         experiment_id=experiment_id,
@@ -301,6 +330,9 @@ def assemble(
             "pre_registered_holdout:always_on,cash,simple_rule,lgbm_gate",
         ],
         equity=_equity(sample, always),
+        comparison_equity=_comparison_equity(sample, runner, fee, slip),
+        walk_forward=_walk_forward(sample, seed, n_estimators, fee, slip),
+        fee_checks=_fee_checks(sample, fee, slip),
         provenance=provenance,
         notes=_notes(thresholds, provenance, decision.verdict, fee, slip, imported=external_positions is not None),
         decision=decision,
@@ -365,7 +397,7 @@ def _analysis_sample(
     else:
         version = "imported-positions"
         sample["target_position"] = _overlay_positions(sample, external_positions)
-    sample = sample.dropna(subset=["momentum_24h", "realized_vol_7d", "volume_zscore", "target_position", "ret_next"])
+    sample = sample.dropna(subset=list(REQUIRED_FEATURES))
     sample = sample.reset_index(drop=True)
     if external_positions is not None:
         sample = _longest_hourly_run(sample)
@@ -385,16 +417,40 @@ def _analysis_sample(
     return version, sample
 
 
+def _embargoed(frame: pd.DataFrame, split: str) -> pd.Series:
+    """True except the last EMBARGO_BARS of this split. Their labels reach into the next split."""
+
+    times = frame.loc[frame["split"] == split, "decision_time"]
+    if len(times) <= EMBARGO_BARS:
+        banned = set(times)
+    else:
+        banned = set(times.iloc[-EMBARGO_BARS:])
+    return ~frame["decision_time"].isin(list(banned))
+
+
+def _in_market(frame: pd.DataFrame, split: str) -> pd.DataFrame:
+    return frame[(frame["split"] == split) & (frame["target_position"] > 0) & _embargoed(frame, split)]
+
+
 def _fit_lgbm(frame: pd.DataFrame, seed: int, n_estimators: int) -> LGBMGate:
-    train = frame[(frame["split"] == "train") & (frame["target_position"] > 0)]
-    valid = frame[(frame["split"] == "validation") & (frame["target_position"] > 0)]
-    if len(train) < 40 or len(valid) < 10:
-        raise RuntimeError("not enough in-market train/validation rows to fit the LightGBM gate")
-    if train["ret_next"].gt(0).nunique() < 2:
+    """Fit on early in-market train, calibrate on the last 25%. Validation is not used."""
+
+    return _fit_lgbm_rows(_in_market(frame, "train"), seed, n_estimators)
+
+
+def _fit_lgbm_rows(rows: pd.DataFrame, seed: int, n_estimators: int) -> LGBMGate:
+    """Chronological split of one train block. The cut is embargoed by EMBARGO_BARS."""
+
+    cut = int(len(rows) * (1.0 - CALIBRATION_SHARE))
+    fit_rows = rows.iloc[: max(cut - EMBARGO_BARS, 0)]
+    cal_rows = rows.iloc[cut:]
+    if len(fit_rows) < MIN_FIT_ROWS or len(cal_rows) < MIN_CALIBRATION_ROWS:
+        raise RuntimeError("not enough in-market train rows to fit and calibrate the LightGBM gate")
+    if fit_rows["ret_next"].gt(0).nunique() < 2:
         raise RuntimeError("train opportunity returns are one-sided; refusing to fit a classifier")
     model = LGBMGate(seed=seed, n_estimators=n_estimators)
-    model.fit(train, train["ret_next"], split="train")
-    model.calibrate(valid, valid["ret_next"], split="validation")
+    model.fit(fit_rows, fit_rows["ret_next"], split="train")
+    model.calibrate(cal_rows, cal_rows["ret_next"], split="train")
     return model
 
 
@@ -465,19 +521,59 @@ def _regime_rows(frame: pd.DataFrame, always: pd.DataFrame, seed: int, n_boot: i
 def _costs(frame: pd.DataFrame, always: pd.DataFrame) -> list[CostBreakdown]:
     rows: list[CostBreakdown] = []
     for split in SPLITS:
-        part = always.loc[frame["split"] == split]
-        rows.append(
-            CostBreakdown(
-                split=split,  # type: ignore[arg-type]
-                gross_return=float(part["gross"].sum()),
-                fees=float(part["fees"].sum()),
-                slippage=float(part["slippage"].sum()),
-                switching=float(part["cost"].sum()),
-                net_return=float(part["net"].sum()),
-                turnover=float(part["dq"].sum()),
-            )
-        )
+        mask = frame["split"] == split
+        rows.append(_cost_row(frame.loc[mask], always.loc[mask], split))
     return rows
+
+
+def _cost_row(frame_part: pd.DataFrame, sim_part: pd.DataFrame, split: str) -> CostBreakdown:
+    """Compounded gross and net. Cost components are the compounded gap, not a second copy of it.
+
+    Bar costs are fees + slippage on |Δexposure|. switching is only the turnover
+    a changing multiplier adds beyond the frozen target's own changes. On
+    always-on that extra is 0, so fees and slippage are the whole gap and are
+    not also reported as switching.
+    """
+
+    gross = _compound(sim_part["gross"].to_numpy(dtype=float))
+    net = _compound(sim_part["net"].to_numpy(dtype=float))
+    fee_sum = float(sim_part["fees"].sum())
+    slip_sum = float(sim_part["slippage"].sum())
+    total_cost = fee_sum + slip_sum
+    extra = _extra_turnover(frame_part["target_position"].to_numpy(dtype=float), sim_part["q"].to_numpy(dtype=float))
+    total_turnover = float(sim_part["dq"].sum())
+    switch_sum = 0.0
+    if total_cost > 0 and total_turnover > 0 and extra > 0:
+        switch_sum = total_cost * min(extra / total_turnover, 1.0)
+        own = total_cost - switch_sum
+        fee_sum = own * (fee_sum / total_cost)
+        slip_sum = own * (slip_sum / total_cost)
+    raw = fee_sum + slip_sum + switch_sum
+    gap = gross - net
+    if raw > 0:
+        scale = gap / raw
+        fees, slippage, switching = fee_sum * scale, slip_sum * scale, switch_sum * scale
+    else:
+        fees = slippage = switching = 0.0
+    return CostBreakdown(
+        split=split,  # type: ignore[arg-type]
+        gross_return=gross,
+        fees=fees,
+        slippage=slippage,
+        switching=switching,
+        net_return=net,
+        turnover=total_turnover,
+    )
+
+
+def _extra_turnover(target: np.ndarray, exposure: np.ndarray) -> float:
+    """Turnover beyond the frozen target's own changes. Zero when exposure follows the target."""
+
+    prev_target = np.concatenate([[0.0], target[:-1]])
+    prev_exposure = np.concatenate([[0.0], exposure[:-1]])
+    always_on = np.abs(target - prev_target)
+    actual = np.abs(exposure - prev_exposure)
+    return float(np.maximum(actual - always_on, 0.0).sum())
 
 
 def _windows(frame: pd.DataFrame) -> list[Window]:
@@ -500,6 +596,141 @@ def _equity(frame: pd.DataFrame, always: pd.DataFrame) -> list[EquityPoint]:
         )
         for i in range(len(frame))
     ]
+
+
+def _comparison_equity(frame: pd.DataFrame, runner: GateRunner, fee_bps: float, slippage_bps: float) -> list[ComparisonPoint]:
+    specs = {
+        "always_on": {"policy_id": "always_on", "family": "always_on"},
+        "cash": {"policy_id": "cash", "family": "cash"},
+        "simple_rule": runner.rule_spec,
+        "lgbm_gate": runner.lgbm.spec(),
+    }
+    curves: dict[str, np.ndarray] = {}
+    for name, spec in specs.items():
+        multiplier = allocation(spec, frame, lgbm=runner.lgbm)
+        simulated = simulate(frame, multiplier, fee_bps=fee_bps, slippage_bps=slippage_bps)
+        curves[name] = np.cumprod(1.0 + simulated["net"].to_numpy(dtype=float))
+    return [
+        ComparisonPoint(
+            decision_time=_py(frame["decision_time"].iloc[i]),
+            split=frame["split"].iloc[i],
+            base=float(curves["always_on"][i]),
+            rule=float(curves["simple_rule"][i]),
+            lgbm=float(curves["lgbm_gate"][i]),
+            cash=float(curves["cash"][i]),
+        )
+        for i in range(len(frame))
+    ]
+
+
+def _walk_forward(frame: pd.DataFrame, seed: int, n_estimators: int, fee_bps: float, slippage_bps: float) -> list[WalkForwardFold]:
+    """Expanding folds inside train. The embargo keeps a fold's labels out of the next block."""
+
+    train = frame[frame["split"] == "train"].reset_index(drop=True)
+    block = len(train) // WALK_FORWARD_FOLDS
+    if block < 40:
+        start = _py(train["decision_time"].iloc[0]) if len(train) else datetime.now()
+        end = _py(train["decision_time"].iloc[-1]) if len(train) else start
+        return [
+            WalkForwardFold(
+                fold=0,
+                n_fit=0,
+                n_score=len(train),
+                score_start=start,
+                score_end=end,
+                note="train is too short for 4 expanding folds",
+            )
+        ]
+    folds: list[WalkForwardFold] = []
+    for fold in range(1, WALK_FORWARD_FOLDS):
+        fit_end = fold * block - EMBARGO_BARS
+        score_start = fold * block
+        score_end = (fold + 1) * block if fold < WALK_FORWARD_FOLDS - 1 else len(train)
+        fit_rows = train.iloc[: max(fit_end, 0)]
+        score_rows = train.iloc[score_start:score_end]
+        if score_rows.empty:
+            continue
+        window_start = _py(score_rows["decision_time"].iloc[0])
+        window_end = _py(score_rows["decision_time"].iloc[-1])
+        in_market = fit_rows[fit_rows["target_position"] > 0]
+        if len(score_rows) < 20:
+            folds.append(
+                WalkForwardFold(
+                    fold=fold,
+                    n_fit=int(len(in_market)),
+                    n_score=int(len(score_rows)),
+                    score_start=window_start,
+                    score_end=window_end,
+                    note="fold skipped: not enough in-market rows after the embargo",
+                )
+            )
+            continue
+        try:
+            model = _fit_lgbm_rows(in_market, seed, n_estimators)
+        except RuntimeError:
+            folds.append(
+                WalkForwardFold(
+                    fold=fold,
+                    n_fit=int(len(in_market)),
+                    n_score=int(len(score_rows)),
+                    score_start=window_start,
+                    score_end=window_end,
+                    note="fold skipped: not enough in-market rows after the embargo",
+                )
+            )
+            continue
+        multiplier = model.allocation(score_rows)
+        gated = simulate(score_rows, multiplier, fee_bps=fee_bps, slippage_bps=slippage_bps)
+        base = simulate(score_rows, pd.Series(1.0, index=score_rows.index), fee_bps=fee_bps, slippage_bps=slippage_bps)
+        delta = _compound(gated["net"].to_numpy(dtype=float)) - _compound(base["net"].to_numpy(dtype=float))
+        folds.append(
+            WalkForwardFold(
+                fold=fold,
+                n_fit=int(len(in_market)),
+                n_score=int(len(score_rows)),
+                score_start=window_start,
+                score_end=window_end,
+                delta_net_return_vs_always_on=delta,
+                note="expanding train fold with a 2-bar embargo; not used to choose the sealed-test policy",
+            )
+        )
+    return folds
+
+
+def _fee_checks(frame: pd.DataFrame, fee_bps: float, slippage_bps: float) -> list[FeeCheck]:
+    visible = (frame["split"] == "validation").to_numpy()
+    ones = pd.Series(1.0, index=frame.index)
+    checks: list[FeeCheck] = []
+    for scale in (0.5, 1.0, 2.0):
+        simulated = simulate(frame, ones, visible=visible, fee_bps=fee_bps * scale, slippage_bps=slippage_bps * scale)
+        net = simulated.loc[visible, "net"].to_numpy(dtype=float)
+        checks.append(
+            FeeCheck(
+                scale=scale,
+                fee_bps=fee_bps * scale,
+                slippage_bps=slippage_bps * scale,
+                net_return=_compound(net),
+            )
+        )
+    return checks
+
+
+def _predictive_range(net: np.ndarray, rng: np.random.Generator, n_boot: int) -> tuple[float, float, int] | None:
+    """90% range for a 14-day path drawn from the training return distribution."""
+
+    horizon = min(PAPER_HORIZON_BARS, len(net))
+    block = 24
+    if horizon < block * 2:
+        return None
+    draws = np.empty(n_boot)
+    for i in range(n_boot):
+        draws[i] = _compound(net[_path_indices(len(net), horizon, rng, block)])
+    return float(np.quantile(draws, 0.05)), float(np.quantile(draws, 0.95)), horizon
+
+
+def _path_indices(n: int, horizon: int, rng: np.random.Generator, block: int) -> np.ndarray:
+    starts = rng.integers(0, n - block + 1, size=horizon // block + 1)
+    return np.concatenate([np.arange(start, start + block) for start in starts])[:horizon]
 
 
 def _compound(values: np.ndarray) -> float:
@@ -535,9 +766,15 @@ def _paired_compound_ci(policy: np.ndarray, base: np.ndarray, rng: np.random.Gen
     return float(np.quantile(draws, 0.05)), float(np.quantile(draws, 0.95))
 
 
-def _allocation_mix(multiplier: pd.Series) -> dict[str, float]:
+def _allocation_mix(multiplier: pd.Series, target: pd.Series) -> tuple[dict[str, float], int, int]:
+    """Shares on bars where the frozen target is not flat. Flat bars are counted, not mixed."""
+
     values = multiplier.to_numpy(dtype=float)
-    return {str(level): float(np.isclose(values, level).mean()) if len(values) else 0.0 for level in (0.0, 0.5, 1.0)}
+    position = target.to_numpy(dtype=float)
+    in_position = np.abs(position) > 1e-12
+    chosen = values[in_position]
+    mix = {str(level): float(np.isclose(chosen, level).mean()) if len(chosen) else 0.0 for level in (0.0, 0.5, 1.0)}
+    return mix, int(len(values)), int(in_position.sum())
 
 
 def _cvar(net: np.ndarray, alpha: float = 0.05) -> float | None:
@@ -617,6 +854,12 @@ def _notes(
         f"vol regime splits at the train median {thresholds['vol_median']:.5f}.",
         "The simple rule allocates 1 when 24h momentum is positive and 7d vol is at or below "
         "the train median, and 0 otherwise.",
+        "The label is the next open-to-open return, so the last 2 bars of train are embargoed, "
+        "and so is the cut inside train. LightGBM fits on the early in-market train rows and "
+        "calibrates on the last 25% of those rows. Validation is not used to fit the calibrator.",
+        "Expanding walk-forward folds stay inside train. They are a stability check, not a way to pick the sealed-test policy.",
+        "Fee checks resimulate always-on on validation at half, one, and double the assumed cost. The arbiter does not read them.",
+        "Spot venue: funding is zero. News is omitted because this snapshot has no first-seen archive.",
         "The test split is scored inside run_experiment only for the pre-registered "
         "always-on, cash, simple-rule and LightGBM policies. GateRunner.evaluate refuses it.",
         f"Verdict {verdict} comes from the deterministic arbiter in kok_a.arbiter. "
@@ -627,8 +870,15 @@ def _notes(
 def _hash_signals(frame: pd.DataFrame) -> str:
     digest = hashlib.sha256()
     digest.update(np.round(frame["target_position"].to_numpy(dtype=float), 6).tobytes())
-    digest.update(pd.to_datetime(frame["decision_time"], utc=True).astype("int64").to_numpy().tobytes())
+    digest.update(epoch_microseconds(frame["decision_time"]).tobytes())
     return digest.hexdigest()[:16]
+
+
+def _policy_content(policy_spec: dict) -> str:
+    """Identity of the decisions, not the display name."""
+
+    body = {key: value for key, value in policy_spec.items() if key != "policy_id"}
+    return hashlib.sha256(json.dumps(body, sort_keys=True, default=str).encode()).hexdigest()
 
 
 def _audit(policy_spec: dict, split: str, snapshot_id: str) -> str:

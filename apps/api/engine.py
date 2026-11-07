@@ -71,7 +71,7 @@ def run_measured_experiment(
     experiment_id: str,
     strategy: dict[str, Any],
     *,
-    n_boot: int = 200,
+    n_boot: int = 2000,
     n_estimators: int = 120,
     force_fallback: bool | None = None,
 ) -> dict[str, Any]:
@@ -106,14 +106,12 @@ def measure(
     experiment_id: str,
     strategy: dict[str, Any],
     *,
-    n_boot: int = 200,
+    n_boot: int = 2000,
     n_estimators: int = 120,
     force_fallback: bool | None = None,
 ) -> dict[str, Any]:
     _ensure_import_path()
     from kok_a.experiment import agent_view, assemble, score_frozen
-    from kok_a.gates import allocation
-    from kok_a.simulate import simulate
     from packages.research_agents.investigate import investigate
 
     positions = _load_positions(strategy)
@@ -146,7 +144,7 @@ def measure(
         agent_note = f"Lane B investigation did not finish ({type(exc).__name__}: {exc}). Lane A numbers below are still from the pre-registered comparison."
 
     champion = _champion_evaluation(report, bundle.runner, score_frozen) if report is not None else None
-    return _present(experiment_id, strategy, bundle, report, champion, allocation, simulate, agent_note)
+    return _present(experiment_id, strategy, bundle, report, champion, agent_note)
 
 
 def _load_positions(strategy: dict[str, Any]) -> pd.DataFrame:
@@ -195,17 +193,13 @@ def _present(
     bundle: Any,
     report: Any,
     champion: Any,
-    allocation: Any,
-    simulate: Any,
     agent_note: str | None,
 ) -> dict[str, Any]:
     result = bundle.result
     decision = result.decision
     if decision is None:
         raise RuntimeError("Lane A returned no verdict.")
-    curves = _curves(bundle, allocation, simulate)
     selected = _short_policy(decision.policy_id, bundle)
-    proposed = curves.get(selected, curves["cash"])
     verdict = VERDICT_FOR_UI.get(decision.verdict, decision.verdict)
     tested = decision.verdict != "INCONCLUSIVE"
     limitations = list(result.notes)
@@ -237,8 +231,8 @@ def _present(
         "windows": {"train": windows.get("train", "pending"), "validation": windows.get("validation", "pending"), "test": windows.get("test", "pending")},
         "metrics": _metrics(result, selected, champion),
         "baselines": _baselines(result, champion),
-        "equity": _equity_points(bundle.frame, curves, proposed),
-        "regimes": _regimes(bundle, curves["always_on_sim"]),
+        "equity": _equity_from_comparison(result.comparison_equity, selected),
+        "regimes": _regimes(result),
         "evidence": _evidence(report),
         "steps": _steps(report, now),
         "hypotheses": _hypotheses(report),
@@ -270,43 +264,30 @@ def _short_policy(policy_id: str, bundle: Any) -> str:
     return policy_id
 
 
-def _curves(bundle: Any, allocation: Any, simulate: Any) -> dict[str, Any]:
-    frame = bundle.frame
-    runner = bundle.runner
-    specs = {
-        "always_on": {"policy_id": "always_on", "family": "always_on"},
-        "cash": {"policy_id": "cash", "family": "cash"},
-        "simple_rule": runner.rule_spec,
-        "lgbm_gate": bundle.lgbm.spec(),
-    }
-    curves: dict[str, Any] = {}
-    for name, spec in specs.items():
-        multiplier = allocation(spec, frame, lgbm=runner.lgbm)
-        sim = simulate(frame, multiplier, fee_bps=runner.fee_bps, slippage_bps=runner.slippage_bps)
-        curves[name] = (1.0 + sim["net"].to_numpy(dtype=float)).cumprod() * 100.0
-        if name == "always_on":
-            curves["always_on_sim"] = sim
-    return curves
+def _equity_from_comparison(points: list[Any], selected: str) -> list[dict[str, Any]]:
+    """Chart series Lane A stored. 100 is the index before the first return is applied, scaled from 1.0."""
 
-
-def _equity_points(frame: pd.DataFrame, curves: dict[str, Any], proposed: Any) -> list[dict[str, Any]]:
-    count = len(frame)
+    field = {"always_on": "base", "cash": "cash", "simple_rule": "rule", "lgbm_gate": "lgbm"}.get(selected, "cash")
+    count = len(points)
+    if count == 0:
+        return []
     step = max(1, count // 1500)
     indexes = list(range(0, count, step))
     if indexes[-1] != count - 1:
         indexes.append(count - 1)
-    points = []
+    rows = []
     for index in indexes:
-        points.append(
+        point = points[index]
+        rows.append(
             {
-                "date": _iso(frame["decision_time"].iloc[index]),
-                "base": round(float(curves["always_on"][index]), 4),
-                "rule": round(float(curves["simple_rule"][index]), 4),
-                "proposed": round(float(proposed[index]), 4),
-                "cash": round(float(curves["cash"][index]), 4),
+                "date": _iso(point.decision_time),
+                "base": round(float(point.base) * 100.0, 4),
+                "rule": round(float(point.rule) * 100.0, 4),
+                "proposed": round(float(getattr(point, field)) * 100.0, 4),
+                "cash": round(float(point.cash) * 100.0, 4),
             }
         )
-    return points
+    return rows
 
 
 def _metrics(result: Any, selected: str, champion: Any) -> list[dict[str, Any]]:
@@ -357,30 +338,27 @@ def _baseline(policy_id: str, name: str, metrics: Any) -> dict[str, Any]:
     }
 
 
-def _regimes(bundle: Any, always_sim: pd.DataFrame) -> list[dict[str, Any]]:
-    frame = bundle.frame
-    train = frame["split"] == "train"
+def _regimes(result: Any) -> list[dict[str, Any]]:
+    """Train regime rows Lane A already computed, including the block-bootstrap interval."""
+
     cards = []
-    for feature in ("trend_regime", "vol_regime"):
-        grouped = frame.loc[train].groupby(feature, sort=True)
-        for bucket, part in grouped:
-            net = always_sim.loc[part.index, "net"].to_numpy(dtype=float)
-            if len(net) == 0 or not pd.notna(net).all():
-                continue
-            compounded = float((1.0 + net).prod() - 1.0)
-            trades = int((always_sim.loc[part.index, "dq_signed"] > 1e-12).sum())
-            cards.append(
-                {
-                    "id": f"train-{feature}-{bucket}",
-                    "trend": str(bucket) if feature == "trend_regime" else "all",
-                    "volatility": str(bucket) if feature == "vol_regime" else "all",
-                    "net_return": compounded,
-                    "trades": trades,
-                    "confidence_low": compounded,
-                    "confidence_high": compounded,
-                    "evidence_id": f"train-{feature}-{bucket}",
-                }
-            )
+    for row in result.per_regime:
+        if row.split != "train":
+            continue
+        feature = row.regime_feature
+        bucket = row.bucket
+        cards.append(
+            {
+                "id": f"train-{feature}-{bucket}",
+                "trend": bucket if feature == "trend_regime" else "all",
+                "volatility": bucket if feature == "vol_regime" else "all",
+                "net_return": float(row.mean_net_return),
+                "trades": int(row.n_trades),
+                "confidence_low": float(row.ci_low),
+                "confidence_high": float(row.ci_high),
+                "evidence_id": f"train-{feature}-{bucket}",
+            }
+        )
     return cards
 
 

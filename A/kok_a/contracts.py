@@ -33,6 +33,13 @@ class RegimeRow(BaseModel):
 
 
 class CostBreakdown(BaseModel):
+    """Compounded returns. gross − fees − slippage − switching = net.
+
+    fees and slippage are the unchanged strategy's own turnover. switching is
+    only the extra turnover a gate adds on top of that path, so it is 0 when
+    the row is the strategy itself.
+    """
+
     split: Split
     gross_return: float
     fees: float
@@ -70,6 +77,39 @@ class EquityPoint(BaseModel):
     exposure: float
 
 
+class ComparisonPoint(BaseModel):
+    """Equity index of the pre-registered policies. 1.0 is the start, before the first bar's return."""
+
+    decision_time: datetime
+    split: Split
+    base: float
+    rule: float
+    lgbm: float
+    cash: float
+
+
+class WalkForwardFold(BaseModel):
+    """One expanding fold inside the train window. It does not see validation or the sealed test."""
+
+    fold: int
+    n_fit: int
+    n_score: int
+    score_start: datetime
+    score_end: datetime
+    delta_net_return_vs_always_on: float | None = None
+    note: str
+
+
+class FeeCheck(BaseModel):
+    """Always-on validation return at a pre-registered cost multiple. Not used to pick a policy."""
+
+    split: Literal["validation"] = "validation"
+    scale: float
+    fee_bps: float
+    slippage_bps: float
+    net_return: float
+
+
 class ExperimentResult(BaseModel):
     experiment_id: str
     strategy_id: str
@@ -85,6 +125,9 @@ class ExperimentResult(BaseModel):
     missingness: dict[str, dict[str, float]] = Field(default_factory=dict)
     audit_ids: list[str] = Field(default_factory=list)
     equity: list[EquityPoint] = Field(default_factory=list)
+    comparison_equity: list[ComparisonPoint] = Field(default_factory=list)
+    walk_forward: list[WalkForwardFold] = Field(default_factory=list)
+    fee_checks: list[FeeCheck] = Field(default_factory=list)
     provenance: dict[str, str] = Field(default_factory=dict)
     notes: list[str] = Field(default_factory=list)
     decision: Decision | None = None
@@ -92,7 +135,13 @@ class ExperimentResult(BaseModel):
 
 
 class GateEvaluation(BaseModel):
-    """One policy, one split. Lane A computes every number."""
+    """One policy, one split. Lane A computes every number.
+
+    allocation_mix is the share of in-position bars at 0, 0.5, and 1.
+    A flat target is not a decision the gate can change, so those bars are
+    left out of the mix. n_decisions counts every bar in the split.
+    n_in_position is the mix denominator.
+    """
 
     policy_id: str
     split: Split
@@ -101,6 +150,8 @@ class GateEvaluation(BaseModel):
     delta_net_return_vs_always_on: float
     ci_delta: tuple[float, float] | None = None
     allocation_mix: dict[str, float] = Field(default_factory=dict)
+    n_decisions: int = 0
+    n_in_position: int = 0
     audit_id: str
 
 
@@ -138,4 +189,7 @@ class PaperPlan(BaseModel):
     challenger_policy_id: str
     frozen_at_experiment: str
     cost_assumptions: str
+    predictive_range_low: float | None = None
+    predictive_range_high: float | None = None
+    predictive_horizon_bars: int | None = None
     notes: list[str]
