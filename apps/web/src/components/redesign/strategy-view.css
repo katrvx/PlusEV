@@ -248,7 +248,7 @@
 .sv-result-empty svg { flex: 0 0 auto; color: var(--kk-text-quiet, #969088); margin-top: 2px; }
 .sv-result-note { margin: -4px 0 20px; color: var(--kk-text-secondary, #b4aea5); font-size: 14px; line-height: 1.55; }
 .sv-chart-wrap { min-height: 300px; border-top: 1px solid var(--kk-hairline, #302c27); border-bottom: 1px solid var(--kk-hairline, #302c27); }
-.sv-chart-caption { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; padding-top: 13px; color: var(--kk-text-quiet, #969088); font-family: var(--kk-mono, "Cascadia Mono", monospace); font-size: 11px; }
+.sv-chart-caption { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; padding-top: 13px; color: var(--kk-text-quiet, #969088); font-family: var(--kk-sans); font-size: 13px; }
 .sv-chart-caption span { display: inline-flex; align-items: center; gap: 7px; }
 .sv-line { display: inline-block; width: 24px; height: 1px; background: var(--kk-original, #d6d0c7); }
 .sv-line-cash { background: repeating-linear-gradient(to right, var(--kk-cash, #847d74) 0 3px, transparent 3px 7px); }
@@ -269,7 +269,7 @@
 .sv-empty-invite { max-width: 680px; color: var(--kk-text-secondary, #b4aea5); font-size: 18px; line-height: 1.6; }
 .sv-empty-invite strong { color: var(--kk-text, #eee9e1); font-weight: 500; }
 .sv-empty-actions { display: flex; flex-wrap: wrap; gap: 26px; margin-top: 30px; }
-.sv-file-note { display: flex; align-items: center; gap: 8px; margin-top: 17px; color: var(--kk-text-quiet, #969088); font-family: var(--kk-mono, "Cascadia Mono", monospace); font-size: 11px; }
+.sv-file-note { display: flex; align-items: center; gap: 8px; margin-top: 17px; color: var(--kk-text-quiet, #969088); font-family: var(--kk-sans); font-size: 13px; }
 .sv-file-note svg { color: var(--kk-accent, #f47735); }
 .sv-empty-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin-top: 88px; border-top: 1px solid var(--kk-hairline, #302c27); border-bottom: 1px solid var(--kk-hairline, #302c27); }
 .sv-empty-steps > div { min-height: 160px; padding: 20px 0; border-left: 1px solid var(--kk-hairline, #302c27); }
@@ -314,3 +314,7 @@
   .sv-disclosure-grid { grid-template-columns: 1fr; }
   .sv-empty-actions { align-items: flex-start; flex-direction: column; gap: 10px; }
 }
+
+.sv-state-icon{border-color:var(--kk-boundary)}
+.sv-status[data-tone="danger"]{color:var(--kk-danger)}
+.sv-kicker,.sv-meta-row span,.sv-cost span,.sv-disclosure-grid span,.sv-empty-steps span{font-size:12px}

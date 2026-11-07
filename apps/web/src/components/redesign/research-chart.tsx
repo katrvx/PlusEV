@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ChartSeries, ResearchChartProps } from "./types";
+import { monotonePath } from "./chart-path";
+export { monotonePath } from "./chart-path";
 import "./research-chart.css";
 
 type Point = { x: number; y: number; date: string; value: number };
 type SeriesDef = { id: ChartSeries; label: string; color: string; dash?: string; width: number };
 
 const SERIES: SeriesDef[] = [
-  { id: "base", label: "Original strategy", color: "#D6D0C7", width: 1.5 },
-  { id: "rule", label: "Simple rule", color: "#A8A198", dash: "7 6", width: 1.25 },
-  { id: "proposed", label: "Suggested filter", color: "#F47735", width: 2 },
-  { id: "cash", label: "Cash", color: "#847D74", dash: "2 7", width: 1.25 },
+  { id: "base", label: "Original strategy", color: "var(--kk-original, #52675d)", width: 3.25 },
+  { id: "rule", label: "Simple rule", color: "var(--kk-simple, #697b8b)", dash: "7 6", width: 1.35 },
+  { id: "proposed", label: "Suggested filter", color: "var(--kk-accent, #2454f4)", width: 4 },
+  { id: "cash", label: "Cash", color: "var(--kk-cash, #85887e)", dash: "2 7", width: 1.5 },
 ];
 const revealedDatasets = new Set<string>();
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -44,9 +46,8 @@ function yTicks(min: number, max: number) {
   return Array.from({ length: 5 }, (_, index) => max - ((max - min) * index) / 4);
 }
 
-function linePath(points: Point[]) {
-  if (!points.length) return "";
-  return points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" ");
+function overviewTicks(min: number, max: number) {
+  return [max, (max + min) / 2, min];
 }
 
 function makeSegments(data: ResearchChartProps["data"], id: ChartSeries, xFor: (row: ResearchChartProps["data"][number], index: number) => number, yFor: (value: number) => number) {
@@ -72,7 +73,8 @@ function nearestIndex(data: ResearchChartProps["data"], x: number, xFor: (row: R
   return nearest;
 }
 
-export default function ResearchChart({ data, series = ["base", "rule", "proposed", "cash"], selectedDate, onSelectDate, label = "Strategy value", mode, height, reveal = true, compact = false }: ResearchChartProps) {
+export default function ResearchChart({ data, series = ["base", "rule", "proposed", "cash"], selectedDate, onSelectDate, label = "Strategy value", mode, height, reveal = true, compact = false, presentation = "default" }: ResearchChartProps) {
+  const areaGradientId = `kk-chart-area-${useId().replace(/:/g, "")}`;
   const rootRef = useRef<HTMLElement>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const dwellRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -87,6 +89,12 @@ export default function ResearchChart({ data, series = ["base", "rule", "propose
   const allowedIds = allowedSeries.map(item => item.id);
   const [visibleSeries, setVisibleSeries] = useState<ChartSeries[]>(allowedIds);
   const [localSelectedDate, setLocalSelectedDate] = useState<string | null>(selectedDate ?? null);
+  // Overview charts only show the original strategy and cash. Give the main
+  // recorded series the accent and extra weight in that single-series mode;
+  // comparison charts retain the neutral original-vs-filter palette.
+  const emphasiseBase = !visibleSeries.includes("proposed");
+  const colorFor = (item: SeriesDef) => item.id === "base" && emphasiseBase ? "var(--kk-accent, #2454f4)" : item.color;
+  const widthFor = (item: SeriesDef) => item.id === "base" && emphasiseBase ? 4 : item.width;
 
   useEffect(() => { setVisibleSeries(allowedIds); }, [allowedIds.join(",")]);
   useEffect(() => { setLocalSelectedDate(selectedDate ?? null); }, [selectedDate]);
@@ -130,7 +138,12 @@ export default function ResearchChart({ data, series = ["base", "rule", "propose
   const requestedHeight = height ?? (compact ? 280 : viewWidth < 760 ? 280 : 420);
   const chartHeight = viewWidth < 760 ? Math.min(requestedHeight, 300) : requestedHeight;
   const viewHeight = chartHeight;
-  const plot = useMemo(() => ({ left: viewWidth < 600 ? 36 : 62, right: viewWidth < 600 ? 32 : 158, top: 28, bottom: viewWidth < 600 ? 70 : 47 }), [viewWidth]);
+  const plot = useMemo(() => {
+    if (presentation === "overview") {
+      return { left: viewWidth < 600 ? 28 : 36, right: viewWidth < 600 ? 18 : 28, top: 22, bottom: viewWidth < 600 ? 52 : 38 };
+    }
+    return { left: viewWidth < 600 ? 36 : 62, right: viewWidth < 600 ? 32 : 158, top: 28, bottom: viewWidth < 600 ? 70 : 47 };
+  }, [presentation, viewWidth]);
 
   const metrics = useMemo(() => {
     const times = data.map(row => dateMs(row.date));
@@ -153,8 +166,8 @@ export default function ResearchChart({ data, series = ["base", "rule", "propose
       return plot.left + Math.max(0, Math.min(1, ratio)) * (viewWidth - plot.left - plot.right);
     };
     const yFor = (value: number) => plot.top + (1 - (value - yMin) / (yMax - yMin)) * (viewHeight - plot.top - plot.bottom);
-    return { yMin, yMax, xFor, yFor, ticks: yTicks(yMin, yMax) };
-  }, [allowedSeries, data, plot, viewHeight, viewWidth]);
+    return { yMin, yMax, xFor, yFor, ticks: presentation === "overview" ? overviewTicks(yMin, yMax) : yTicks(yMin, yMax) };
+  }, [allowedSeries, data, plot, presentation, viewHeight, viewWidth]);
 
   const selectedIndex = useMemo(() => {
     const activeDate = localSelectedDate ?? selectedDate;
@@ -167,12 +180,12 @@ export default function ResearchChart({ data, series = ["base", "rule", "propose
   const readoutIndex = pinnedIndex ?? hoverIndex;
   const readoutRow = readoutIndex === null || !data[readoutIndex] ? null : data[readoutIndex];
   const readoutX = readoutRow && readoutIndex !== null ? metrics.xFor(readoutRow, readoutIndex) : null;
-  const readoutValues = readoutRow ? allowedSeries.filter(item => visibleSeries.includes(item.id)).map(item => ({ ...item, value: finiteValue(readoutRow, item.id) })).filter((item): item is SeriesDef & { value: number } => item.value !== null) : [];
+  const readoutValues = readoutRow ? allowedSeries.filter(item => visibleSeries.includes(item.id)).map(item => ({ ...item, color: colorFor(item), width: widthFor(item), value: finiteValue(readoutRow, item.id) })).filter((item): item is SeriesDef & { value: number } => item.value !== null) : [];
   const endLabels = useMemo(() => {
     const labels = allowedSeries.filter(item => visibleSeries.includes(item.id)).map(item => {
       const points = makeSegments(data, item.id, metrics.xFor, metrics.yFor).flat();
       const point = points[points.length - 1];
-      return point ? { ...item, point, labelY: point.y } : null;
+      return point ? { ...item, color: colorFor(item), width: widthFor(item), point, labelY: point.y } : null;
     }).filter((item): item is SeriesDef & { point: Point; labelY: number } => item !== null).sort((a, b) => a.labelY - b.labelY);
     for (let index = 1; index < labels.length; index += 1) {
       if (labels[index].labelY - labels[index - 1].labelY < 18) labels[index].labelY = labels[index - 1].labelY + 18;
@@ -254,35 +267,55 @@ export default function ResearchChart({ data, series = ["base", "rule", "propose
   const narrow = viewWidth < 600;
   const readoutPlacement = readoutX !== null && readoutX < viewWidth * 0.28 ? "start" : readoutX !== null && readoutX > viewWidth * 0.72 ? "end" : "center";
   const readoutHint = mode === "demo" ? "Recorded example point" : "Actual observation";
+  const showEndLabels = presentation !== "overview";
+  const overviewPrimary = allowedSeries.find(item => item.id === "base" && visibleSeries.includes(item.id)) ?? allowedSeries.find(item => visibleSeries.includes(item.id));
+  const overviewAreaSegments = useMemo(() => {
+    if (presentation !== "overview" || !overviewPrimary) return [];
+    return makeSegments(data, overviewPrimary.id, metrics.xFor, metrics.yFor);
+  }, [data, metrics, overviewPrimary, presentation]);
+  const overviewEndpoint = overviewAreaSegments.at(-1)?.at(-1) ?? null;
+  const areaPath = (segment: Point[]) => {
+    if (!segment.length) return "";
+    const base = monotonePath(segment);
+    const bottom = viewHeight - plot.bottom;
+    const first = segment[0];
+    const last = segment[segment.length - 1];
+    return `${base} L${last.x.toFixed(2)} ${bottom.toFixed(2)} L${first.x.toFixed(2)} ${bottom.toFixed(2)} Z`;
+  };
+  const chartControls = <>
+    <div className="kk-chart-controls">
+      <div className="kk-chart-series-toggle" aria-label="Visible chart series">{allowedSeries.map(item => <label key={item.id} data-series={item.id}><input type="checkbox" checked={visibleSeries.includes(item.id)} onChange={() => setVisibleSeries(current => current.includes(item.id) ? current.filter(value => value !== item.id) : [...current, item.id])} /><i style={{ backgroundColor: colorFor(item) }} />{item.label}</label>)}</div>
+      <div className="kk-chart-actions"><button type="button" className="kk-chart-link" onClick={() => setShowData(value => !value)}>{showData ? "Hide data" : "View data"}</button><button type="button" className="kk-chart-link" onClick={downloadCsv}>Download data</button></div>
+    </div>
+    {narrow && showEndLabels && <div className="kk-chart-narrow-labels" aria-label="Latest values">{endLabels.map(item => <span key={item.id}><i style={{ backgroundColor: item.color }} />{item.label}<b>{valueText(item.point.value)}</b></span>)}</div>}
+    <label className="kk-chart-scrubber"><span>Select date</span><input type="range" min={0} max={Math.max(0, data.length - 1)} value={activeIndex ?? 0} onChange={event => chooseIndex(Number(event.target.value), true)} onKeyDown={handleRangeKeyDown} aria-label="Select an observation date" /><output>{activeRow ? displayDate(activeRow.date) : "No date selected"}</output></label>
+    {showData && <div className="kk-chart-data"><table><caption>Actual chart observations</caption><thead><tr><th>Date</th>{allowedSeries.filter(item => visibleSeries.includes(item.id)).map(item => <th key={item.id}>{item.label}</th>)}</tr></thead><tbody>{data.map(row => <tr key={row.date}><th scope="row">{displayTimestamp(row.date)}</th>{allowedSeries.filter(item => visibleSeries.includes(item.id)).map(item => <td key={item.id}>{finiteValue(row, item.id) === null ? "—" : valueText(finiteValue(row, item.id) as number)}</td>)}</tr>)}</tbody></table></div>}
+  </>;
 
-  return <section ref={rootRef} className={`kk-chart ${compact ? "kk-chart-compact" : ""}`} style={{ "--kk-chart-height": `${chartHeight}px` } as React.CSSProperties} aria-label={label}>
-    <div className="kk-chart-toolbar">
+  return <section ref={rootRef} className={`kk-chart ${compact ? "kk-chart-compact" : ""} ${presentation === "overview" ? "kk-chart-presentation-overview" : ""}`} style={{ "--kk-chart-height": `${chartHeight}px` } as React.CSSProperties} aria-label={label}>
+    {presentation !== "overview" && <div className="kk-chart-toolbar">
       <div><span className="kk-chart-label">{label}</span><span className="kk-chart-unit">Value of 100 · indexed strategy value</span></div>
       <div className="kk-chart-scope">{mode === "demo" ? "Illustrative example" : mode === "pending" ? "Awaiting measured results" : "Measured result"}</div>
-    </div>
+    </div>}
     <div className={`kk-chart-stage ${shouldReveal ? "kk-chart-reveal" : ""}`} ref={chartRef}>
       <svg viewBox={`0 0 ${viewWidth} ${viewHeight}`} preserveAspectRatio="none" role="group" aria-label={`${label} chart`}>
+        {presentation === "overview" && overviewPrimary && overviewAreaSegments.length > 0 && <defs><linearGradient id={areaGradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--kk-accent, #2454f4)" stopOpacity="0.14" /><stop offset="100%" stopColor="var(--kk-accent, #2454f4)" stopOpacity="0" /></linearGradient></defs>}
         <g className="kk-chart-grid" aria-hidden="true">
-          {metrics.ticks.map((tick, index) => { const y = metrics.yFor(tick); return <g key={`y-${index}`}><line x1={plot.left} x2={viewWidth - plot.right} y1={y} y2={y} /><text x={plot.left - 12} y={y + 4} textAnchor="end">{tick.toFixed(0)}</text></g>; })}
-          {data.filter((_, index) => index === 0 || index === data.length - 1 || index === Math.floor((data.length - 1) / 2)).map((row, index) => <text key={`x-${row.date}-${index}`} x={metrics.xFor(row, data.indexOf(row))} y={viewHeight - 15} textAnchor={index === 0 ? "start" : index === 2 ? "end" : "middle"}>{shortDate(row.date)}</text>)}
-          <text className="kk-chart-axis-label" x={plot.left} y={15}>Value</text>
-          <text className="kk-chart-axis-label" x={viewWidth - plot.right} y={viewHeight - 1} textAnchor="end">UTC date</text>
+          {metrics.ticks.map((tick, index) => { const y = metrics.yFor(tick); return <g key={`y-${index}`}><line x1={plot.left} x2={viewWidth - plot.right} y1={y} y2={y} /><text className="kk-chart-y-tick" x={plot.left - 12} y={y + 4} textAnchor="end">{tick.toFixed(0)}</text></g>; })}
+          {data.filter((_, index) => presentation === "overview" ? index === 0 || index === data.length - 1 : index === 0 || index === data.length - 1 || index === Math.floor((data.length - 1) / 2)).map((row, index) => <text className="kk-chart-x-tick" key={`x-${row.date}-${index}`} x={metrics.xFor(row, data.indexOf(row))} y={viewHeight - 15} textAnchor={presentation === "overview" ? (index === 0 ? "start" : "end") : index === 0 ? "start" : index === 2 ? "end" : "middle"}>{shortDate(row.date)}</text>)}
+          {presentation !== "overview" && <><text className="kk-chart-axis-label" x={plot.left} y={15}>Value</text><text className="kk-chart-axis-label" x={viewWidth - plot.right} y={viewHeight - 1} textAnchor="end">UTC date</text></>}
         </g>
+        {presentation === "overview" && overviewPrimary && overviewAreaSegments.length > 0 && <g className="kk-chart-area" aria-hidden="true">{overviewAreaSegments.map((segment, index) => <path key={`area-${overviewPrimary.id}-${index}`} d={areaPath(segment)} fill={`url(#${areaGradientId})`} />)}</g>}
         <g className="kk-chart-series" aria-hidden="true">
-          {allowedSeries.filter(item => visibleSeries.includes(item.id)).map(item => makeSegments(data, item.id, metrics.xFor, metrics.yFor).map((segment, index) => <path key={`${item.id}-${index}`} d={linePath(segment)} fill="none" stroke={item.color} strokeDasharray={item.dash} strokeWidth={item.width} vectorEffect="non-scaling-stroke" />))}
-          {!narrow && endLabels.map(item => <text key={`${item.id}-label`} className="kk-chart-end-label" x={item.point.x + 12} y={item.labelY + 4} fill={item.color}>{item.label} {valueText(item.point.value)}</text>)}
+          {allowedSeries.filter(item => visibleSeries.includes(item.id)).map(item => makeSegments(data, item.id, metrics.xFor, metrics.yFor).map((segment, index) => <path key={`${item.id}-${index}`} className={`kk-chart-line kk-chart-line--${item.id}`} d={monotonePath(segment)} fill="none" stroke={colorFor(item)} strokeDasharray={item.dash} strokeWidth={widthFor(item)} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />))}
+          {presentation === "overview" && overviewPrimary && overviewEndpoint && <circle className="kk-chart-endpoint" cx={overviewEndpoint.x} cy={overviewEndpoint.y} r="4" fill={colorFor(overviewPrimary)} />}
+          {!narrow && showEndLabels && endLabels.map(item => <text key={`${item.id}-label`} className="kk-chart-end-label" x={item.point.x + 12} y={item.labelY + 4} fill={item.color}>{item.label} {valueText(item.point.value)}</text>)}
         </g>
         {guideX !== null && <line className="kk-chart-guide" x1={guideX} x2={guideX} y1={plot.top} y2={viewHeight - plot.bottom} aria-hidden="true" />}
         <rect className="kk-chart-hit-area" x={plot.left} y={plot.top} width={Math.max(1, viewWidth - plot.left - plot.right)} height={Math.max(1, viewHeight - plot.top - plot.bottom)} tabIndex={0} role="slider" aria-label="Chart observation" aria-valuemin={0} aria-valuemax={Math.max(0, data.length - 1)} aria-valuenow={activeIndex ?? 0} aria-valuetext={activeRow ? displayTimestamp(activeRow.date) : "No date selected"} onPointerMove={handlePointerMove} onPointerLeave={clearHover} onClick={event => chooseIndex(pointerIndex(event), true)} onKeyDown={handleKeyDown} />
       </svg>
       {readoutRow && readoutX !== null && <div className={`kk-chart-readout kk-chart-readout--${readoutPlacement}`} style={{ left: `${(readoutX / viewWidth) * 100}%`, "--kk-chart-readout-left": `${(readoutX / viewWidth) * 100}%` } as React.CSSProperties} onPointerEnter={keepReadout} onPointerLeave={clearHover}><strong>{displayTimestamp(readoutRow.date)}</strong>{readoutValues.map(item => <span key={item.id}><i style={{ backgroundColor: item.color }} />{item.label}<b>{valueText(item.value)}</b></span>)}<small>{readoutHint} · press Escape to clear</small></div>}
     </div>
-    <div className="kk-chart-controls">
-      <div className="kk-chart-series-toggle" aria-label="Visible chart series">{allowedSeries.map(item => <label key={item.id} data-series={item.id}><input type="checkbox" checked={visibleSeries.includes(item.id)} onChange={() => setVisibleSeries(current => current.includes(item.id) ? current.filter(value => value !== item.id) : [...current, item.id])} /><i style={{ backgroundColor: item.color }} />{item.label}</label>)}</div>
-      <div className="kk-chart-actions"><button type="button" className="kk-chart-link" onClick={() => setShowData(value => !value)}>{showData ? "Hide data" : "View data"}</button><button type="button" className="kk-chart-link" onClick={downloadCsv}>Download data</button></div>
-    </div>
-    {narrow && <div className="kk-chart-narrow-labels" aria-label="Latest values">{endLabels.map(item => <span key={item.id}><i style={{ backgroundColor: item.color }} />{item.label}<b>{valueText(item.point.value)}</b></span>)}</div>}
-    <label className="kk-chart-scrubber"><span>Select date</span><input type="range" min={0} max={Math.max(0, data.length - 1)} value={activeIndex ?? 0} onChange={event => chooseIndex(Number(event.target.value), true)} onKeyDown={handleRangeKeyDown} aria-label="Select an observation date" /><output>{activeRow ? displayDate(activeRow.date) : "No date selected"}</output></label>
-    {showData && <div className="kk-chart-data"><table><caption>Actual chart observations</caption><thead><tr><th>Date</th>{allowedSeries.filter(item => visibleSeries.includes(item.id)).map(item => <th key={item.id}>{item.label}</th>)}</tr></thead><tbody>{data.map(row => <tr key={row.date}><th scope="row">{displayTimestamp(row.date)}</th>{allowedSeries.filter(item => visibleSeries.includes(item.id)).map(item => <td key={item.id}>{finiteValue(row, item.id) === null ? "—" : valueText(finiteValue(row, item.id) as number)}</td>)}</tr>)}</tbody></table></div>}
+    {presentation !== "overview" && chartControls}
   </section>;
 }

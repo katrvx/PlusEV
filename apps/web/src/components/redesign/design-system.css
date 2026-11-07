@@ -1,25 +1,31 @@
 :root {
-  --kk-canvas: #0b0b0a;
-  --kk-surface: #191714;
-  --kk-surface-raised: #211e1a;
-  --kk-text: #eee9e1;
-  --kk-text-secondary: #b4aea5;
-  --kk-text-quiet: #969088;
-  --kk-accent: #f47735;
-  --kk-accent-hover: #ff9658;
-  --kk-accent-area: rgba(244, 119, 53, 0.1);
-  --kk-hairline: #302c27;
-  --kk-boundary: #7a736a;
-  --kk-focus: #ffaa73;
-  --kk-original: #d6d0c7;
-  --kk-simple: #a8a198;
-  --kk-cash: #847d74;
+  --kk-canvas: #ffffff;
+  --kk-surface: #ffffff;
+  --kk-surface-raised: #f3f5f9;
+  --kk-text: #121826;
+  --kk-text-secondary: #596374;
+  --kk-text-quiet: #667080;
+  --kk-accent: #2454f4;
+  --kk-accent-hover: #1740c7;
+  --kk-accent-area: rgba(36, 84, 244, 0.08);
+  --kk-hairline: #e6e9f0;
+  --kk-boundary: #929dac;
+  --kk-focus: #2454f4;
+  --kk-original: #586b87;
+  --kk-simple: #7957bb;
+  --kk-cash: #6b7481;
+  --kk-overlay: rgba(20, 28, 46, 0.2);
+  --kk-shadow: 0 16px 48px rgba(20, 35, 70, 0.1);
+  --kk-button-hover: #263044;
+  --kk-danger-soft: #fbeef1;
+  --kk-success-soft: #eaf5ef;
   --kk-secondary: var(--kk-text-secondary);
   --kk-quiet: var(--kk-text-quiet);
   --kk-border: var(--kk-hairline);
   --kk-rule: var(--kk-simple);
-  --kk-serif: "Instrument Serif", Georgia, serif;
-  --kk-sans: "Geist Variable", "Segoe UI", sans-serif;
+  --kk-sans: "Inter Variable", "Segoe UI", Arial, sans-serif;
+  /* Legacy display hooks share the neutral UI face across all integrated screens. */
+  --kk-serif: var(--kk-sans);
   --kk-mono: "Geist Mono Variable", "Cascadia Mono", Consolas, monospace;
   /* Compatibility aliases keep chart and screen-local styles on the same
      loaded families and colour scale as the shared tokens above. */
@@ -31,8 +37,8 @@
   --kk-orange: var(--kk-accent);
   --kk-orange-hover: var(--kk-accent-hover);
   --kk-essential: var(--kk-hairline);
-  --kk-danger: #e89b8a;
-  --kk-success: #a6c9a7;
+  --kk-danger: #b33f55;
+  --kk-success: #277958;
   --kk-space-1: 4px;
   --kk-space-2: 8px;
   --kk-space-3: 12px;
@@ -52,11 +58,36 @@
   --kk-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --kk-ease-in: cubic-bezier(0.4, 0, 1, 1);
   --kk-ease-balanced: cubic-bezier(0.4, 0, 0.2, 1);
+  --kk-radius-control: 999px;
+  --kk-radius-panel: 20px;
 }
+
+/* Shared primary action across import, research, comparison and approval. */
+.kk-app .kk-primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 13px 24px;
+  border: 0;
+  border-radius: var(--kk-radius-control);
+  background: var(--kk-accent);
+  color: #fff !important;
+  font: 600 15px/22px var(--kk-sans);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 160ms ease, box-shadow 160ms ease;
+}
+.kk-app .kk-primary-button:hover:not(:disabled) {
+  background: var(--kk-accent-hover);
+  box-shadow: 0 5px 18px var(--kk-accent-area);
+}
+.kk-magnetic { flex-shrink: 0; }
 
 html:has(.kk-app) {
   background: var(--kk-canvas);
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 .kk-body {
@@ -81,8 +112,7 @@ html:has(.kk-app) {
   min-height: 100svh;
   background: var(--kk-canvas);
   color: var(--kk-text);
-  /* workspace.css historically supplied a stale Geist/Inter stack. Keep the
-     shell on the locally loaded variable font without locking descendants. */
+  /* Keep the shell on the locally loaded UI family. */
   font-family: var(--kk-sans) !important;
   isolation: isolate;
 }
@@ -93,6 +123,12 @@ html:has(.kk-app) {
 :where(.kk-app) h4,
 :where(.kk-app) p {
   margin: 0;
+}
+
+.kk-body .kk-app :is(h1, h2, h3) {
+  font-family: var(--kk-sans);
+  font-weight: 650;
+  letter-spacing: -0.035em;
 }
 
 :where(.kk-app) button,
@@ -126,9 +162,7 @@ html:has(.kk-app) {
   outline-offset: 4px;
 }
 
-/* Keep navigation on the same UI family even when its screen stylesheet is
-   loaded after this file. Descendant wordmarks and labels can still opt into
-   their serif/mono faces explicitly. */
+/* Keep navigation on the same UI family across screen stylesheet imports. */
 :where(.kk-app) .kk-nav {
   font-family: var(--kk-sans) !important;
 }
@@ -149,7 +183,7 @@ html:has(.kk-app) {
 .kk-page-heading,
 .kk-upload-heading {
   font-family: var(--kk-serif);
-  font-weight: 400;
+  font-weight: 650;
   letter-spacing: -0.018em;
 }
 
@@ -278,7 +312,7 @@ html:has(.kk-app) {
 .kk-bubble {
   max-width: min(400px, calc(100vw - 32px));
   padding: 12px;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--kk-shadow);
   animation: kk-bubble-in var(--kk-motion-bubble) var(--kk-ease-out) both;
 }
 

@@ -354,7 +354,7 @@ export default function ImportWizard({ onClose, onImported, initialFile = null }
               >
                 <input ref={inputRef} className="iw-visually-hidden" type="file" accept=".csv,.parquet,.pq,text/csv" onChange={(event) => chooseFile(event.target.files?.[0])} />
                 <div className="iw-upload-icon"><UploadCloud size={23} /></div>
-                {loading ? <><h3>Inspecting your file…</h3><Loader2 className="iw-spin" size={18} /></> : <><h3>Drop your strategy export</h3><p><button className="iw-upload-cta" type="button" onClick={() => inputRef.current?.click()}>Choose a CSV or Parquet file</button></p></>}
+                {loading ? <><h3>Inspecting your file…</h3><Loader2 className="iw-spin" size={18} /></> : <><h3>Drop your strategy export</h3><p><button className="iw-upload-cta kk-primary-button" type="button" onClick={() => inputRef.current?.click()}>Choose a CSV or Parquet file</button></p></>}
                 <span className="iw-upload-note">Example: positions.csv · timestamp, symbol, allocation</span>
               </div>
               {file && <div className="iw-active-file"><div className="iw-active-file-icon"><FileSpreadsheet size={16} /></div><div><span>Active file</span><strong>{file.name}</strong><small>{prettyBytes(file.size)}{loading ? " · inspecting columns…" : " · ready to configure"}</small></div></div>}
@@ -426,8 +426,8 @@ export default function ImportWizard({ onClose, onImported, initialFile = null }
 
         <footer className="iw-footer">
           {step === 1 && <><span className="iw-footer-hint">Source stays unchanged.</span><button className="iw-button iw-button-secondary" type="button" disabled={importing} onClick={() => onCloseRef.current()}>Cancel</button></>}
-          {step === 2 && <><button className="iw-button iw-button-ghost" type="button" disabled={importing} onClick={() => { setStep(1); setError(null); }}><ArrowLeft size={16} /> Replace file</button><div className="iw-footer-actions"><button className="iw-button iw-button-secondary" type="button" disabled={importing} onClick={() => onCloseRef.current()}>Cancel</button><button className="iw-button iw-button-primary" type="button" disabled={importing || !preview} onClick={() => void importStrategy()}>{importing ? <><Loader2 className="iw-spin" size={16} /> Validating…</> : <>Import strategy <ArrowRight size={16} /></>}</button></div></>}
-          {step === 3 && <><span className="iw-footer-hint">Next: investigate this strategy.</span><button className="iw-button iw-button-primary" type="button" onClick={onClose}>Open research workspace <ArrowRight size={16} /></button></>}
+          {step === 2 && <><button className="iw-button iw-button-ghost" type="button" disabled={importing} onClick={() => { setStep(1); setError(null); }}><ArrowLeft size={16} /> Replace file</button><div className="iw-footer-actions"><button className="iw-button iw-button-secondary" type="button" disabled={importing} onClick={() => onCloseRef.current()}>Cancel</button><button className="iw-button iw-button-primary kk-primary-button" type="button" disabled={importing || !preview} onClick={() => void importStrategy()}>{importing ? <><Loader2 className="iw-spin" size={16} /> Validating…</> : <>Import strategy <ArrowRight size={16} /></>}</button></div></>}
+          {step === 3 && <><span className="iw-footer-hint">Next: investigate this strategy.</span><button className="iw-button iw-button-primary kk-primary-button" type="button" onClick={onClose}>Open research workspace <ArrowRight size={16} /></button></>}
         </footer>
       </div>
     </div>

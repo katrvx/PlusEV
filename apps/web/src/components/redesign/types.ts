@@ -21,4 +21,6 @@ export type ResearchChartProps = {
   height?: number;
   reveal?: boolean;
   compact?: boolean;
+  /** Quiet first-view mode for overview charts; details stay available below. */
+  presentation?: "default" | "overview";
 };

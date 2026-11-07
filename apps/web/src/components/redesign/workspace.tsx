@@ -13,6 +13,7 @@ import ComparisonView from "./comparison";
 import PaperReview from "./paper-review";
 import ObserveView from "./observe";
 import StrategyEntry from "./strategy-entry";
+import { ActiveIndicator, InterfaceMotion, Reveal } from "./ui-motion";
 import type { ExploreTab, MainView, MotionPreference, SharedResearchProps } from "./types";
 import "./workspace.css";
 
@@ -20,7 +21,7 @@ const topViews: { id: MainView; label: string; hint: string }[] = [
   { id: "strategy", label: "Strategy", hint: "Add, check and test your strategy" },
   { id: "explore", label: "Explore", hint: "Read patterns and evidence" },
   { id: "compare", label: "Compare", hint: "Test a proposed filter" },
-  { id: "observe", label: "Observe", hint: "Follow a paper test" },
+  { id: "observe", label: "Plans", hint: "Review saved paper plans" },
 ];
 
 const exploreTabs: { id: ExploreTab; label: string }[] = [
@@ -300,7 +301,7 @@ export default function Workspace() {
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
       if (strategyMenu && !strategyPanelRef.current?.contains(target) && !strategyTriggerRef.current?.contains(target)) setStrategyMenu(false);
-      if (displayMenu && !displayPanelRef.current?.contains(target) && !displayTriggerRef.current?.contains(target)) setDisplayMenu(false);
+      if (displayMenu && !displayPanelRef.current?.contains(target) && !displayTriggerRef.current?.contains(target) && !navDisplayRef.current?.contains(target)) setDisplayMenu(false);
       if (mobileNav && !mobileMenuRef.current?.contains(target) && !document.querySelector(".kk-nav")?.contains(target)) setMobileNav(false);
     };
     document.addEventListener("keydown", onKeyDown);
@@ -308,15 +309,15 @@ export default function Workspace() {
     return () => { document.removeEventListener("keydown", onKeyDown); document.removeEventListener("pointerdown", onPointerDown); };
   }, [strategyMenu, displayMenu, mobileNav]);
 
-  return <div className="kk-app" data-motion={motion} data-view={view}>
+  return <InterfaceMotion preference={motion}><div className="kk-app" data-motion={motion} data-view={view}>
     <a className="kk-skip" href="#kk-main">Skip to main content</a>
     <header className="kk-header">
-      <button className="kk-wordmark" type="button" onClick={() => { scrollTop(); setEntryOpen(true); setMobileNav(false); setStrategyMenu(false); setDisplayMenu(false); writeUrl({ view: "strategy", tab: "overview", strategy: "", experiment: "", date: "", compare: false }); }} aria-label="Keep or Kill home"><span>keep<span className="kk-slash">/</span>kill</span><small>research instrument</small></button>
+      <button className="kk-wordmark" type="button" onClick={() => { scrollTop(); setEntryOpen(true); setMobileNav(false); setStrategyMenu(false); setDisplayMenu(false); writeUrl({ view: "strategy", tab: "overview", strategy: "", experiment: "", date: "", compare: false }); }} aria-label="Keep or Kill home"><span>keep<span className="kk-slash">/</span>kill</span></button>
       <div className="kk-header-context">
-        {selected ? <button ref={strategyTriggerRef} type="button" className="kk-strategy-trigger" aria-expanded={strategyMenu} aria-haspopup="dialog" onClick={() => setStrategyMenu(value => !value)}>{selected.name}<ChevronDown size={15} /></button> : <span className="kk-context-quiet">No strategy selected</span>}
+        {selected ? <button ref={strategyTriggerRef} type="button" className="kk-strategy-trigger" title={selected.name} aria-label={`Switch strategy: ${selected.name}`} aria-expanded={strategyMenu} aria-haspopup="dialog" onClick={() => setStrategyMenu(value => !value)}>Your strategies<ChevronDown size={15} /></button> : <span className="kk-context-quiet">No strategy selected</span>}
         {strategyMenu && <div ref={strategyPanelRef} className="kk-switcher" role="dialog" aria-label="Switch strategy"><div className="kk-switcher-head"><span>Switch strategy</span><button type="button" onClick={() => { setStrategyMenu(false); strategyTriggerRef.current?.focus(); }} aria-label="Close strategy switcher"><X size={15} /></button></div><label className="kk-switcher-search"><span className="kk-sr-only">Find a strategy</span><input value={strategyQuery} onChange={event => setStrategyQuery(event.target.value)} placeholder="Find a strategy" aria-label="Find a strategy" /></label><div className="kk-switcher-list">{filteredStrategies.map(strategy => <button type="button" key={strategy.strategy_id} className={strategy.strategy_id === selectedId ? "selected" : ""} onClick={() => selectStrategy(strategy)}><span><strong>{strategy.name}</strong><small>{strategy.symbol} · {strategy.timeframe} · {strategy.status === "demo" ? "Example" : "Imported"}</small></span><ArrowUpRight size={14} /></button>)}{filteredStrategies.length === 0 && <p className="kk-switcher-empty">No matching strategy.</p>}<button type="button" className="kk-switcher-add" onClick={() => openImport()}><Plus size={15} />Add strategy</button></div></div>}
       </div>
-      <nav className={`kk-nav ${mobileNav ? "open" : ""}`} aria-label="Primary navigation">{topViews.map(item => <button type="button" key={item.id} ref={node => { navRefs.current[item.id] = node; }} className={view === item.id ? "active" : ""} aria-current={view === item.id ? "page" : undefined} onClick={() => selectView(item.id)} title={item.hint}>{item.label}</button>)}<button ref={navDisplayRef} className="kk-nav-display" type="button" onClick={() => { displayFocusRef.current = navDisplayRef.current; setDisplayMenu(value => !value); setMobileNav(false); }}><Settings2 size={15} />Display</button></nav>
+      <nav className={`kk-nav ${mobileNav ? "open" : ""}`} aria-label="Primary navigation">{topViews.map(item => <button type="button" key={item.id} ref={node => { navRefs.current[item.id] = node; }} className={view === item.id ? "active" : ""} aria-current={view === item.id ? "page" : undefined} onClick={() => selectView(item.id)} title={item.hint}>{view === item.id && <ActiveIndicator group="primary" />}<span className="kk-nav-label">{item.label}</span></button>)}<button ref={navDisplayRef} className="kk-nav-display" type="button" aria-label="Display settings" title="Display settings" aria-expanded={displayMenu} aria-haspopup="dialog" onClick={() => { displayFocusRef.current = navDisplayRef.current; setDisplayMenu(value => !value); setMobileNav(false); }}><Settings2 size={17} /></button></nav>
       <div className="kk-header-actions"><button ref={displayTriggerRef} className="kk-display" type="button" aria-expanded={displayMenu} aria-haspopup="dialog" onClick={() => { displayFocusRef.current = displayTriggerRef.current; setDisplayMenu(value => !value); }}><Settings2 size={16} /><span>Display</span></button><button ref={mobileMenuRef} className="kk-mobile-menu" type="button" aria-expanded={mobileNav} aria-haspopup="menu" onClick={() => setMobileNav(value => !value)} aria-label="Navigate"><Menu size={21} /><span>Navigate</span></button></div>
       {displayMenu && <div ref={displayPanelRef} className="kk-display-menu" role="dialog" aria-label="Display settings"><span>Motion</span>{(["system", "reduced", "full"] as MotionPreference[]).map(option => <button type="button" key={option} className={motion === option ? "selected" : ""} onClick={() => { setMotionPreference(option); setDisplayMenu(false); displayFocusRef.current?.focus(); }}>{option[0].toUpperCase() + option.slice(1)}</button>)}</div>}
     </header>
@@ -325,24 +326,24 @@ export default function Workspace() {
       {entryOpen ? <StrategyEntry example={exampleExperiment} onImport={openImport} onExample={() => { if (exampleStrategy) selectStrategy(exampleStrategy); }} onResume={selected ? () => selectStrategy(selected) : undefined} /> : loading ? <div className="kk-loading" role="status"><span className="kk-loading-line" />Preparing your research workspace</div> : <>
         <ConnectionNotice strategy={selected} health={health} onExample={exampleStrategy ? () => selectStrategy(exampleStrategy) : undefined} />
         {view !== "observe" && selected && experimentLoading ? <ResearchLoading strategy={selected} /> : <>
-          {view === "strategy" && <><StrategyView strategy={selected} experiment={experiment} health={health} onImport={openImport} onExample={() => { if (exampleStrategy) selectStrategy(exampleStrategy); }} onRun={onRun} running={running || !!active} />{incompleteResearch && experiment && <ExperimentStatus experiment={experiment} />}</>}
-          {view === "explore" && !shared && <EmptyStage title="Run a backtest first." body="Add a supported position or signal file, then return here to explore the result." action="Add your strategy" onAction={() => openImport()} />}
+          {view === "strategy" && <Reveal key={selectedId}><StrategyView strategy={selected} experiment={experiment} health={health} onImport={openImport} onExample={() => { if (exampleStrategy) selectStrategy(exampleStrategy); }} onRun={onRun} running={running || !!active} />{incompleteResearch && experiment && <ExperimentStatus experiment={experiment} />}</Reveal>}
+          {view === "explore" && !shared && <EmptyStage title="Start with your strategy." body="Upload your signals or positions to begin the research." action="Add your strategy" onAction={() => openImport()} />}
           {view === "explore" && shared && <>
-            <div className="kk-local-nav" role="tablist" aria-label="Explore views">{exploreTabs.map(item => <button type="button" key={item.id} role="tab" aria-selected={tab === item.id} className={tab === item.id ? "active" : ""} onClick={() => onExploreTab(item.id)}>{item.label}</button>)}</div>
+            <div className="kk-local-nav" role="tablist" aria-label="Explore views">{exploreTabs.map(item => <button type="button" key={item.id} role="tab" aria-selected={tab === item.id} className={tab === item.id ? "active" : ""} onClick={() => onExploreTab(item.id)}>{tab === item.id && <ActiveIndicator group="explore" />}<span className="kk-nav-label">{item.label}</span></button>)}</div>
             {incompleteResearch && <ExperimentStatus experiment={shared.experiment} />}
-            {!incompleteResearch && tab === "overview" && <ResearchOverview {...shared} onConditions={() => onExploreTab("conditions")} onCompare={() => selectView("compare")} />}
-            {!incompleteResearch && tab === "conditions" && <ConditionsView {...shared} />}
-            {!incompleteResearch && tab === "evidence" && <EvidenceView {...shared} onCompare={() => selectView("compare")} />}
+            {!incompleteResearch && tab === "overview" && <Reveal key="overview"><ResearchOverview {...shared} onConditions={() => onExploreTab("conditions")} onCompare={() => selectView("compare")} /></Reveal>}
+            {!incompleteResearch && tab === "conditions" && <Reveal key="conditions"><ConditionsView {...shared} /></Reveal>}
+            {!incompleteResearch && tab === "evidence" && <Reveal key="evidence"><EvidenceView {...shared} onCompare={() => selectView("compare")} /></Reveal>}
           </>}
           {view === "compare" && !shared && <EmptyStage title="There is nothing to compare yet." body="Run a backtest and find a candidate rule before comparing it on unseen history." action="Go to Strategy" onAction={() => selectView("strategy")} />}
-          {view === "compare" && shared && (incompleteResearch ? <ExperimentStatus experiment={shared.experiment} /> : compareReview ? <PaperReview experiment={shared.experiment} strategy={shared.strategy} onSaved={onSavedPlan} onBack={() => { setCompareReview(false); writeUrl({ compare: false }, true); }} /> : <ComparisonView {...shared} onReview={showReview} />)}
-          {view === "observe" && <ObserveView plans={plans} strategies={strategies} onReview={() => { if (shared) showReview(); else selectView("strategy"); }} />}
+          {view === "compare" && shared && (incompleteResearch ? <ExperimentStatus experiment={shared.experiment} /> : compareReview ? <PaperReview experiment={shared.experiment} strategy={shared.strategy} onSaved={onSavedPlan} onBack={() => { setCompareReview(false); writeUrl({ compare: false }, true); }} /> : <Reveal key="comparison"><ComparisonView {...shared} onReview={showReview} /></Reveal>)}
+          {view === "observe" && <Reveal key="plans"><ObserveView plans={plans} strategies={strategies} onReview={() => { if (shared) showReview(); else selectView("strategy"); }} /></Reveal>}
         </>}
       </>}
-      {!entryOpen && <footer className="kk-footer"><span>Original strategy unchanged.</span><span>Paper only · no live trading.</span></footer>}
+      {!entryOpen && !(view === "explore" && tab === "overview") && <footer className="kk-footer"><span>Research only · no live trading</span></footer>}
     </main>
     {importOpen && <ImportWizard initialFile={initialImportFile} onClose={closeImport} onImported={onImported} />}
     {evidence && <EvidenceDialog evidence={evidence} onClose={() => setEvidence(null)} />}
     {toast && <Toast message={toast} onClose={dismissToast} />}
-  </div>;
+  </div></InterfaceMotion>;
 }

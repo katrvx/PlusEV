@@ -3,6 +3,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUpRight, Pause, Play, RotateCcw } from "lucide-react";
 import type { Experiment } from "./types";
+import { monotonePath } from "./chart-path";
+import { MagneticAction, Reveal } from "./ui-motion";
 import "./strategy-entry.css";
 
 type Props = {
@@ -37,7 +39,7 @@ function ExamplePlayback({ example }: { example: Experiment | null }) {
       proposed: 237 - (row.proposed - low) / (high - low || 1) * 205,
     }));
   }, [example]);
-  const path = (key: "base" | "proposed") => points.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(2)},${point[key].toFixed(2)}`).join(" ");
+  const path = (key: "base" | "proposed") => monotonePath(points.map(point => ({ x: point.x, y: point[key] })));
   const area = points.length ? `${path("proposed")} L992,260 L8,260 Z` : "";
 
   useEffect(() => {
@@ -93,11 +95,11 @@ function ExamplePlayback({ example }: { example: Experiment | null }) {
       <svg className="se-graph" viewBox="0 0 1000 260" preserveAspectRatio="none" role="img" aria-label="Animated playback of the recorded example: original strategy and suggested filter. Illustrative data, not live performance.">
         <defs><clipPath id={clipId}><rect ref={clip} width="0" height="260" /></clipPath></defs>
         <g clipPath={`url(#${clipId})`}>
-          <path d={area} fill="#F47735" fillOpacity="0.035" />
-          <path d={path("base")} fill="none" stroke="#B4AEA5" strokeWidth="1.35" vectorEffect="non-scaling-stroke" />
-          <path d={path("proposed")} fill="none" stroke="#F47735" strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
+          <path d={area} fill="var(--kk-accent)" fillOpacity="0.045" />
+          <path d={path("base")} fill="none" stroke="var(--kk-original)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          <path d={path("proposed")} fill="none" stroke="var(--kk-accent)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
         </g>
-        <g ref={cursor} transform={`translate(${points[0].x},${points[0].proposed})`}><circle r="3" fill="#F47735" /></g>
+        <g ref={cursor} transform={`translate(${points[0].x},${points[0].proposed})`}><circle r="3" fill="var(--kk-accent)" /></g>
       </svg>
     </>}
     <div className="se-playback-meta"><span>Example data · not a live result</span><span ref={date} className="se-date" />{points.length > 0 && !reduced && <button type="button" onClick={togglePlayback} aria-label={finished ? "Replay example animation" : playing ? "Pause example animation" : "Play example animation"}>{finished ? <RotateCcw size={14} /> : playing ? <Pause size={14} /> : <Play size={14} />}</button>}</div>
@@ -113,15 +115,15 @@ export default function StrategyEntry({ example, onImport, onExample, onResume }
     onDragOver={event => event.preventDefault()}
     onDragLeave={event => { event.preventDefault(); if (--dragCount.current <= 0) setDragging(false); }}
     onDrop={event => { event.preventDefault(); dragCount.current = 0; setDragging(false); const file = event.dataTransfer.files[0]; if (file) onImport(file); }}>
-    <div className="se-topline"><p>Start with your strategy.</p><span>01 / Import</span></div>
-    <div className="se-invitation">
+    <div className="se-topline"><p>keep/kill</p></div>
+    <Reveal className="se-invitation">
       <h1 id="se-title">{dragging ? "Let’s take a look." : "Drop your strategy."}</h1>
       <p>CSV or Parquet <span>· signals or positions</span></p>
       <div className="se-direction" aria-hidden="true"><span /><ArrowDown size={20} /></div>
-      <button className="se-choose" type="button" onClick={() => input.current?.click()}>Choose file <ArrowUpRight size={25} /></button>
+      <MagneticAction><button className="se-choose kk-primary-button" type="button" onClick={() => input.current?.click()}>Choose file <ArrowUpRight size={21} /></button></MagneticAction>
       <button className="se-example" type="button" onClick={onExample}>Try an example</button>
       <input ref={input} type="file" accept=".csv,.parquet,.pq" className="se-file" tabIndex={-1} aria-label="Choose a strategy file" onChange={event => { const file = event.target.files?.[0]; if (file) onImport(file); event.target.value = ""; }} />
-    </div>
+    </Reveal>
     <ExamplePlayback example={example} />
     <footer className="se-footer">{onResume ? <button type="button" className="se-resume" onClick={onResume}>Your workspace <ArrowUpRight size={14} /></button> : <span />}<ol aria-label="Strategy workflow"><li aria-current="step">Import</li><li aria-hidden="true">→</li><li>Check data</li><li aria-hidden="true">→</li><li>Explore</li></ol></footer>
   </section>;

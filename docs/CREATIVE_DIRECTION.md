@@ -1,5 +1,7 @@
 # Keep or Kill — complete interface and motion direction
 
+> Current implementation note: later user direction replaces the dark theme with white surfaces, navy text and an electric blue accent. Use neutral Inter typography, a bold result and one concise finding, thicker smooth curves, and minimal small-font detail. React Bits and Motion provide restrained, consistent interactions. See `CREATIVE_DIRECTION_IMPLEMENTATION.md` for the current design and unchanged integration contract; the original brief below remains reference material.
+
 Copy this entire brief into the design or implementation agent. It defines the product flow, visual system, screens, chart behaviour, every reusable bubble, motion choreography, failure states and acceptance criteria. Treat the timings as deliberate design specifications, not research findings.
 
 ## 1. Your assignment

@@ -26,6 +26,11 @@ function EvidenceDialog({ evidence, onClose }: { evidence: Evidence; onClose: ()
     returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialog.showModal();
     const close = () => {
+      // React StrictMode can replay the effect: the cleanup closes the first
+      // dialog instance, and that native close event may be delivered after
+      // the second effect has registered its listener. If a fresh modal is
+      // already open, this is that stale event; do not dismiss the new one.
+      if (dialog.open) return;
       returnFocusRef.current?.focus();
       closeRef.current();
     };
@@ -63,7 +68,7 @@ export default function EvidenceView({ experiment, strategy, onEvidence, onCompa
   const openEvidence = (id: string) => onEvidence(id);
   if (showTeamReport) return <section className="ev-view ev-team-view" aria-labelledby="ev-team-title"><div className="ev-team-head"><div><span className="ev-kicker">NATIVE AGENT REPORT</span><h1 id="ev-team-title">The report behind this evidence</h1><p>Open the recorded agent report, with its research mode, source trail, trials and comparison rules intact.</p></div></div><TeamResearch initialExperimentId={experiment.experiment_id} strategyId={strategy.strategy_id} onBack={() => setShowTeamReport(false)} /></section>;
   return <section className="ev-view" aria-labelledby="ev-title">
-    <header className="ev-header"><div><span className="ev-kicker">EXPLORE · EVIDENCE</span><h1 id="ev-title">Why did the result change?</h1><p>{strategy.name} · {strategy.symbol} · recorded findings and sources</p></div><div className="ev-header-actions"><button type="button" className="ev-action" onClick={() => setShowTeamReport(true)}>Open agent report <ArrowUpRight size={15} /></button><button type="button" className="ev-action" onClick={onCompare}>Compare the rule <ArrowUpRight size={15} /></button></div></header>
+    <header className="ev-header"><div><span className="ev-kicker">EXPLORE · EVIDENCE</span><h1 id="ev-title">Why did the result change?</h1><p>{strategy.name}</p></div><div className="ev-header-actions"><button type="button" className="ev-action" onClick={() => setShowTeamReport(true)}>Open agent report <ArrowUpRight size={15} /></button><button type="button" className="ev-action kk-primary-button" onClick={onCompare}>Compare the rule <ArrowUpRight size={15} /></button></div></header>
     <section className="ev-findings" aria-labelledby="ev-findings-title"><div className="ev-section-head"><div><span className="ev-kicker">STRUCTURED FINDINGS</span><h2 id="ev-findings-title">What the research can say</h2><p>Every statement keeps its status and its source.</p></div></div><div className="ev-hypothesis-list">{experiment.hypotheses.map(item => <Hypothesis key={item.id} item={item} onEvidence={openEvidence} />)}</div></section>
     {experiment.steps.length > 0 && <ResearchPath experiment={experiment} onEvidence={openEvidence} />}
     <section className="ev-library" aria-labelledby="ev-library-title"><div className="ev-section-head"><div><span className="ev-kicker">EVIDENCE LIBRARY</span><h2 id="ev-library-title">Recorded sources</h2><p>Open a source for its arguments and raw output. Technical details stay here when you need them.</p></div><span className="ev-count">{experiment.evidence.length}</span></div><div className="ev-source-list">{experiment.evidence.map(item => <details className="ev-source-row" key={item.id}><summary><span><FileSearch size={15} /><strong>{item.title}</strong><small>{item.kind} · {item.window}</small></span><ChevronDown size={16} /></summary><div className="ev-source-summary"><p>{item.summary}</p><button type="button" className="ev-action" onClick={() => openEvidence(item.id)}>Open source detail <ExternalLink size={14} /></button></div></details>)}</div></section>

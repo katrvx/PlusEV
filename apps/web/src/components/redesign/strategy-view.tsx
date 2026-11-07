@@ -56,7 +56,7 @@ function EmptyStrategy({ onImport, onExample }: Pick<Props, "onImport" | "onExam
     <h1 id="sv-empty-title">Test your strategy.</h1>
     <p className="sv-empty-invite"><strong>Add your strategy.</strong> Bring a timestamped export and let the research agents look for where it holds up, where it weakens, and what still needs evidence.</p>
     <div className="sv-empty-actions">
-      <button type="button" className="sv-action sv-action-primary" onClick={onImport}><Upload size={16} aria-hidden="true" />Choose a file <ArrowRight size={15} aria-hidden="true" /></button>
+      <button type="button" className="sv-action sv-action-primary kk-primary-button" onClick={onImport}><Upload size={16} aria-hidden="true" />Choose a file <ArrowRight size={15} aria-hidden="true" /></button>
       <button type="button" className="sv-action sv-action-secondary" onClick={onExample}><FlaskConical size={16} aria-hidden="true" />Open the example</button>
     </div>
     <p className="sv-file-note"><FileInput size={15} aria-hidden="true" />CSV or Parquet · timestamped signals or target positions</p>
@@ -113,7 +113,7 @@ function ResearchState({ strategy, experiment, health, onRun, running }: { strat
     return <div className="sv-research-state sv-research-state-note"><RefreshCw size={17} aria-hidden="true" /><span>Last run did not finish{experiment.message ? ` · ${experiment.message}` : ""}</span><button type="button" className="sv-inline-action" onClick={onRun}>Try again <ArrowRight size={14} aria-hidden="true" /></button></div>;
   }
 
-  return <div className="sv-run-row"><StatusLine tone={isDemo ? "accent" : "quiet"}>{isDemo ? "Example" : experiment ? "Ready again" : "Ready"}</StatusLine><button type="button" className="sv-action sv-action-primary" onClick={onRun} disabled={isActive} aria-busy={isActive}><Play size={15} aria-hidden="true" />{isDemo ? "Run example" : experiment ? "Run again" : "Run research"}<ArrowRight size={15} aria-hidden="true" /></button></div>;
+  return <div className="sv-run-row"><StatusLine tone={isDemo ? "accent" : "quiet"}>{isDemo ? "Example" : experiment ? "Ready again" : "Ready"}</StatusLine><button type="button" className="sv-action sv-action-primary kk-primary-button" onClick={onRun} disabled={isActive} aria-busy={isActive}><Play size={15} aria-hidden="true" />{isDemo ? "Run example" : experiment ? "Run again" : "Run research"}<ArrowRight size={15} aria-hidden="true" /></button></div>;
 }
 
 function ExperimentResult({ experiment }: { experiment: Experiment }) {

@@ -4,9 +4,19 @@ This document is the integration guardrail for the redesign described in `KEEP_O
 
 ## Latest surface direction (user steering)
 
-The final landing surface is intentionally sparse and reference-led: a quiet import invitation, a real example playback, and a short three-step orientation. This latest direction supersedes the earlier “no graph on the landing surface” interpretation of the brief. The landing graph is not a dashboard or a fabricated performance teaser: `apps/web/src/components/redesign/strategy-entry.tsx` replays only the seeded demo experiment's recorded `equity` points, labels the result as illustrative, and provides pause/replay plus reduced-motion behavior. File selection, drag-and-drop, “Try an example,” and “Your workspace” remain the entry actions.
+Use a crisp light palette: white canvas, cool grey surfaces, navy text and electric blue (#2454f4) accents. The shared tokens in `apps/web/src/components/redesign/design-system.css` own the palette, including input boundaries, chart series, focus states, tooltips and dialogs. This supersedes the original dark and orange brief. Keep neutral Inter typography and the simple open layout.
 
-The surface change does not change the product contract. Core import, strategy, experiment, native agent-report, report-download, and paper-plan APIs remain unchanged; the dense research workspace appears after the user leaves the entry surface. The landing playback must never be reused for imported strategies or presented as measured market performance.
+The overview leads with the strategy name and a clearly supplied return figure, using the same navy as the heading. Keep only a readable “Return after costs” caption and a visible example-data label when applicable. The original curve occupies the main canvas; small y-axis labels and repeated metadata are omitted here. The overview has no View data block, date slider or series checkbox. Chart hover, touch and keyboard inspection remain available; detailed observations and exports remain on the other research screens. Full research and source links remain in Evidence. One short finding and “See why” sit below the curve. Small decorative labels, duplicated strategy names, and the overview footer are removed.
+
+The entry surface stays sparse: a strategy import invitation, real example playback, and a short workflow. `strategy-entry.tsx` replays the seeded demo experiment’s recorded `equity` points, labels it as example data, and preserves pause/replay and reduced-motion behavior. File selection, drag-and-drop, Try an example, and Your workspace remain functional. The playback must never be reused for imported strategies or presented as measured market performance.
+
+Research and entry charts use `chart-path.ts` for shape-preserving cubic interpolation through supplied points, with a thicker primary stroke. Smoothing changes drawing only: observations, tooltips, exports, metrics, and API contracts are unchanged. All import, strategy, experiment, native report, report download and paper-plan integrations remain intact.
+
+## Animation and shared controls
+
+Official React Bits `AnimatedContent` and `Magnet` are vendored in `apps/web/src/components/react-bits`, with pinned upstream source and license notices. GSAP runs the restrained 14px page entrances; Motion animates the shared navigation selection. `redesign/ui-motion.tsx` centralizes timings and the existing motion preference. The operating system reduced-motion preference always disables the new motion; magnetic controls also stop on touch and keyboard focus. Financial figures are never counted through fictional values.
+
+The primary action uses `kk-primary-button` across entry, strategy, overview, evidence, comparison and plan approval. Colours, pill radius, focus rings and touch targets come from `design-system.css`. The overview curve has a quiet blue area fill; it preserves the supplied points and data gaps. Effects must remain short, respect reduced motion and never gate access to content.
 
 ## What must continue to work
 
