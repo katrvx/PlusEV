@@ -153,6 +153,13 @@ def lookup_evidence(ctx: RunContext[ToolContext], evidence_id: str) -> dict:
     return ctx.deps.store.get(evidence_id).model_dump(mode="json")
 
 
+def strategy_health(ctx: RunContext[ToolContext]) -> dict:
+    """Bad luck vs broken, computed by code: are the unchanged strategy's validation 14-day results inside its
+    train-only range, and which assumptions (exposure, turnover, costs, volatility, regime frequencies) changed
+    between train and validation? Returns an evidence_id to cite."""
+    return ctx.deps.health or {"error": "strategy health is not available for this loader"}
+
+
 def trial_log(ctx: RunContext[ToolContext]) -> list[dict]:
     """Every policy attempted so far (including refused ones), with train and arbiter validation results."""
     return [t.model_dump() for t in ctx.deps.trials]
@@ -184,6 +191,9 @@ trials, effects only in train, validation contradicting train), fragile sample s
 Critique every proposal exactly once and cite that gate's own evaluation evidence id. You cannot change thresholds.
 trial_log also holds the arbiter's walk-forward runs (note 'walk-forward fold k'): the same gate on later TRAIN sub-periods.
 Use them to check whether an effect is stable over time; thresholds were chosen on all of train, so they are not unseen data.
+strategy_health says whether the unchanged strategy's validation result is ordinary bad luck or outside its training
+range, and which assumptions changed (e.g. a regime that became much more frequent). A gate whose feature's regime
+shifted between train and validation may only look good or bad because of that shift: say so.
 All confidence intervals are 90%. Put only issues that should BLOCK the frozen test in fragile_samples; non-blocking
 remarks go in observations. Verdict 'approve_for_frozen_test' only if the validation evidence supports it.
 Numbers: copy them from the cited tool output and round to 3-4 significant digits (0.3043, -3.54e-05, 5.15%);
@@ -222,7 +232,7 @@ def _proposer_agent(model, hypothesis_ids: set[str]) -> Agent:
 
 def _critic_agent(model, proposals: ProposalSet) -> Agent:
     agent = Agent(model, output_type=CritiqueSet, deps_type=ToolContext, instructions=CRITIC_INSTRUCTIONS,
-                  tools=[trial_log, lookup_evidence], retries=3, defer_model_check=True)
+                  tools=[trial_log, lookup_evidence, strategy_health], retries=3, defer_model_check=True)
 
     @agent.output_validator
     def _v(ctx: RunContext[ToolContext], out: CritiqueSet) -> CritiqueSet:

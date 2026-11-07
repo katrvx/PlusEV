@@ -56,3 +56,16 @@ def test_lane_b_scores_gates_on_lane_a_train_folds_and_keeps_lightgbm_out_of_sam
     assert folds and all(trial.split == "train" for trial in folds)
     assert not any(trial.source == "meta_model" for trial in folds)
     assert report.holdout_accessed is False
+
+
+def test_strategy_health_runs_on_lane_a_and_is_code_computed():
+    loaded = load_for_lane_b(SNAPSHOT_SYNTHETIC)
+    report = investigate(SNAPSHOT_SYNTHETIC, loader=lambda _experiment_id: loaded, force_fallback=True)
+    health = report.strategy_health
+    n_validation = sum(point.split == "validation" for point in loaded[0].equity)
+    if loaded[0].train_predictive_range is None or n_validation < loaded[0].train_predictive_range.horizon_bars:
+        assert health is None and any(item.startswith("Bad luck vs broken: not run") for item in report.limitations)
+        return
+    assert health["status"] in ("within_training_range", "outside_training_range")
+    assert health["train_range"]["horizon_bars"] == loaded[0].train_predictive_range.horizon_bars
+    assert any(basis.startswith("strategy health") for basis in report.verdict_basis)

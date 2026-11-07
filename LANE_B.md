@@ -27,31 +27,47 @@ report = investigate(experiment_id)        # -> InvestigationReport (pydantic), 
 
 - **No held-out labels.** Every tool refuses the test split; a news window that reaches into the test period is refused; LightGBM refuses to fit/calibrate on test; any attempt sets `holdout_accessed=True` in the report.
 - **Claims link to evidence.** Every tool output is stored with a content-addressed `evidence_id`. Output validators make the LLM retry if it cites an id no tool produced.
-- **Allowlisted gates only.** `threshold_gate`, 1–2 conditions, features `momentum_24h / realized_vol_7d / volume_zscore / fear_greed / news_sentiment`, allocations `{0, 0.5, 1}`, thresholds must be training-quantile values, features need ≥90% coverage. Anything else is refused and logged.
+- **Allowlisted gates only.** `threshold_gate`, 1–2 conditions, features `momentum_24h / momentum_7d / realized_vol_7d / atr_14 / price_drawdown / volume_zscore / fear_greed / news_sentiment`, allocations `{0, 0.5, 1}`, thresholds must be training-quantile values, features need ≥90% coverage. Anything else is refused and logged.
 - **Budget.** At most 12 agent train tests per investigation; the arbiter's validation runs never consume it. All attempts disclosed.
 - **Agents see train only.** Validation is used only by the arbiter (code); the critic sees validation results through the trial log.
-- **Claims are checked, not just ids** (`verify.py`). EVERY text field of all three agents: numbers must be copied from the cited evidence (print rounding only; `%` and `bp` are the only rescalings; integers above 10 must equal an evidence count; explicit signs must match; number words and `3.5x` count as numbers; only the CI label `90%` is free). Regime conditions must exist in the cited rows; `high` confidence needs |mean| > CI width; critiques must cover exactly the real proposals, cite each gate's own evaluation, and may not 'approve' while listing blocking fragility.
+- **Claims are checked, not just ids** (`verify.py`). EVERY text field of all three agents: numbers must be copied from the cited evidence (print rounding, and never more than 1% of the value; `%` and `bp` are the only rescalings; `.5`, Unicode minus signs and e-notation integers are numbers too; a written zero needs an exact zero; integers above 10 must equal an evidence count; explicit signs must match; number words and `3.5x` count as numbers; only the CI label `90%` is free). Regime conditions must exist in the cited rows; `high` confidence needs |mean| > CI width; critiques must cover exactly the real proposals, cite each gate's own evaluation, and may not 'approve' while listing blocking fragility.
 - **Results keyed by spec hash**, so two proposals with the same name can never share a result; duplicate ids are rejected.
 - **Robust to LLM failure.** Bad tool arguments become retries; any LLM stage failure falls back to the deterministic agent and is listed in `agent_failures`.
 - **Missing data is conservative**: a row with a missing gate feature gets min(allocation_when_true, allocation_when_false).
 - **No strategy changes, no code execution, no orders.** Gates output multipliers only.
 - **News is point-in-time.** Visible only if `first_seen_at <= decision cutoff`; coverage reported; never used in a gate unless coverage ≥ 90%.
-- **The arbiter is code.** Pre-registered rule (docstring of `investigate.py`): an agent proposal is eligible iff on validation it beats always-on (finite delta > 0, finite CI), beats cash (own net return > 0), is not degenerate (no multiplier on >= 95% of IN-POSITION bars) and is not vetoed by the critic. The eligible one with the highest validation delta is the single champion; only it plus the competitors (simple rule, LightGBM) go to the frozen test. No champion -> `INCONCLUSIVE`, and `verdict_basis` tells Lane A's arbiter when the unchanged strategy loses to cash.
+- **The arbiter is code.** Pre-registered rule (docstring of `investigate.py`): an agent proposal is eligible iff on validation it beats always-on (finite delta > 0, finite CI), beats cash (own net return > 0), is not degenerate (no multiplier on >= 95% of IN-POSITION bars) and is not vetoed by the critic. The eligible one with the highest validation delta is the single champion; only it plus the competitors (simple rule, LightGBM, and Lane A's regime filter when it selected at least one bucket) go to the frozen test. No champion -> `INCONCLUSIVE`, and `verdict_basis` tells Lane A's arbiter when the unchanged strategy loses to cash.
 - **Timeouts are honest.** Stage timeout, request timeout and request limit; tool calls that finish after their stage ended are logged (status `error`, note `abandoned: ...`) and disclosed. `agent_mode` stays within the Lane C contract (`llm` / `llm_with_fallback` / `deterministic_fallback`).
 - **LightGBM is out-of-sample on validation**: fitted on early train, calibrated on late train, band preselected around the calibration base rate.
 
 ## Adversarial review
 
-Two independent agents attacked Lane B on 7 Nov. Round 1: 18 findings (17 reproduced). Round 2, after the first real Gemini 4 Argon run: 17 findings (16 reproduced), incl. a claim verifier that accepted almost any number, '95% CI' written 4 times in the Argon report, mixed return conventions in the stand-in ('strategy underperforms always-on'), and no comparison with cash. All critical/high findings of both rounds are fixed with regression tests (68 tests after round 2). Note: with the corrected bootstrap (2000 draws, seeded by spec), the stand-in's 'high volatility' effect on train is borderline (90% CI upper bound just above zero), so the strict deterministic fallback now proposes no gate; we did not retune the synthetic data to change that. Remaining known gaps: no Context/News agent yet, no `get_strategy_health` / `run_bootstrap` tools, no news data, and the default loader in tests is the synthetic stand-in.
+Two independent agents attacked Lane B on 7 Nov. Round 1: 18 findings (17 reproduced). Round 2, after the first real Gemini 4 Argon run: 17 findings (16 reproduced), incl. a claim verifier that accepted almost any number, '95% CI' written 4 times in the Argon report, mixed return conventions in the stand-in ('strategy underperforms always-on'), and no comparison with cash. All critical/high findings of both rounds are fixed with regression tests (68 tests after round 2). Note: with the corrected bootstrap (2000 draws, seeded by spec), the stand-in's 'high volatility' effect on train is borderline (90% CI upper bound just above zero), so the strict deterministic fallback now proposes no gate; we did not retune the synthetic data to change that. Remaining known gaps: no Context/News agent yet, no `run_bootstrap` tool (CIs come from Lane A), no news data, and the default loader in tests is the synthetic stand-in.
 
-Round 3 (7 Nov evening), first full `mode=llm` run on Lane A's real BTCUSDT data with Gemini 4 Argon. All three agents ran with no fallback, and the holdout was not accessed. The verifier made the proposer and the critic retry three times: once for an invented number, and once for real numbers cited from the wrong gate's evidence. The critic found that one gate switched more often than always-on (70 vs 50 on validation), that its validation Sharpe failed the proposal's own falsification test, and that the other gate's validation gain came from lower exposure in a falling market. Both gates were rejected; neither beats cash on validation. Fixed after that run:
+Round 3 (7 Nov evening) started from the first full `mode=llm` runs on Lane A's real BTCUSDT data with Gemini 4 Argon. In the first one (19:24, not committed), all three agents ran with no fallback, and the holdout was not accessed. The verifier made the proposer and the critic retry three times: once for an invented number, and once for real numbers cited from the wrong gate's evidence. The critic found that one gate switched more often than always-on (70 vs 50 on validation), that its validation Sharpe failed the proposal's own falsification test, and that the other gate's validation gain came from lower exposure in a falling market. Both gates were rejected; neither beats cash on validation. Fixed after that run:
 - the verifier no longer rejects numbers the agents were given (`20` in the instructions, `24`/`72` in `btc-trend-24-72-demo`);
 - numbers glued to `h`/`d` (`73h`) are now checked;
 - agents are told to round to 3–4 significant digits;
 - default timeouts are now 180 s per request and 400 s per stage (Argon's critic hit the old 90 s);
 - Lane A's new `momentum_7d`, `atr_14` and `price_drawdown` are allowlisted, and only where the loader reports coverage.
 
-Lane A meanwhile fixed the four contract gaps Lane B reported: compounded cost rows (`switching` is 0 for the unchanged strategy), in-position `allocation_mix` with `n_decisions`/`n_in_position`, a bootstrap seeded by the spec body with 2000 draws, and LightGBM calibrated on late train with its seed and model hash in `spec()`. On real data that LightGBM sits at 0.5 on 99% of in-position validation bars, and Lane B flags it as degenerate.
+Lane A meanwhile fixed the four contract gaps Lane B reported: compounded cost rows (`switching` is 0 for the unchanged strategy), in-position `allocation_mix` with `n_decisions`/`n_in_position`, a bootstrap seeded by the spec body with 2000 draws, and LightGBM calibrated on late train with its seed and model hash in `spec()`. With the old 0.45/0.55 cut that LightGBM sat at 0.5 on 99% of in-position validation bars, and Lane B flagged it as degenerate. Lane A then switched to a band of the train-tail base rate ± 2 points. It is no longer degenerate, but it loses: −17.7% vs always-on on validation and 0/3 on Lane A's refit walk-forward.
+
+The committed artifact `experiments/investigation_argon_lane_a.json` comes from the second full Argon run (20:07). It has one agent gate, `fear_greed > 53` (the train median). The critic showed that on validation it is off 99% of the time after a sentiment shift, that its +6.8% vs always-on comes only from sitting out a falling market, and that its Sharpe fails the proposal's own falsification test. That run predates walk-forward folds, the regime-filter competitor and the strategy-health check, so those are not in that file yet.
+
+A third independent review (round 3) then attacked everything above: 13 findings, all reproduced. Critical: after the walk-forward change, rule (c) (no degenerate gate) only ran when fold results existed, so a degenerate gate approved by an LLM critic could reach the sealed test on a runner without folds. Fixed, with a regression test on the stand-in runner. Also fixed:
+- verifier leaks: `.9876`, a Unicode minus, numbers like `0.3` passing for 0.251, `2e2 trades`, a bare `20`, written zeros, and free numbers drawn from upload ids;
+- real-data runs were written under the synthetic fixture's file name;
+- the regime filter posed as a competitor when it had selected no buckets (it is always-on, and is now reported as such);
+- failed folds were described as missing folds;
+- trial records now carry a structured `fold`;
+- Lane A's notes, which quote the sealed-test verdict, are dropped from what agents can see.
+
+## Bad luck vs broken (`health.py`)
+
+Spec section 8: a poor result alone is not proof that a strategy broke. Code, not an agent, cuts the unchanged strategy's validation period into 14-day blocks. It compares each block with Lane A's train-only 14-day range (5th to 95th percentile of block-bootstrapped train paths). About 5% of blocks should fall below that range by chance. If more do (one-sided binomial p < 0.05), the result is `outside_training_range`; otherwise it is `within_training_range`. It also checks which assumption changed between train and validation: exposure, turnover per bar, cost per bar, bar volatility (ratio outside 2/3–3/2), and how often each regime occurs (total variation ≥ 0.25). The thresholds are fixed in the module. Because the check reads validation, only the critic can call it (`strategy_health` tool) and it appears in the report (`strategy_health`, plus a line in `verdict_basis`). The fallback critic notes when the regime behind a gate's feature shifted.
+
+On real data: 10 of 10 validation blocks fall inside the train range [−9.1%, +10.1%]. The −7.1% validation loss is therefore not by itself evidence that the strategy broke. One assumption did change: sentiment went from about 51% "fear" bars on train to 99% on validation. That is exactly why the agent's Fear & Greed gate collapsed.
 
 ## Run on Lane A
 
@@ -61,6 +77,7 @@ The default loader is still `fixtures/lane_a_stub.py`, so `tests/test_lane_b.py`
 python3 scripts/run_investigation.py --lane-a --fallback
 python3 scripts/run_investigation.py --lane-a --fallback --experiment-id synthetic-btcusdt-1h-v1
 python3 scripts/run_investigation.py --lane-a --fallback --frozen
+# --lane-a writes experiments/investigation_lane_a_<mode>.json by default (never the synthetic fixture's name)
 KOK_AGENT_MODEL=google:gemini-4-argon GEMINI_API_KEY=... python3 scripts/run_investigation.py --lane-a   # LLM agents on real data
 ```
 
@@ -72,7 +89,7 @@ Walk-forward: every agent gate and competitor is also scored with Lane A's `Gate
 
 ```bash
 pip install "pydantic-ai-slim[google]" lightgbm scikit-learn pandas numpy pytest
-python3 -m pytest -q tests/test_lane_b.py          # 83 guardrail + regression tests
+python3 -m pytest -q tests/test_lane_b.py          # 111 guardrail + regression tests
 python3 scripts/run_investigation.py --fallback     # deterministic agents
 KOK_AGENT_MODEL=google:gemini-3.8-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
 ```

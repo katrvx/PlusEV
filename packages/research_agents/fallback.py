@@ -7,6 +7,7 @@ agents must at least match. Like the agents, it reads TRAIN data only.
 from __future__ import annotations
 
 from .models import Critique, CritiqueSet, DiagnosticReport, GateProposal, Hypothesis, ProposalSet, ThresholdCondition
+from .health import feature_shift
 from .tools import ToolContext, is_fold, spec_hash
 
 MIN_TRADES = 20
@@ -118,6 +119,11 @@ def critique(ctx: ToolContext, proposals: ProposalSet) -> CritiqueSet:
                 if 2 * wins < len(folds):
                     risks.append(f"beats always-on on only {wins} of {len(folds)} walk-forward train folds: unstable over time")
                 evs.append(folds[-1].evidence_id)
+            shifted = feature_shift(ctx.health, [c.feature for c in p.conditions])
+            if shifted:
+                obs.append(f"the regime behind this gate's feature shifted between train and validation ({', '.join(shifted)}): "
+                           "the validation result may reflect that shift, not a stable effect")
+                evs.append(ctx.health["evidence_id"])
             if ctx.agent_tests_used() > 6:
                 risks.append("many agent train tests (see trial log): multiple-comparison risk")
             verdict = "approve_for_frozen_test" if (val.delta_net_return_vs_always_on or 0) > 0 and not fragile and not counter else "reject"

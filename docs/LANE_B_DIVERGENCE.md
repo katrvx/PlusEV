@@ -17,9 +17,9 @@ Lane B is still the original product. It investigates an unchanged strategy, cit
 | The decision is Keep, Modify, Restrict, Monitor, Kill, or Inconclusive. | Lane B reports `candidate_for_frozen_test` or `INCONCLUSIVE`. The keep-or-kill words are Lane A's arbiter. |
 | An interval that still contains zero is not a decision. | A positive validation delta whose 90% interval includes zero can still be the agent champion. The code says the frozen test decides. Lane A may then abstain. |
 | Compare the overlay with always-on, the simple rule, and cash. | Cash is a veto: validation net return must be above zero. A gate that only loses less than the original strategy, while still losing to cash, cannot be the champion. |
-| Challenge the agent gate on the same walk-forward splits as the baselines. | The agent gate is scored on one validation block. Train walk-forward exists on Lane A and is not read by the critic yet. Showing those folds to the critic does not open the holdout: they are train-only and already stay on the development view. |
+| Challenge the agent gate on the same walk-forward splits as the baselines. | Done after this note (Lane B `2ad3da0`): every agent gate and competitor is also scored with `GateRunner.evaluate_folds`, the critic reads the folds in the trial log, and LightGBM uses Lane A's refit walk-forward. Thresholds come from all of train, so folds are a stability check, not unseen data. |
 | News and sentiment, with a context agent, and no causal claim from a headline. | The point-in-time store and labeller exist. There is no news archive and no context agent. The handoff said to cut news before cutting execution. |
-| Tools include strategy health and a bootstrap. | Those two tools are not built. Regime, cost, news, and train-gate tests are. |
+| Tools include strategy health and a bootstrap. | Strategy health is built (`health.py`, critic tool `strategy_health`, uses `train_predictive_range`). A separate bootstrap tool is not; CIs come from Lane A. |
 | Combine two strategies when they complement each other. | Not in this lane. One investigation is one book, same as Lane A. |
 
 ## The champion rule, as coded

@@ -37,7 +37,7 @@ FOLD_NOTE = "walk-forward fold"   # TrialRecord.note prefix for arbiter fold run
 
 
 def is_fold(trial) -> bool:
-    return str(getattr(trial, "note", "")).startswith(FOLD_NOTE)
+    return getattr(trial, "fold", None) is not None or str(getattr(trial, "note", "")).startswith(FOLD_NOTE)
 
 
 class HoldoutAccessError(PermissionError):
@@ -103,11 +103,18 @@ def normalise_quantiles(tq: dict) -> dict[str, dict[float, float]]:
 
 def redact(exp: ExperimentResult) -> ExperimentResult:
     """Copy with every test-split row removed (windows kept, so guards know where test starts)."""
-    return exp.model_copy(update={
+    update = {
         "per_regime": [r for r in exp.per_regime if r.split != "test"],
         "costs": [c for c in exp.costs if c.split != "test"],
         "baselines": [b for b in exp.baselines if b.split != "test"],
-    })
+    }
+    for name in ("equity", "comparison_equity"):        # Lane A's dev view already strips these; belt and braces
+        rows = getattr(exp, name, None)
+        if rows:
+            update[name] = [r for r in rows if getattr(r, "split", None) != "test"]
+    if getattr(exp, "notes", None):                     # Lane A's notes can quote the sealed-test verdict; agents never need them
+        update["notes"] = []
+    return exp.model_copy(update=update)
 
 
 @dataclass
@@ -122,6 +129,9 @@ class ToolContext:
     holdout_accessed: bool = False
     stage: int = 0                                    # bumped when an agent stage ends; late tool results become 'abandoned'
     inflight: int = 0
+    health: dict | None = None                        # code-computed bad-luck-vs-broken check (critic only; reads validation)
+    folds_status: str | None = None                   # None (not tried) / "missing" (runner has no evaluate_folds) / "ran"
+    fold_errors: int = 0
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def __post_init__(self):
@@ -280,14 +290,18 @@ class ToolContext:
         train sub-periods, not unseen data. Every fold is logged and stored as citable evidence."""
         fn = getattr(self.gate_runner, "evaluate_folds", None)
         if fn is None:
+            self.folds_status = self.folds_status or "missing"
             return []
         pid, h = str(policy_spec.get("policy_id", "unnamed")), spec_hash(policy_spec)
         try:
             evs = fn(policy_spec)
         except Exception as exc:      # noqa: BLE001 - logged, never silently dropped
             self._log(policy_id=pid, spec_hash=h, source=source, split="train", delta_net_return_vs_always_on=None,
-                      ci_delta=None, evidence_id=None, status="error", note=f"{FOLD_NOTE}s failed: {type(exc).__name__}: {exc}")
+                      ci_delta=None, evidence_id=None, status="error", fold=None,
+                      note=f"{FOLD_NOTE}s failed: {type(exc).__name__}: {exc}")
+            self.fold_errors += 1
             return []
+        self.folds_status = "ran"
         out = []
         for ev in evs:
             k = getattr(ev, "fold", None)
@@ -296,7 +310,7 @@ class ToolContext:
             self._log(policy_id=pid, spec_hash=h, source=source, split="train",
                       delta_net_return_vs_always_on=ev.delta_net_return_vs_always_on, ci_delta=ev.ci_delta,
                       net_return=ev.metrics.net_return, allocation_mix=ev.allocation_mix, evidence_id=eid,
-                      status="evaluated", note=f"{FOLD_NOTE} {k} (train sub-period; stability check, not unseen data)")
+                      status="evaluated", fold=k, note=f"{FOLD_NOTE} {k} (train sub-period; stability check, not unseen data)")
             out.append({"evidence_id": eid, **payload})
         return out
 

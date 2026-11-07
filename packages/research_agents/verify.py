@@ -8,9 +8,12 @@ Every text field an agent writes is checked, not just the headline statement:
 - zeros in the evidence never 'support' anything; numbers written as words (above ten),
   multiples like '3.5x', durations like '73h' / '5d' and basis points are numbers too and are checked;
 - the only free-standing label allowed is the CI level '90%' (all Lane A intervals are 90%);
-- numbers the agent was GIVEN rather than measured are allowed too: digits in the strategy id/version
-  (e.g. '24' and '72' in 'btc-trend-24-72-demo') and the instruction threshold MIN_TRADES.
-Rounding for print is fine (3-4 significant digits); changing digits is not.
+- numbers the agent was GIVEN rather than measured are allowed too: whole numeric tokens of the strategy
+  id/version (e.g. '24' and '72' in 'btc-trend-24-72-demo'), and MIN_TRADES only when quoted as a threshold
+  ('fewer than 20 trades');
+- rounding for print is fine (3-4 significant digits) but a number may differ from its evidence by at most
+  1% of its size; a written zero needs an exact zero in the evidence; '.5', Unicode minus signs and
+  e-notation integers ('2e2') are numbers like any other.
 """
 
 from __future__ import annotations
@@ -25,29 +28,36 @@ CI_LEVEL = 90
 MIN_TRADES = 20          # 'treat buckets with fewer than 20 trades as weak' (agent instructions)
 TRIVIAL_INTS = set(range(0, 11)) | {100}
 DATE_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?\b")
-NUM_RE = re.compile(r"(?<![A-Za-z_\d.])([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*(%|bps|bp|x|h|d)?(?![A-Za-z_\d])")
+NUM_RE = re.compile(r"(?<![A-Za-z_\d.])([-+]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][-+]?\d+)?)\s*(%|bps|bp|x|h|d)?(?![A-Za-z_\d])")
+DASHES = str.maketrans({"\u2212": "-", "\u2013": "-", "\u2014": "-", "\u2012": "-", "\ufe63": "-", "\uff0d": "-"})
+# the instruction threshold may be quoted as a threshold ("fewer than 20 trades", "<20 trades"), not as a measurement
+THRESHOLD_RE = re.compile(r"(?:\b(?:fewer than|less than|under|below|at least|minimum of|min\.?)\s*|[<>]=?\s*|\u2265\s*|\u2264\s*)"
+                          rf"{MIN_TRADES}(?![\d.])(?=\s*(?:trades?\b|$|[).,;]))", re.I)
+REL_TOL = 0.01           # a copied number may differ from the evidence by print rounding AND by at most 1% of its size
 WORD_NUM_RE = re.compile(r"\b(eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|"
                          r"fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|percent)\b", re.I)
 
 
-def _collect(obj, floats: list[float], ints: set[int]) -> None:
+def _collect(obj, floats: list[float], ints: set[int], zero: list[bool]) -> None:
     if isinstance(obj, bool) or obj is None:
         return
+    if isinstance(obj, (int, float)) and obj == 0:
+        zero[0] = True                     # a written zero needs an exact zero; zeros never support other numbers
+        return
     if isinstance(obj, int):
-        if obj != 0:
-            ints.add(abs(obj))
-            floats.append(float(obj))
+        ints.add(abs(obj))
+        floats.append(float(obj))
     elif isinstance(obj, float):
-        if obj != 0 and math.isfinite(obj):
+        if math.isfinite(obj):
             floats.append(obj)
             if obj == int(obj):
                 ints.add(abs(int(obj)))
     elif isinstance(obj, dict):
         for v in obj.values():
-            _collect(v, floats, ints)
+            _collect(v, floats, ints, zero)
     elif isinstance(obj, (list, tuple)):
         for v in obj:
-            _collect(v, floats, ints)
+            _collect(v, floats, ints, zero)
 
 
 def unsupported_numbers(text: str, payloads: list) -> list[str]:
@@ -56,9 +66,11 @@ def unsupported_numbers(text: str, payloads: list) -> list[str]:
         return []
     floats: list[float] = []
     ints: set[int] = set()
-    _collect(payloads, floats, ints)
+    zero = [False]
+    _collect(payloads, floats, ints, zero)
+    text = text.translate(DASHES)          # a Unicode minus must not hide a sign
     bad = [m.group(0) for m in WORD_NUM_RE.finditer(text)]
-    clean = DATE_RE.sub(" ", text)
+    clean = THRESHOLD_RE.sub(" ", DATE_RE.sub(" ", text))
     for m in NUM_RE.finditer(clean):
         raw, unit = m.group(1), (m.group(2) or "").lower()
         try:
@@ -67,13 +79,18 @@ def unsupported_numbers(text: str, payloads: list) -> list[str]:
             continue
         val = float(d)
         signed = raw[0] in "+-"
-        is_int = d == d.to_integral_value() and "." not in raw and "e" not in raw.lower()
+        mantissa = raw.lower().split("e")[0]
+        is_int = d == d.to_integral_value() and "." not in mantissa      # '2e2' is the integer 200
         if unit == "%" and val == CI_LEVEL:
             continue
         if unit in ("", "h", "d") and is_int:      # '73h' is the integer 73 with a unit
             if abs(int(val)) in TRIVIAL_INTS or abs(int(val)) in ints:
                 continue
             bad.append(m.group(0).strip())
+            continue
+        if val == 0:
+            if not zero[0]:
+                bad.append(m.group(0).strip())
             continue
         scale = {"%": 100.0, "bp": 1e4, "bps": 1e4}.get(unit, 1.0)
         target = val / scale
@@ -82,7 +99,7 @@ def unsupported_numbers(text: str, payloads: list) -> list[str]:
         for v in floats:
             ref = v if signed else abs(v)
             t = target if signed else abs(target)
-            if abs(ref - t) <= tol + 1e-12 * abs(ref):
+            if abs(ref - t) <= min(tol, REL_TOL * abs(ref)) + 1e-12 * abs(ref):
                 ok = True
                 break
         if not ok:
@@ -94,8 +111,8 @@ def context_numbers(ctx) -> dict:
     """Numbers the agents were given in their prompt/instructions, not measured by a tool."""
     exp = ctx.experiment
     label = f"{getattr(exp, 'strategy_id', '')} {getattr(exp, 'strategy_version', '')}"
-    return {"strategy_label_numbers": [float(x) for x in re.findall(r"\d+(?:\.\d+)?", label)],
-            "instruction_numbers": [MIN_TRADES]}
+    # whole hyphen/space-separated tokens only ('24' and '72' in 'btc-trend-24-72-demo', '24' in '...-24h-...'), never fragments of ids or hashes
+    return {"strategy_label_numbers": [float(x) for x in re.findall(r"(?<![A-Za-z0-9._])\d+(?:\.\d+)?(?=[hd]?(?![A-Za-z0-9_]))", label)]}
 
 
 def _payloads(ctx, ids: list[str]) -> list:

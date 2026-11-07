@@ -35,6 +35,7 @@ from packages.meta_policy import LGBM_UNAVAILABLE, rule_gate_spec
 from . import fallback
 from .agents import configured_model, model_name, run_critic, run_diagnostic, run_proposer
 from .models import CritiqueSet, InvestigationReport, PolicyCandidate, ProposalSet
+from .health import strategy_health
 from .tools import ToolContext, spec_hash
 from .verify import verify_critiques, verify_diagnostic, verify_proposals
 
@@ -112,6 +113,12 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
     # Lane A's train-selected regime filter: the judges' question is whether the agent beats it.
     # Like the simple rule it is a reference, not a veto (the selection rule below is pre-registered).
     regime = getattr(runner, "regime_spec", None)
+    regime_note = None
+    if regime and regime.get("family") == "regime_gate" and not regime.get("flat_buckets") and not regime.get("full_buckets") \
+            and regime.get("allocation_else", 1.0) == 1.0:
+        # no train bucket was selected: the filter IS always-on; comparing against it would just repeat always-on
+        regime_note = f"Lane A regime filter selected no train buckets, so it equals always-on ({regime.get('summary', '')}); not a separate competitor"
+        regime = None
     if regime:
         ctx.arbiter_evaluate(regime, "validation", source="rule_baseline")
         competitors.append(("rule_baseline", regime))
@@ -147,6 +154,11 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
     regime_t = val_trial(regime) if regime else None
     regime_delta = regime_t.delta_net_return_vs_always_on if regime_t else None
     always_on = rule_out.get("evaluation", {}).get("always_on", {}) if isinstance(rule_out, dict) else {}
+
+    # 3c. bad luck vs broken (code; reads validation of the unchanged strategy, so the critic sees it, agents 1-2 do not)
+    health = strategy_health(ctx.experiment)
+    if health:
+        ctx.health = {**health, "evidence_id": ctx.store.add("strategy_health", {}, health)}
 
     # 4. critic
     critiques = CritiqueSet.model_construct(critiques=[])
@@ -186,12 +198,12 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
                     reasons.append("validation CI includes zero; the frozen test decides")
                 if _finite(regime_delta):
                     reasons.append(f"vs Lane A regime filter on validation: {d - regime_delta:+.4f} (reference, not a veto)")
-        fl = fold_line(spec)
-        if fl:
-            reasons.append(fl)
             if mix and max(mix.values()) >= DEGENERATE_SHARE:
                 eligible = False
                 reasons.append(f"degenerate: one multiplier on {max(mix.values()):.0%} of in-position validation decisions")
+        fl = fold_line(spec)
+        if fl:
+            reasons.append(fl)
         if c is None or c.verdict != "approve_for_frozen_test":
             eligible = False
             reasons.append(f"critic veto: verdict '{c.verdict if c else 'missing'}'")
@@ -248,8 +260,12 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
     ao_net, ao_ci = always_on.get("net_return"), always_on.get("ci_net_return")
     basis = [f"always-on on validation: net {ao_net:+.4f}, 90% CI {ao_ci}" if _finite(ao_net) else "always-on validation metrics unavailable",
              "cash on validation: net 0.0000"]
+    if regime_note:
+        basis.append(regime_note)
     if regime_t and _finite(regime_delta, regime_t.net_return):
         basis.append(f"Lane A regime filter on validation: delta vs always-on {regime_delta:+.4f}, net {regime_t.net_return:+.4f}")
+    if ctx.health:
+        basis.append(f"strategy health ({ctx.health['status']}): {ctx.health['summary']}")
     if champion:
         verdict = "candidate_for_frozen_test"
         basis.append(f"champion {champion[1]['policy_id']} beats always-on and cash on validation and passed the critic")
@@ -272,10 +288,17 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
         f"{len(agent_specs)} distinct agent gate specs attempted ({ctx.agent_tests_used()} agent train tests logged, refused ones included); "
         f"{len(all_specs)} distinct policies evaluated in total. Multiple-comparison risk applies to train and validation results.",
         "The critic can veto a proposal (part of the pre-registered rule); the critic sees validation results.",
+        ("Bad luck vs broken: validation 14-day blocks of the unchanged strategy are compared with Lane A's train-only 14-day "
+         "range, and exposure, turnover, costs, volatility and regime frequencies are compared train vs validation "
+         "(pre-registered thresholds in health.py). Code computes it; only the critic sees it."
+         if ctx.health else "Bad luck vs broken: not run (the loader gives no train predictive range or per-bar equity, or validation is shorter than one 14-day block)."),
         ("Walk-forward: every agent gate and competitor is also scored on Lane A's expanding train folds (same windows and "
          "2-bar embargo as the LightGBM walk-forward). Thresholds come from quantiles of the whole train window, so the folds "
          "are a stability check across train sub-periods, not unseen data, and they do not change the pre-registered selection."
-         if any(fold_runs.values()) else "Walk-forward: the loader has no GateRunner.evaluate_folds, so no fold stability check was run."),
+         if any(fold_runs.values()) else
+         f"Walk-forward: GateRunner.evaluate_folds failed ({ctx.fold_errors} error trial(s) in the trial log), so no fold stability check is reported."
+         if ctx.fold_errors else
+         "Walk-forward: the loader has no GateRunner.evaluate_folds, so no fold stability check was run."),
         "Regime effects are associations under lagged features, not causal.",
         "Returns convention: compounded simple returns after costs everywhere (Lane A contract); deltas and CIs use the same convention.",
         "The verdict only says whether an agent gate earned one sealed look; Lane A's arbiter makes the strategy decision.",
@@ -317,4 +340,5 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
                        "Report each vs always_on, vs cash and vs the simple rule, with CIs. Do not change any policy after seeing the result."],
         limitations=limitations, evidence=ctx.store.all(), n_distinct_agent_policies=len(agent_specs),
         n_policies_tried=len(all_specs), holdout_accessed=ctx.holdout_accessed,
+        strategy_health=ctx.health,
     )

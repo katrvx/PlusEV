@@ -651,3 +651,180 @@ def test_fallback_critic_flags_gates_that_are_unstable_across_folds_and_ignores_
 def test_runner_without_folds_is_disclosed():
     rep = investigate("x", model=None, loader=fixture_loader)
     assert any("no GateRunner.evaluate_folds" in l for l in rep.limitations)
+
+
+# ------------------------------------------------------------------ bad luck vs broken (health.py)
+
+def _health_exp(val_bar, shift=False, n_train=3360, n_val=1680):
+    from types import SimpleNamespace as NS
+    t0 = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    rng = np.random.default_rng(1)
+    eq = [NS(split="train", decision_time=t0 + timedelta(hours=i), net_return=float(rng.normal(0, 0.003)), exposure=1.0)
+          for i in range(n_train)]
+    eq += [NS(split="validation", decision_time=t0 + timedelta(hours=n_train + i), net_return=val_bar(i, rng), exposure=1.0)
+           for i in range(n_val)]
+    m = lambda turn: NS(exposure=0.5, turnover=turn)  # noqa: E731
+    regimes = [NS(regime_feature="sentiment_regime", split="train", bucket="fear", n_decisions=50),
+               NS(regime_feature="sentiment_regime", split="train", bucket="greed", n_decisions=50),
+               NS(regime_feature="sentiment_regime", split="validation", bucket="fear", n_decisions=99 if shift else 50),
+               NS(regime_feature="sentiment_regime", split="validation", bucket="greed", n_decisions=1 if shift else 50)]
+    return NS(train_predictive_range=NS(low=-0.09, high=0.10, horizon_bars=336), equity=eq,
+              baselines=[NS(policy="always_on", split="train", metrics=m(60.0)), NS(policy="always_on", split="validation", metrics=m(30.0))],
+              costs=[], per_regime=regimes)
+
+
+def test_ordinary_losses_inside_the_training_range_are_not_called_a_breakdown():
+    from packages.research_agents.health import strategy_health
+    h = strategy_health(_health_exp(lambda i, r: 0.003 * (-1) ** i - 0.00002, shift=True))
+    assert h["status"] == "within_training_range" and h["n_blocks"] == 5
+    assert h["changed_assumptions"] == ["sentiment_regime_shares"] and "does not show the strategy broke" in h["summary"]
+
+
+def test_many_blocks_below_the_range_are_flagged_as_outside():
+    from packages.research_agents.health import strategy_health
+    h = strategy_health(_health_exp(lambda i, r: -0.0005))
+    assert h["status"] == "outside_training_range" and h["n_below"] == 5 and h["p_below"] < 0.05
+
+
+def test_health_is_skipped_and_disclosed_without_a_train_range():
+    from packages.research_agents.health import strategy_health
+    assert strategy_health(build()[0]) is None
+    rep = investigate("x", model=None, loader=fixture_loader)
+    assert rep.strategy_health is None and any(l.startswith("Bad luck vs broken: not run") for l in rep.limitations)
+
+
+def test_only_the_critic_can_read_strategy_health():
+    tools = lambda a: set(a._function_toolset.tools)  # noqa: E731
+    assert "strategy_health" in tools(agents._critic_agent("test", ProposalSet(proposals=[])))
+    assert "strategy_health" not in tools(agents._diagnostic_agent("test")) | tools(agents._proposer_agent("test", set()))
+
+
+def test_fallback_critic_says_when_the_gate_feature_regime_shifted():
+    from packages.research_agents import fallback
+    from packages.research_agents.health import strategy_health
+    ctx = make_ctx()
+    h = strategy_health(_health_exp(lambda i, r: float(r.normal(0, 0.003)), shift=True))
+    ctx.health = {**h, "evidence_id": ctx.store.add("strategy_health", {}, h)}
+    spec = gate(ctx, feature="fear_greed", op=">", q=0.5, a_t=1.0, a_f=0.0, pid="agent::P1")
+    p = GateProposal(proposal_id="P1", based_on=["H1"], conditions=[ThresholdCondition(**spec["conditions"][0])],
+                     allocation_when_true=1.0, allocation_when_false=0.0, rationale="r",
+                     evidence_ids=[ctx.feature_grid()["evidence_id"]], falsification_test="reject if the validation delta is not positive")
+    ps = ProposalSet(proposals=[p])
+    ctx.arbiter_evaluate(p.to_policy_spec(), "validation")
+    c = fallback.critique(ctx, ps).critiques[0]
+    assert any("sentiment_regime_shares" in o for o in c.observations) and ctx.health["evidence_id"] in c.evidence_ids
+    assert not verify_critiques(ctx, fallback.critique(ctx, ps), ps)
+
+
+def test_redact_also_strips_test_equity_rows():
+    from types import SimpleNamespace as NS
+    from packages.research_agents.tools import redact
+    exp = build()[0]
+    leaky = exp.model_copy(update={"equity": [NS(split="validation"), NS(split="test")]})
+    assert [r.split for r in redact(leaky).equity] == ["validation"]
+
+
+# ------------------------------------------------------------------ adversarial review round 3 regressions
+
+def test_degenerate_rule_applies_without_walk_forward_folds(monkeypatch):
+    """R3-F1: rule (c) was nested under the fold line, so a runner without evaluate_folds skipped it."""
+    from packages.research_agents import fallback
+    from packages.research_agents.models import Critique, CritiqueSet
+
+    def edit(spec, ev):
+        if spec.get("policy_id", "").startswith("agent::") and ev.split == "validation":
+            return ev.model_copy(update={"allocation_mix": {"0.0": 0.02, "0.5": 0.0, "1.0": 0.98},
+                                         "delta_net_return_vs_always_on": 0.01, "ci_delta": (0.001, 0.02),
+                                         "metrics": ev.metrics.model_copy(update={"net_return": 0.05})})
+        return ev
+
+    def approve(ctx, props):
+        out = []
+        for p in props.proposals:
+            h = spec_hash(p.to_policy_spec())
+            t = next(t for t in ctx.trials if t.spec_hash == h and t.split == "validation")
+            out.append(Critique(proposal_id=p.proposal_id, verdict="approve_for_frozen_test", evidence_ids=[t.evidence_id]))
+        return CritiqueSet(critiques=out)
+
+    monkeypatch.setattr(fallback, "critique", approve)
+    r = investigate("x", loader=_loader_forcing_vol_hypothesis(edit), force_fallback=True)
+    agent = [c for c in r.candidates if c.source == "agent"]
+    assert agent and r.champion_policy_id is None
+    assert any("degenerate" in reason for reason in agent[0].reasons)
+
+
+R3_EV = [{"hit_rate": 0.251, "n_trades": 151, "n_decisions": 5001, "delta": 0.0012, "mean": 0.9875}]
+
+
+@pytest.mark.parametrize("text", ["mean .9876 per bar", "ci .5-.7", "delta −0.0012", "delta –0.0012",
+                                  "hit rate 0.3", "2e2 trades", "1e4 decisions", "only 20 trades in high vol",
+                                  "improvement 0.0%", "delta -0.0"])
+def test_round3_verifier_leaks_are_closed(text):
+    """R3-F4/F5/F7/F8/F9: leading dot, Unicode minus, loose rounding, e-notation integers, bare 20, zeros."""
+    assert unsupported_numbers(text, R3_EV)
+
+
+@pytest.mark.parametrize("text", ["hit rate 0.251 (25.1%)", "151 trades in 5001 decisions", "delta +0.0012, 0.12%",
+                                  "buckets with fewer than 20 trades are weak", "sideways is fragile (<20 trades)",
+                                  "mean 0.9875"])
+def test_round3_verifier_still_accepts_honest_copies(text):
+    assert not unsupported_numbers(text, R3_EV)
+
+
+def test_uploaded_strategy_ids_do_not_hand_out_free_numbers():
+    """R3-F6: digits inside an id/hash are not 'given' numbers; whole tokens of a demo id are."""
+    from types import SimpleNamespace as NS
+    from packages.research_agents.verify import context_numbers
+    up = context_numbers(NS(experiment=NS(strategy_id="strat_3a2f1094c7e8", strategy_version="imported-positions")))
+    demo = context_numbers(NS(experiment=NS(strategy_id="btc-trend-24-72-demo", strategy_version="v1")))
+    assert up["strategy_label_numbers"] == [] and demo["strategy_label_numbers"] == [24.0, 72.0]
+
+
+def test_empty_regime_filter_is_reported_as_always_on_not_a_competitor():
+    """R3-F12: a filter that selected no buckets is always-on; it must not pose as a separate reference."""
+    exp, runner, tq, _df, lgbm = _built()
+
+    class EmptyRegime:
+        regime_spec = {"policy_id": "rule::regime_filter", "family": "regime_gate", "flat_buckets": [], "full_buckets": [],
+                       "allocation_flat": 0.0, "allocation_full": 1.0, "allocation_else": 1.0, "selected_on": "train",
+                       "summary": "No train regime had an interval entirely off zero."}
+
+        def __getattr__(self, name):
+            return getattr(runner, name)
+
+    rep = investigate("x", model=None, loader=lambda _: (exp, EmptyRegime(), tq, None, lgbm))
+    assert not any(c.policy_id == "rule::regime_filter" for c in rep.candidates)
+    assert any("equals always-on" in b for b in rep.verdict_basis)
+
+
+def test_failed_folds_are_disclosed_as_failed_not_missing():
+    """R3-F10."""
+    exp, runner, tq, _df, lgbm = _built()
+
+    class Raising:
+        def evaluate_folds(self, spec):
+            raise RuntimeError("boom")
+
+        def __getattr__(self, name):
+            return getattr(runner, name)
+
+    rep = investigate("x", model=None, loader=lambda _: (exp, Raising(), tq, None, lgbm))
+    assert any("evaluate_folds failed" in l for l in rep.limitations)
+    assert any(t.status == "error" and "walk-forward folds failed" in t.note for t in rep.trial_log)
+
+
+def test_fold_trials_carry_a_structured_fold_field():
+    """R3-F11: folds are identified by TrialRecord.fold, not only by note text."""
+    exp, runner, tq, _df, lgbm = _built()
+    rep = investigate("x", model=None, loader=lambda _: (exp, _WithFolds(runner), tq, None, lgbm))
+    folds = [t for t in rep.trial_log if t.fold is not None]
+    assert folds and {t.fold for t in folds} == {1, 2, 3}
+    assert all(t.fold is None for t in rep.trial_log if not t.note.startswith("walk-forward"))
+
+
+def test_redact_drops_lane_a_notes_that_quote_the_sealed_verdict():
+    """R3-F2: Lane A's dev view keeps a note with the test-derived verdict; agents never get it."""
+    from packages.research_agents.tools import redact
+    exp = build()[0]
+    leaky = exp.model_copy(update={"notes": ["Verdict KEEP comes from the deterministic arbiter"]})
+    assert redact(leaky).notes == []

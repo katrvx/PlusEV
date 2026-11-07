@@ -128,6 +128,7 @@ class TrialRecord(BaseModel):
     evidence_id: str | None
     status: Literal["evaluated", "refused", "error"]   # late results after a stage timeout: "error" with note "abandoned: ..."
     note: str = ""
+    fold: int | None = None                      # walk-forward train fold (arbiter only); None for every other trial
 
 
 class PolicyCandidate(BaseModel):
@@ -170,6 +171,7 @@ class InvestigationReport(BaseModel):
     n_distinct_agent_policies: int
     n_policies_tried: int
     holdout_accessed: bool = False
+    strategy_health: dict | None = None   # bad luck vs broken (spec section 8); code-computed, see health.py
 
 
 __all__ = [

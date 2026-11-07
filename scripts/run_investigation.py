@@ -28,7 +28,9 @@ def main():
     ap.add_argument("--fallback", action="store_true", help="force the deterministic agents")
     ap.add_argument("--lane-a", action="store_true", help="load a real Lane A experiment instead of the synthetic stand-in")
     ap.add_argument("--frozen", action="store_true", help="with --lane-a, score each accepted candidate once on the sealed test")
-    ap.add_argument("--out", type=Path, default=ROOT / "experiments" / "investigation_fixture.json")
+    ap.add_argument("--out", type=Path, default=None,
+                    help="default: experiments/investigation_fixture.json for the stand-in (Lane C labels it synthetic), "
+                         "experiments/investigation_lane_a_<mode>.json for --lane-a (real data, never the fixture name)")
     a = ap.parse_args()
     if a.frozen and not a.lane_a:
         raise SystemExit("--frozen scores Lane A's sealed test; pass --lane-a")
@@ -48,6 +50,9 @@ def main():
                 )
     else:
         report = investigate(a.experiment_id, force_fallback=a.fallback)
+    if a.out is None:
+        name = f"investigation_lane_a_{report.agent_mode}.json" if a.lane_a else "investigation_fixture.json"
+        a.out = ROOT / "experiments" / name
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(report.model_dump_json(indent=2))
     print(f"mode={report.agent_mode} model={report.model_id} policies_tried={report.n_policies_tried} "

@@ -71,7 +71,7 @@ existing strategy (immutable) ─► import / validate / hash
 | Lane | Owns | Output interface | Status |
 |---|---|---|---|
 | **A · Quant / Data** | `A/` (target layout was `packages/ingestion`, `feature_store`, `strategies`, `quant`, `evaluation`) | `run_experiment(...) -> ExperimentResult`, including a deterministic verdict and a recorded 14-day plan | on this branch |
-| **B · Agents / Context** (Kate) | `packages/research_agents`, `meta_policy`, news enrichment | `investigate(experiment_id) -> InvestigationReport` | current `main` agents (adversarially reviewed twice, 83 tests, walk-forward folds, first full Argon run on real data). Default loader is the synthetic stand-in. `--lane-a` uses Lane A's development view |
+| **B · Agents / Context** (Kate) | `packages/research_agents`, `meta_policy`, news enrichment | `investigate(experiment_id) -> InvestigationReport` | current `main` agents (adversarially reviewed three times, 111 tests, walk-forward folds, bad-luck-vs-broken check, Argon run on real data). Default loader is the synthetic stand-in. `--lane-a` uses Lane A's development view |
 | **C · API / UI / Demo** | `apps/api`, `apps/web`, docs, practice-plan interface | consumes native Lane B reports; adapts Lane A results into UI contracts | on this branch. BTCUSDT 1h position imports are scored by A and B. Start at [`LANE_C.md`](LANE_C.md). |
 
 Work on branches per lane; don't edit another lane's directories without coordinating. Freeze shared Pydantic contracts before integrating.
@@ -103,7 +103,7 @@ Python 3.10+ (on macOS: `uv venv --python 3.12 && source .venv/bin/activate`; Li
 
 ```bash
 pip install -r requirements-lane-b.txt
-python3 -m pytest -q tests/test_lane_b.py           # 83 guardrail + regression tests
+python3 -m pytest -q tests/test_lane_b.py           # 111 guardrail + regression tests
 python3 scripts/run_investigation.py --fallback      # deterministic agents -> experiments/investigation_fixture.json
 KOK_AGENT_MODEL=google:gemini-3.8-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
 ```
