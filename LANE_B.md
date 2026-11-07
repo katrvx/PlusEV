@@ -64,13 +64,13 @@ python3 scripts/run_investigation.py --lane-a --fallback --frozen
 KOK_AGENT_MODEL=google:gemini-4-argon GEMINI_API_KEY=... python3 scripts/run_investigation.py --lane-a   # LLM agents on real data
 ```
 
-`load_for_lane_b` returns train and validation metrics only. `GateRunner.evaluate` refuses `test`. `--frozen` is the one sealed look, and only for the champion the arbiter accepted. The simple-rule competitor is Lane A's own rule when the loader provides `runner.rule_spec` (flat when the condition fails). The arbiter scores it directly, so the fixed momentum threshold of `0` does not have to sit on the agent quantile grid.
+`load_for_lane_b` returns train and validation metrics only. `GateRunner.evaluate` refuses `test`. `--frozen` is the one sealed look, and only for the champion the arbiter accepted. The simple-rule competitor is Lane A's own rule when the loader provides `runner.rule_spec` (flat when the condition fails). The arbiter scores it directly, so the fixed momentum threshold of `0` does not have to sit on the agent quantile grid. Lane A's train-selected regime filter (`runner.regime_spec`) is a third competitor. Each agent gate's reasons show its validation delta against that filter, and the verdict basis states the filter's own result. Like the simple rule, the filter is a reference and not a veto, because the selection rule was registered before any run.
 
 ## Run
 
 ```bash
 pip install "pydantic-ai-slim[google]" lightgbm scikit-learn pandas numpy pytest
-python3 -m pytest -q tests/test_lane_b.py          # 79 guardrail + regression tests
+python3 -m pytest -q tests/test_lane_b.py          # 80 guardrail + regression tests
 python3 scripts/run_investigation.py --fallback     # deterministic agents
 KOK_AGENT_MODEL=google:gemini-3.8-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
 ```

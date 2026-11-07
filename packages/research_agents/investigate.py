@@ -4,7 +4,8 @@ Flow:
   1. diagnostic agent  -> ranked hypotheses from TRAIN regime stats; every text field checked against evidence
   2. gate proposer     -> allowlisted gates, tested on TRAIN only (own budget, every attempt logged)
   3. arbiter (code)    -> evaluates every proposal on VALIDATION, plus competitors under identical conditions:
-                          the simple rule baseline and the LightGBM gate; always-on and cash are the references
+                          the simple rule baseline, the LightGBM gate and (when the loader has one) Lane A's
+                          train-selected regime filter; always-on and cash are the references
   4. critic agent      -> reviews each gate against its own train + validation evidence
   5. arbiter (code)    -> PRE-REGISTERED RULE (written before any run):
        an agent proposal is ELIGIBLE iff, on validation,
@@ -107,6 +108,12 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
     if lgbm is not None:
         ctx.arbiter_evaluate(lgbm.spec(), "validation", source="meta_model")
         competitors.append(("meta_model", lgbm.spec()))
+    # Lane A's train-selected regime filter: the judges' question is whether the agent beats it.
+    # Like the simple rule it is a reference, not a veto (the selection rule below is pre-registered).
+    regime = getattr(runner, "regime_spec", None)
+    if regime:
+        ctx.arbiter_evaluate(regime, "validation", source="rule_baseline")
+        competitors.append(("rule_baseline", regime))
 
     def val_trial(spec):
         h = spec_hash(spec)
@@ -114,6 +121,8 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
 
     rule_t = val_trial(rule)
     rule_delta = rule_t.delta_net_return_vs_always_on if rule_t else None
+    regime_t = val_trial(regime) if regime else None
+    regime_delta = regime_t.delta_net_return_vs_always_on if regime_t else None
     always_on = rule_out.get("evaluation", {}).get("always_on", {}) if isinstance(rule_out, dict) else {}
 
     # 4. critic
@@ -152,6 +161,8 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
                     reasons.append("does not beat cash on validation (net return <= 0)")
                 if ci[0] <= 0:
                     reasons.append("validation CI includes zero; the frozen test decides")
+                if _finite(regime_delta):
+                    reasons.append(f"vs Lane A regime filter on validation: {d - regime_delta:+.4f} (reference, not a veto)")
             if mix and max(mix.values()) >= DEGENERATE_SHARE:
                 eligible = False
                 reasons.append(f"degenerate: one multiplier on {max(mix.values()):.0%} of in-position validation decisions")
@@ -194,6 +205,8 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
                 reasons.append(f"degenerate: one multiplier on {max(t.allocation_mix.values()):.0%} of in-position validation decisions")
         else:
             reasons.append("validation evaluation failed or not finite")
+        if spec.get("summary"):
+            reasons.append(f"Lane A: {spec['summary']}")
         candidates.append(PolicyCandidate(
             policy_id=spec["policy_id"], spec_hash=spec_hash(spec), source=source, role="competitor", policy_spec=spec,
             status="competitor", validation_delta_vs_always_on=t.delta_net_return_vs_always_on if t else None,
@@ -206,6 +219,8 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
     ao_net, ao_ci = always_on.get("net_return"), always_on.get("ci_net_return")
     basis = [f"always-on on validation: net {ao_net:+.4f}, 90% CI {ao_ci}" if _finite(ao_net) else "always-on validation metrics unavailable",
              "cash on validation: net 0.0000"]
+    if regime_t and _finite(regime_delta, regime_t.net_return):
+        basis.append(f"Lane A regime filter on validation: delta vs always-on {regime_delta:+.4f}, net {regime_t.net_return:+.4f}")
     if champion:
         verdict = "candidate_for_frozen_test"
         basis.append(f"champion {champion[1]['policy_id']} beats always-on and cash on validation and passed the critic")

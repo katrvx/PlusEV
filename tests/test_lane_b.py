@@ -577,3 +577,24 @@ def test_durations_glued_to_units_are_checked(text):
 
 def test_small_durations_are_trivial_like_small_integers():
     assert not unsupported_numbers("a 7d window", EV) and unsupported_numbers("a 17d window", EV)
+
+
+def test_lane_a_regime_filter_is_a_competitor_and_a_reference_for_agent_gates():
+    exp, runner, tq, _df, lgbm = _built()
+
+    class WithRegime:
+        def __init__(self, inner):
+            self._inner = inner
+            self.regime_spec = {"policy_id": "rule::regime_filter", "family": "threshold_gate",
+                                "conditions": [{"feature": "realized_vol_7d", "op": ">", "threshold": tq["realized_vol_7d"][0.67]}],
+                                "allocation_when_true": 0.0, "allocation_when_false": 1.0, "summary": "flat in the top vol tercile"}
+
+        def __getattr__(self, name):
+            return getattr(self._inner, name)
+
+    rep = investigate("x", model=None, loader=lambda _: (exp, WithRegime(runner), tq, None, lgbm))
+    comp = next(c for c in rep.candidates if c.policy_id == "rule::regime_filter")
+    assert comp.role == "competitor" and comp.status == "competitor"
+    assert any("Lane A: flat in the top vol tercile" in r for r in comp.reasons)
+    assert any("regime filter" in b for b in rep.verdict_basis)
+    assert any(t.policy_id == "rule::regime_filter" and t.split == "validation" for t in rep.trial_log)
