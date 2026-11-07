@@ -63,6 +63,7 @@ existing strategy (immutable) ─► import / validate / hash
 | [`LANE_B.md`](LANE_B.md) | What Lane B built, its interface, guardrails, adversarial review, and what it needs from Lane A |
 | [`LANE_C.md`](LANE_C.md) | Web workspace, shared route constants and types, and the teammate integration guide |
 | [`docs/INTEGRATION_DECISIONS.md`](docs/INTEGRATION_DECISIONS.md) | Choices made while putting Lane A, current Lane B, and Lane C on one branch |
+| [`docs/LANE_B_DIVERGENCE.md`](docs/LANE_B_DIVERGENCE.md) | Where Lane B still matches the original idea, and where the champion rule has moved |
 | [`archive/`](archive/) | Earlier +EV design notes, kept for reference only |
 
 ## Team and lanes

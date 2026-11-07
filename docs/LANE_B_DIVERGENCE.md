@@ -1,0 +1,29 @@
+# Lane B against the original idea
+
+Checked 7 Nov 2026 against `KEEP_OR_KILL_PROJECT_SPEC.md` section 9, `KEEP_OR_KILL_AGENTS.md` Lane B, and `packages/research_agents` on `main` at `91ceb32`.
+
+Lane B is still the original product. It investigates an unchanged strategy, cites tool output, and refuses the holdout. It does not decide Keep or Kill. That decision stays with Lane A's arbiter. That split is recorded in [`INTEGRATION_DECISIONS.md`](INTEGRATION_DECISIONS.md).
+
+## Still the idea
+
+- Gates are allocation multipliers. Agents cannot run uploaded code or edit the signal.
+- Diagnostic, critic, and gate proposer are built. A verifier rejects numbers that are not in the cited tool output. A fallback runs when the model fails.
+- Tools refuse the test split. One champion gets one sealed look. The critic sees validation only through the trial log.
+
+## Where it moved
+
+| Original idea | What Lane B does now |
+|---|---|
+| The decision is Keep, Modify, Restrict, Monitor, Kill, or Inconclusive. | Lane B reports `candidate_for_frozen_test` or `INCONCLUSIVE`. The keep-or-kill words are Lane A's arbiter. |
+| An interval that still contains zero is not a decision. | A positive validation delta whose 90% interval includes zero can still be the agent champion. The code says the frozen test decides. Lane A may then abstain. |
+| Compare the overlay with always-on, the simple rule, and cash. | Cash is a veto: validation net return must be above zero. A gate that only loses less than the original strategy, while still losing to cash, cannot be the champion. |
+| Challenge the agent gate on the same walk-forward splits as the baselines. | The agent gate is scored on one validation block. Train walk-forward exists on Lane A and is not read by the critic yet. Showing those folds to the critic does not open the holdout: they are train-only and already stay on the development view. |
+| News and sentiment, with a context agent, and no causal claim from a headline. | The point-in-time store and labeller exist. There is no news archive and no context agent. The handoff said to cut news before cutting execution. |
+| Tools include strategy health and a bootstrap. | Those two tools are not built. Regime, cost, news, and train-gate tests are. |
+| Combine two strategies when they complement each other. | Not in this lane. One investigation is one book, same as Lane A. |
+
+## The champion rule, as coded
+
+An agent gate reaches the single sealed look only if its validation delta versus always-on is above zero, its own net return is above zero, no multiplier covers 95% or more of in-position bars, and the critic approves it. Among those, the largest validation delta wins. A confidence interval that still covers zero is noted and does not block the look.
+
+Source: `packages/research_agents/investigate.py`, the pre-registered selection block.
