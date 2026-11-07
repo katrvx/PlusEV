@@ -40,5 +40,13 @@ export type Experiment = {
   recommendation: string; limitations: string[];
   policy: { description: string; conditions: string[]; holdout_frozen: boolean; test_evaluated: boolean };
 };
-export type PaperPlan = { paper_test_id: string; experiment_id: string; status: "planned"; duration_days: number; approved_at: string; policy_id: string; mode: "demo" | "measured" };
+export type PaperPlanSnapshot = {
+  strategy_id: string;
+  dataset_hash: string;
+  policy_id: string;
+  windows: { train: string; validation: string; test: string };
+  policy: { description: string; conditions: string[]; holdout_frozen: boolean; test_evaluated: boolean };
+  assumptions: Partial<Strategy["assumptions"]>;
+};
+export type PaperPlan = { paper_test_id: string; experiment_id: string; status: "planned"; duration_days: number; approved_at: string; policy_id: string; mode: "demo" | "measured"; snapshot?: PaperPlanSnapshot };
 export type Health = { status: string; research_engine: boolean; version: string };
