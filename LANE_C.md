@@ -32,7 +32,7 @@ The web proxy uses `API_URL` from [`apps/web/.env.example`](apps/web/.env.exampl
 - Seeded demo strategies may use `mode: "demo"` and replay the checked-in illustrative fixture.
 - Imported user strategies use `status: "awaiting_engine"`, `mode: "pending"`, empty metrics/baselines/equity/evidence/steps, and `verdict: "INCONCLUSIVE"` until the evaluator is connected.
 - A pending user upload must never receive demo metrics or agent findings. Do not flip it to `demo` to make the UI look complete.
-- Native Lane B reports preserve `agent_mode: "llm" | "deterministic_fallback"`; the UI labels fallback reports as scripted examples and does not imply a live model call.
+- Native Lane B reports preserve `agent_mode: "llm" | "llm_with_fallback" | "deterministic_fallback"`; the UI labels fallback reports as scripted research and does not imply a live model call.
 
 ### Native Lane B boundary and sample
 
@@ -155,3 +155,5 @@ The API tests use temporary storage so they do not add test strategies or plans 
 The interface targets traders who understand basic strategies but are not quantitative researchers. The overview leads with where a strategy worked, where it struggled, and the next useful test. Plain-language labels come first; evidence, uncertainty ranges, execution assumptions, and technical identifiers open on demand. The How it works page explains the workflow and provides concrete position/trade examples. Imports use a three-step upload, match, and review flow with sample CSVs and inline validation.
 
 The visual system uses locally bundled Inter, a quiet light research area, dark navigation, and a purple action color. Responsive layouts preserve readable type and touch targets. Illustrative UI examples and the authentic scripted agent report remain explicitly distinguished from measured results.
+
+Native reports preserve mixed-model fallback status and all current Lane B fields. The checked-in `experiments/investigation_fixture.json` is explicitly labelled sample market data even though its source is `team_artifact`. Other filenames are not assumed to prove measured market data; the source badge describes the artifact, not profitability. Baseline candidates with `status: "competitor"` appear as comparisons, not rejections.

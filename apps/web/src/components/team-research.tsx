@@ -8,12 +8,16 @@ import "./team-research.css";
 const pct = (value: number | null) => value === null ? "—" : `${value > 0 ? "+" : ""}${(value * 100).toFixed(2)}%`;
 const when = (value: string) => new Date(value).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 const json = (value: unknown) => JSON.stringify(value, null, 2);
-const splitLabel = (split: TeamTrial["split"]) => split === "train" ? "Training" : "Validation";
-const sourceLabel = (source: TeamTrial["source"]) => source === "agent" ? "Agent-proposed rule" : source === "meta_model" ? "Model comparison" : "Simple rule comparison";
+const splitLabel = (split: TeamTrial["split"]) => split === "train" ? "Training" : split === "validation" ? "Validation" : "New-data test";
+const sourceLabel = (source: TeamTrial["source"]) => source === "agent" ? "Agent-proposed rule" : source === "meta_model" ? "Model comparison" : source === "arbiter" ? "Independent review" : "Simple rule comparison";
 
 function ModeBadge({ item, compact = false }: { item: { agent_mode: string; model_id?: string | null; synthetic?: boolean }; compact?: boolean }) {
   const fallback = item.agent_mode === "deterministic_fallback";
-  return <span className={`tr-mode ${fallback ? "fallback" : "model"}`} title={fallback ? "Scripted example: fixed research steps and no language-model call." : item.model_id || "Model-assisted research report"}><span className="tr-mode-dot" />{compact ? fallback ? "Scripted example" : "Model-assisted" : fallback ? "Scripted example" : item.model_id ? `Model-assisted · ${item.model_id}` : "Model-assisted"}</span>;
+  const mixed = item.agent_mode === "llm_with_fallback";
+  const label = fallback ? "Scripted research" : mixed ? item.model_id ? `Model + scripted fallback · ${item.model_id}` : "Model + scripted fallback" : item.model_id ? `Model-assisted · ${item.model_id}` : "Model-assisted";
+  const compactLabel = fallback ? "Scripted research" : mixed ? "Model + scripted fallback" : "Model-assisted";
+  const title = fallback ? "Scripted research: fixed research steps and no language-model call." : mixed ? "A language model was configured, and one or more stages used scripted fallback." : item.model_id || "Model-assisted research report";
+  return <span className={`tr-mode ${fallback ? "fallback" : mixed ? "mixed" : "model"}`} title={title}><span className="tr-mode-dot" />{compact ? compactLabel : label}</span>;
 }
 
 function SourceBadge({ item }: { item: { source: string; synthetic: boolean } }) {
@@ -35,7 +39,8 @@ function TrialRow({ trial }: { trial: TeamTrial }) {
 
 function CandidateCard({ candidate }: { candidate: TeamCandidate }) {
   const eligible = candidate.status === "accepted_for_frozen_test";
-  return <article className={`tr-candidate ${eligible ? "eligible" : "rejected"}`}><div className="tr-candidate-head"><span className="tr-candidate-status">{eligible ? <><CircleCheck size={14} />Ready for a new-data test</> : <><CircleX size={14} />Rejected</>}</span><code>{candidate.policy_id}</code></div><p className="tr-candidate-note">{eligible ? "This trading rule passed the development-stage checks. It has not been validated on data it did not see during research." : "This trading rule will not proceed to the new-data test."}</p><ul>{candidate.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul><details className="tr-policy-spec"><summary>Trading rule details <ChevronRight size={13} /></summary><code>{json(candidate.policy_spec)}</code></details></article>;
+  const competitor = candidate.status === "competitor";
+  return <article className={`tr-candidate ${eligible ? "eligible" : competitor ? "competitor" : "rejected"}`}><div className="tr-candidate-head"><span className="tr-candidate-status">{eligible ? <><CircleCheck size={14} />Ready for a new-data test</> : competitor ? <><Info size={14} />Comparison rule</> : <><CircleX size={14} />Rejected</>}</span><code>{candidate.policy_id}</code></div><p className="tr-candidate-note">{eligible ? "This trading rule passed the development-stage checks. It has not been validated on data it did not see during research." : competitor ? "This rule is included as a comparison point; it is not an agent-selected candidate." : "This trading rule will not proceed to the new-data test."}</p><ul>{candidate.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul><details className="tr-policy-spec"><summary>Trading rule details <ChevronRight size={13} /></summary><code>{json(candidate.policy_spec)}</code></details></article>;
 }
 
 export default function TeamResearch() {

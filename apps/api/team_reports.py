@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "lane_b_investigation.json"
+CHECKED_IN_SYNTHETIC_ARTIFACT = Path("experiments") / "investigation_fixture.json"
 REPORT_NAME_PATTERN = re.compile(r"^investigation_[A-Za-z0-9._-]+\.json$")
 REPORT_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 VALID_AGENT_MODES = {"llm", "llm_with_fallback", "deterministic_fallback"}
@@ -31,18 +32,24 @@ def _relative(path: Path) -> str:
         return path.name
 
 
-def _artifact_paths() -> tuple[list[Path], bool]:
-    """Return trusted artifacts and whether the bundled fallback is in use."""
+def _artifact_paths() -> list[tuple[Path, bool, str]]:
+    """Return trusted artifacts with explicit provenance metadata.
+
+    Only the known checked-in fixture path is marked synthetic among local
+    artifacts. Arbitrary reports under ``experiments/`` are team artifacts;
+    their provenance must not be guessed from their contents or filename.
+    """
     experiment_dir = ROOT / "experiments"
     paths = sorted(
         (path for path in experiment_dir.glob("investigation_*.json") if path.is_file() and REPORT_NAME_PATTERN.fullmatch(path.name)),
         key=lambda path: path.name,
     )
     if paths:
-        return paths, False
+        checked_in_fixture = (ROOT / CHECKED_IN_SYNTHETIC_ARTIFACT).resolve()
+        return [(path, path.resolve() == checked_in_fixture, "team_artifact") for path in paths]
     if FIXTURE_PATH.is_file():
-        return [FIXTURE_PATH], True
-    return [], False
+        return [(FIXTURE_PATH, True, "bundled_lane_b_fixture")]
+    return []
 
 
 def _validate_report(report: Any, path: Path) -> dict[str, Any]:
@@ -100,7 +107,7 @@ def _validate_report(report: Any, path: Path) -> dict[str, Any]:
     return report
 
 
-def _load_wrapper(path: Path, synthetic: bool) -> dict[str, Any]:
+def _load_wrapper(path: Path, synthetic: bool, source: str) -> dict[str, Any]:
     try:
         report = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -114,7 +121,7 @@ def _load_wrapper(path: Path, synthetic: bool) -> dict[str, Any]:
     except ValueError as exc:
         raise HTTPException(status_code=500, detail=f"Invalid investigation artifact {_relative(path)}: {exc}") from exc
     return {
-        "source": "bundled_lane_b_fixture" if synthetic else "team_artifact",
+        "source": source,
         "synthetic": synthetic,
         "source_path": _relative(path),
         "report": validated,
@@ -122,8 +129,7 @@ def _load_wrapper(path: Path, synthetic: bool) -> dict[str, Any]:
 
 
 def _load_wrappers() -> list[dict[str, Any]]:
-    paths, synthetic = _artifact_paths()
-    return [_load_wrapper(path, synthetic) for path in paths]
+    return [_load_wrapper(path, synthetic, source) for path, synthetic, source in _artifact_paths()]
 
 
 def _summary(wrapper: dict[str, Any]) -> dict[str, Any]:

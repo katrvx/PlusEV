@@ -1,5 +1,5 @@
 /** Native Lane B investigation report shape consumed by Part C. */
-export type AgentMode = "llm" | "deterministic_fallback";
+export type AgentMode = "llm" | "llm_with_fallback" | "deterministic_fallback";
 
 export type TeamEvidence = {
   evidence_id: string;
@@ -31,19 +31,27 @@ export type TeamProposal = {
 };
 export type TeamTrial = {
   policy_id: string;
-  source: "agent" | "rule_baseline" | "meta_model";
-  split: "train" | "validation";
+  spec_hash?: string | null;
+  source: "agent" | "arbiter" | "rule_baseline" | "meta_model";
+  split: "train" | "validation" | "test";
   delta_net_return_vs_always_on: number | null;
   ci_delta: [number, number] | null;
+  allocation_mix?: Record<string, number>;
   evidence_id: string | null;
   status: "evaluated" | "refused" | "error";
   note: string;
 };
 export type TeamCandidate = {
   policy_id: string;
+  spec_hash?: string | null;
   source: "agent" | "rule_baseline" | "meta_model";
+  role?: "agent_champion" | "agent_not_selected" | "competitor";
   policy_spec: Record<string, unknown>;
-  status: "accepted_for_frozen_test" | "rejected";
+  status: "accepted_for_frozen_test" | "rejected" | "competitor";
+  validation_delta_vs_always_on?: number | null;
+  validation_ci?: [number, number] | null;
+  validation_delta_vs_simple_rule?: number | null;
+  allocation_mix?: Record<string, number>;
   reasons: string[];
   evidence_ids: string[];
 };
@@ -53,6 +61,9 @@ export type TeamReport = {
   generated_at: string;
   agent_mode: AgentMode;
   model_id: string | null;
+  agent_failures?: string[];
+  verdict?: "candidate_for_frozen_test" | "INCONCLUSIVE";
+  champion_policy_id?: string | null;
   diagnostic: {
     summary: string;
     hypotheses: TeamHypothesis[];
@@ -66,6 +77,7 @@ export type TeamReport = {
   test_requests: string[];
   limitations: string[];
   evidence: TeamEvidence[];
+  n_distinct_agent_policies?: number;
   n_policies_tried: number;
   holdout_accessed: boolean;
 };

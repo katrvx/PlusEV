@@ -12,8 +12,10 @@
 .tr-context-time { margin-left: auto; font-size: 10px; }
 .tr-mode,.tr-source { display: inline-flex; align-items: center; gap: 6px; padding: 5px 7px; border: 1px solid #e0deea; border-radius: 5px; font-size: 10px; color: #75618e; background: #f7f4fb; white-space: nowrap; }
 .tr-mode.fallback { color: #687080; background: #f7f8fa; border-color: #e4e6ed; }
+.tr-mode.mixed { color: #866941; background: #fbf7ee; border-color: #eee2cf; }
 .tr-mode-dot { height: 5px; width: 5px; border-radius: 50%; background: #a18cc5; }
 .tr-mode.fallback .tr-mode-dot { background: #8e96a6; }
+.tr-mode.mixed .tr-mode-dot { background: #c49150; }
 .tr-source { color: #4b7d66; background: #f2f8f5; border-color: #dcebe3; }
 .tr-source.synthetic { color: #82704c; background: #faf7ee; border-color: #eae2cd; }
 .tr-inline-error,.tr-holdout-warning { display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px; background: #fff4f0; border: 1px solid #efd7cd; border-radius: 8px; margin-bottom: 16px; font-size: 12px; line-height: 1.7; color: #a26655; }
@@ -110,9 +112,11 @@
 .tr-candidates { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 15px; padding: 0 22px 22px; }
 .tr-candidate { border: 1px solid #e1e9e2; border-left: 3px solid #8aac90; border-radius: 8px; padding: 20px; }
 .tr-candidate.rejected { border-color: #eedee4; border-left-color: #bf8a99; }
+.tr-candidate.competitor { border-color: #e5e1ed; border-left-color: #a793bd; }
 .tr-candidate-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 9px; }
 .tr-candidate-status { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #6a9376; }
 .tr-candidate.rejected .tr-candidate-status { color: #b5828d; }
+.tr-candidate.competitor .tr-candidate-status { color: #8d7aa2; }
 .tr-candidate-head code { font-size: 10px; color: #9d8ba7; }
 .tr-candidate-note { margin: 14px 0; font-size: 12px; line-height: 1.8; color: #8f8098; }
 .tr-candidate ul { padding-left: 17px; font-size: 11px; line-height: 1.9; color: #8f8395; margin: 0; }

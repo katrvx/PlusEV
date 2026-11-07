@@ -117,3 +117,31 @@ def test_unknown_nested_evidence_reference_is_invalid(monkeypatch: pytest.Monkey
         team_reports.list_investigations()
     assert caught.value.status_code == 500
     assert "ev_missing" in str(caught.value.detail)
+
+
+def test_current_lane_b_fixture_is_preserved_and_labelled_sample_data(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    native = Path(__file__).resolve().parents[2] / "experiments" / "investigation_fixture.json"
+    artifact = tmp_path / "experiments" / "investigation_fixture.json"
+    artifact.parent.mkdir(parents=True)
+    shutil.copyfile(native, artifact)
+    configure(monkeypatch, tmp_path, tmp_path / "missing_bundled.json")
+
+    original = json.loads(native.read_text(encoding="utf-8"))
+    result = team_reports.get_investigation(original["experiment_id"])
+    assert result["report"] == original
+    assert result["source"] == "team_artifact"
+    assert result["synthetic"] is True
+    assert any(candidate["status"] == "competitor" for candidate in result["report"]["candidates"])
+
+
+def test_mixed_model_run_keeps_its_failure_provenance(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    artifact = tmp_path / "experiments" / "investigation_mixed.json"
+    artifact.parent.mkdir(parents=True)
+    report = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    report.update(agent_mode="llm_with_fallback", model_id="example-model", agent_failures=["Critic unavailable; scripted check used."])
+    artifact.write_text(json.dumps(report), encoding="utf-8")
+    configure(monkeypatch, tmp_path, tmp_path / "missing_bundled.json")
+
+    result = team_reports.get_investigation(report["experiment_id"])
+    assert result["report"] == report
+    assert team_reports.list_investigations()[0]["agent_mode"] == "llm_with_fallback"

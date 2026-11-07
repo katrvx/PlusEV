@@ -70,7 +70,7 @@ existing strategy (immutable) ─► import / validate / hash
 |---|---|---|---|
 | **A · Quant / Data** | `packages/ingestion`, `feature_store`, `strategies`, `quant`, `evaluation` | `run_experiment(strategy_id, dataset_snapshot_id, policy_spec) -> ExperimentResult` | in progress |
 | **B · Agents / Context** (Kate) | `packages/research_agents`, `meta_policy`, news enrichment | `investigate(experiment_id) -> InvestigationReport` | in `main`: diagnostic / proposer / critic agents, 4 allowlisted tools, evidence store, rule + LightGBM gates, deterministic fallback, adversarially reviewed, 38 tests; runs on a labelled synthetic Lane A stand-in until Lane A lands |
-| **C · API / UI / Demo** | `apps/api`, `apps/web`, docs, paper-run interface | consumes `ExperimentResult` + `InvestigationReport` | in progress |
+| **C · API / UI / Demo** | `apps/api`, `apps/web`, docs, practice-plan interface | consumes native Lane B reports; adapts Lane A results into UI contracts | on `lane-c`: working web UI, validated CSV/Parquet imports, evidence/report views, saved practice plans; live evaluation of uploads and practice execution pending. Start at [`LANE_C.md`](LANE_C.md). |
 
 Work on branches per lane; don't edit another lane's directories without coordinating. Freeze shared Pydantic contracts before integrating.
 
@@ -79,7 +79,8 @@ Work on branches per lane; don't edit another lane's directories without coordin
 ```text
 apps/api            FastAPI routes                       (C)
 apps/web            Next.js UI                           (C)
-packages/contracts  shared Pydantic schemas              (all, frozen first)
+packages/contracts  Part C TypeScript types + API constants (C)
+packages/contracts_lane_b  native Python research contracts (B)
 packages/ingestion, feature_store, strategies, quant, evaluation   (A)
 packages/research_agents, meta_policy                    (B)
 packages/paper      paper-only shadow runner             (C)
