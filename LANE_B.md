@@ -49,7 +49,7 @@ An independent agent attacked Lane B on 7 Nov (18 findings, 17 reproduced). All 
 pip install "pydantic-ai-slim[google]" lightgbm scikit-learn pandas numpy pytest
 python3 -m pytest -q tests/test_lane_b.py          # 38 guardrail + regression tests
 python3 scripts/run_investigation.py --fallback     # deterministic agents
-KOK_AGENT_MODEL=google-gla:gemini-2.5-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
+KOK_AGENT_MODEL=google:gemini-2.5-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
 ```
 
 ## What Lane A needs to provide (to replace the stand-in)
