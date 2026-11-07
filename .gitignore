@@ -19,6 +19,11 @@ data/parquet/
 # node
 node_modules/
 dist/
+.next/
+out/
+*.tsbuildinfo
+.env.local
+artifacts/
 
 # eval outputs are committed on purpose (eval/results/)
 
@@ -27,7 +32,15 @@ agentverse/
 
 # practice datasets are regenerated from the kit with fixed seeds (see README)
 data/
+!data/
+data/*
+!data/fixtures/
+!data/fixtures/**
 eval/challenge/*/revealed-cases/
 
 # lane B
 .pytest_cache/
+
+# Isolated Lane C test scratch directories
+.pytest_api_*/
+.pytest-tmp*/

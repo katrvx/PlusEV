@@ -61,6 +61,7 @@ existing strategy (immutable) ─► import / validate / hash
 | [`KEEP_OR_KILL_PROJECT_SPEC.md`](KEEP_OR_KILL_PROJECT_SPEC.md) | **Authoritative spec**: idea, maths, data rules, evaluation, agents, API, risk, demo script |
 | [`KEEP_OR_KILL_AGENTS.md`](KEEP_OR_KILL_AGENTS.md) | Handoff brief for the three lanes, shared contracts, collaboration rules, definition of done |
 | [`LANE_B.md`](LANE_B.md) | What Lane B built, its interface, guardrails, adversarial review, and what it needs from Lane A |
+| [`LANE_C.md`](LANE_C.md) (branch `lane-c`) | Web workspace, shared route constants and types, and the teammate integration guide |
 | [`archive/`](archive/) | Earlier +EV design notes, kept for reference only |
 
 ## Team and lanes
