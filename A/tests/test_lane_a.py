@@ -17,8 +17,8 @@ from kok_a.experiment import (
     _fit_lgbm,
     agent_view,
     assemble,
-    fit_regime_labels,
 )
+from kok_a.regimes import discover_regime_filter, fit_regime_labels
 from kok_a.features import (
     MARKET_FEATURES,
     TemporalLeakError,
@@ -29,10 +29,10 @@ from kok_a.features import (
     market_features,
     with_execution,
 )
-from kok_a.arbiter import DRAWDOWN_CAP, MIN_TEST_DECISIONS, decide
-from kok_a.contracts import GateEvaluation, Metrics
-from kok_a.gates import allocation, rule_gate_spec
-from kok_a.lgbm_gate import LGBMGate
+from kok_a.arbiter import DRAWDOWN_CAP, MIN_TEST_DECISIONS, build_paper_plan, decide
+from kok_a.contracts import Decision, GateEvaluation, Metrics
+from kok_a.gates import allocation, regime_gate_allocation, rule_gate_spec
+from kok_a.lgbm_gate import BAND, LGBMGate
 from kok_a.market import hash_ohlcv, synthetic_ohlcv
 from kok_a.snapshot import (
     FEAR_GREED_PATH,
@@ -267,7 +267,7 @@ def test_preregistered_baselines_exist_on_every_split_including_holdout(bundle):
     result = bundle.result
     present = {(row.split, row.policy) for row in result.baselines}
     for split in ("train", "validation", "test"):
-        for policy in ("always_on", "cash", "simple_rule", "lgbm_gate"):
+        for policy in ("always_on", "cash", "simple_rule", "regime_filter", "lgbm_gate"):
             assert (split, policy) in present
     cash = next(row for row in result.baselines if row.split == "test" and row.policy == "cash")
     assert cash.metrics.net_return == pytest.approx(0.0, abs=1e-12)
@@ -333,8 +333,9 @@ def test_ready_snapshot_is_real_binance_and_fear_greed_with_no_invented_news():
     assert ready.result.decision is not None
     assert ready.result.decision.verdict in {
         "KEEP",
-        "ACTIVATE CONDITIONALLY",
-        "REDUCE",
+        "MODIFY",
+        "COMBINE",
+        "RESTRICT",
         "MONITOR",
         "KILL",
         "INCONCLUSIVE",
@@ -421,6 +422,64 @@ def test_lightgbm_spec_records_seed_and_a_stable_model_hash(bundle):
     assert first.spec()["model_hash"] == second.spec()["model_hash"]
     assert first.spec()["model_hash"] != other.spec()["model_hash"]
     assert len(first.spec()["model_hash"]) == 16
+    assert first.base_rate is not None
+    assert first.low == pytest.approx(first.base_rate - BAND)
+    assert first.high == pytest.approx(first.base_rate + BAND)
+    assert first.spec()["thresholds"] == [first.low, first.high]
+    assert first.spec()["band"] == BAND
+
+
+def test_regime_filter_is_chosen_on_train_and_ignores_the_sealed_window(bundle):
+    spec = bundle.runner.regime_spec
+    assert spec["selected_on"] == "train"
+    assert spec["family"] == "regime_gate"
+    poisoned = bundle.frame.copy()
+    poisoned.loc[poisoned["split"] == "test", "ret_next"] = -0.2
+    poisoned.loc[poisoned["split"] == "validation", "momentum_24h"] += 5
+    again = discover_regime_filter(
+        poisoned,
+        simulate(poisoned, pd.Series(1.0, index=poisoned.index)),
+        seed=7,
+        n_boot=30,
+    )
+    assert again["flat_buckets"] == spec["flat_buckets"]
+    assert again["full_buckets"] == spec["full_buckets"]
+    assert "sentiment_regime" in bundle.frame.columns
+    assert "liquidity_regime" in bundle.frame.columns
+    assert bundle.result.coverage["news_sentiment"] == 0.0
+
+
+def test_regime_filter_goes_flat_where_the_train_interval_is_below_zero():
+    n = 120
+    regime = np.array(["high"] * 60 + ["low"] * 60)
+    frame = pd.DataFrame(
+        {
+            "split": ["train"] * n,
+            "vol_regime": regime,
+            "target_position": np.ones(n),
+        }
+    )
+    net = np.where(regime == "high", -0.01, 0.01)
+    simulated = pd.DataFrame({"net": net, "q": np.ones(n), "dq_signed": np.zeros(n)})
+    spec = discover_regime_filter(frame, simulated, seed=1, n_boot=20)
+    assert {"axis": "vol_regime", "bucket": "high"} in spec["flat_buckets"]
+    assert {"axis": "vol_regime", "bucket": "low"} in spec["full_buckets"]
+    context = pd.DataFrame({"vol_regime": ["high", "low", "low"]})
+    assert regime_gate_allocation(spec, context).tolist() == [0.0, 1.0, 1.0]
+
+
+def test_paper_plan_champion_is_the_policy_the_verdict_chose():
+    modify = Decision(verdict="MODIFY", policy_id="rule::regime_filter", reasons=["interval above zero"], evidence={})
+    plan = build_paper_plan("exp", "strat", "v1", modify, "10 bps")
+    assert plan.champion_policy_id == "rule::regime_filter"
+    assert plan.challenger_policy_id == "always_on"
+    kill = Decision(verdict="KILL", policy_id="cash", reasons=["below zero"], evidence={})
+    killed = build_paper_plan("exp", "strat", "v1", kill, "10 bps")
+    assert killed.champion_policy_id == "cash"
+    assert killed.challenger_policy_id == "always_on"
+    keep = Decision(verdict="KEEP", policy_id="always_on", reasons=["above zero"], evidence={})
+    kept = build_paper_plan("exp", "strat", "v1", keep, "10 bps")
+    assert kept.champion_policy_id == "always_on"
 
 
 def test_simple_rule_goes_flat_when_the_condition_fails():
@@ -485,7 +544,7 @@ def test_arbiter_activates_when_the_gate_interval_is_above_zero():
     rule = _evaluation("simple_rule", 0.08, 0.11, 0.4, (0.02, 0.12), (0.01, 0.08), 0.06)
     model = _evaluation("lgbm_gate", 0.03, 0.10, 0.5, (-0.01, 0.06), (-0.02, 0.03), 0.01)
     decision = decide(_panel(always, rule, model), n_test=400)
-    assert decision.verdict == "ACTIVATE CONDITIONALLY"
+    assert decision.verdict == "MODIFY"
     assert decision.policy_id == "simple_rule"
 
 
@@ -513,7 +572,7 @@ def test_arbiter_reduces_when_full_size_breaks_the_drawdown_cap():
     rule = _evaluation("simple_rule", -0.01, 0.20, 0.3, (-0.06, 0.04), (-0.04, 0.08), 0.03)
     model = _evaluation("lgbm_gate", -0.02, 0.22, 0.5, (-0.08, 0.03), (-0.05, 0.06), 0.02)
     decision = decide(_panel(always, rule, model), n_test=400)
-    assert decision.verdict == "REDUCE"
+    assert decision.verdict == "RESTRICT"
     assert decision.policy_id == "simple_rule"
     assert decision.risk_override is True
 
@@ -550,7 +609,14 @@ def test_experiment_records_an_unstarted_paper_plan(bundle):
     assert plan.approved is False
     assert plan.horizon_days == 14
     assert plan.status == "recorded_not_started"
-    assert plan.champion_policy_id == "always_on"
+    if decision.verdict == "KILL":
+        assert plan.champion_policy_id == "cash"
+        assert plan.challenger_policy_id == "always_on"
+    elif decision.verdict in {"MODIFY", "RESTRICT", "COMBINE"}:
+        assert plan.champion_policy_id == decision.policy_id
+        assert plan.challenger_policy_id == "always_on"
+    else:
+        assert plan.champion_policy_id == "always_on"
     assert plan.frozen_at_experiment == bundle.result.experiment_id
     assert "not a result" in " ".join(plan.notes)
     assert plan.predictive_range_low is not None and plan.predictive_range_high is not None
@@ -558,6 +624,12 @@ def test_experiment_records_an_unstarted_paper_plan(bundle):
     assert plan.predictive_horizon_bars == 14 * 24
     scored = [fold for fold in bundle.result.walk_forward if fold.delta_net_return_vs_always_on is not None]
     assert scored and all("sealed-test" in fold.note for fold in scored)
+    train_end = next(window.end for window in bundle.result.windows if window.split == "train")
+    assert all(fold.score_end <= train_end for fold in bundle.result.walk_forward)
+    line = next(note for note in bundle.result.notes if "walk-forward" in note.lower() or "Walk-forward" in note or "Honest negative" in note)
+    if all(fold.delta_net_return_vs_always_on < 0 for fold in scored):
+        assert "Honest negative" in line
+    assert "sealed-test policy" in line
     assert {check.scale for check in bundle.result.fee_checks} == {0.5, 1.0, 2.0}
     assert bundle.result.coverage["atr_14"] == 1.0
     assert bundle.result.coverage["momentum_7d"] == 1.0

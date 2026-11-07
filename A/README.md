@@ -13,17 +13,18 @@ A gate only multiplies a strategy's target position by 0, 0.5, or 1.
 | Fear & Greed | Real Alternative.me daily index. Usable only from the next UTC day, because the historical publication time is not documented. |
 | News | Omitted. The column is entirely missing. Nothing is filled in. |
 | The two strategies | Demo generators (24/72 trend, 48-bar mean reversion) run on these prices. Not an imported live strategy, and not claimed as alpha. |
-| Simple rule | Full size only when lagged momentum is positive and 7d vol is at or below the train median. Otherwise allocation is 0. |
+| Simple rule | Full size only when lagged momentum is positive and 7d vol is at or below the train median. Otherwise allocation is 0. This is the fixed baseline. |
+| Regime filter | Chosen on train from the buckets whose return interval sits entirely above or below zero: trend, volatility, liquidity, and sentiment when that column is actually populated. News is skipped while it is missing. The sealed test only scores the frozen filter. |
 | Verdict | Deterministic arbiter on the sealed test. An interval that still contains zero is INCONCLUSIVE. A drawdown above 40% cannot be overruled into keep or conditional activation. |
 | 14-day paper plan | Recorded with the experiment. `completed` and `approved` are false. It is not a shadow-run result. |
 | Fills | Real next-bar opens from the klines. PnL is that open to the following open. |
 | Fees and slippage | Assumed: 10 bps Binance spot regular-user taker fee, plus 1 bp slippage. Not a measured fill. |
 | Regimes, splits, Sharpe, drawdown, block-bootstrap intervals | Computed. Cutpoints are fit on the train window only. |
-| LightGBM gate | Fit on the early in-market train rows, calibrated on the last 25% of those rows. Validation is not used to fit the calibrator. The 2 bars before each cut are embargoed, because the label reaches across the cut. `spec()` includes the seed and a hash of the fitted model. It never fits on the test window. |
-| Walk-forward | Four expanding folds inside train only. They do not choose the sealed-test policy. |
+| LightGBM gate | Fit on the early in-market train rows, calibrated on the last 25% of those rows. The allocation band is that tail's base rate ± 2 points, fixed before validation. It is not the old 0.45/0.55 cut. `spec()` includes the seed, the band, and a hash of the fitted model. It never fits on the test window. |
+| Walk-forward | Four expanding folds inside train only. They do not choose the sealed-test policy. If the gate loses on every scored fold, that loss is written into the run notes. |
 | 14-day range | A block-bootstrap range from training returns, stored on the unstarted paper plan. A later result inside it is a plausible draw, not proof the strategy broke. |
 | Fee check | Always-on on validation at half, one, and double the assumed cost. The arbiter does not read it. |
-| Holdout | The last 20% of the real timeline. `run_experiment` scores the four pre-registered policies there once. `GateRunner.evaluate` refuses that split. |
+| Holdout | The last 20% of the real timeline. `run_experiment` scores the pre-registered policies there once. `GateRunner.evaluate` refuses that split. |
 
 The synthetic series is still in the package so the fill, leakage, and cost tests can force a close spike. It is not what `scripts/run_experiment.py` runs.
 

@@ -90,7 +90,7 @@ experiments/        run manifests, hashes, outputs
 tests/              no-future-data, execution lag, switching costs, holdout isolation, baselines
 ```
 
-Lane A’s code is in [`A/`](A/). The simple rule can allocate 0. A deterministic arbiter returns KEEP, ACTIVATE CONDITIONALLY, REDUCE, MONITOR, KILL, or INCONCLUSIVE from the sealed test, and a 14-day paper plan is stored with `completed=false`. News is still omitted.
+Lane A’s code is in [`A/`](A/). The simple rule can allocate 0. A train-only regime filter can sit a strategy out where its own interval is entirely below zero. The arbiter returns KEEP, MODIFY, RESTRICT, MONITOR, KILL, or INCONCLUSIVE from the sealed test. COMBINE needs a second strategy, so a one-book run does not emit it. The 14-day paper plan records the policy that verdict chose, with `completed=false`. News is still omitted.
 
 `python3 scripts/run_investigation.py --lane-a --fallback` runs Lane B's deterministic agents on Lane A's loader. That view keeps the test window's dates and drops its metrics, the verdict, and the paper plan. `--frozen` then scores the accepted champion once. `plusev/` and the Streamlit app are the earlier kit and do not call this path.
 

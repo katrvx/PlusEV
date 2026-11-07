@@ -32,6 +32,7 @@ from kok_a.contracts import (
 from kok_a.features import FEATURE_COLUMNS, build_frame, coverage_table
 from kok_a.gates import allocation, rule_gate_spec
 from kok_a.lgbm_gate import LGBMGate
+from kok_a.regimes import discover_regime_filter, fit_regime_labels
 from kok_a.market import epoch_microseconds, hash_ohlcv
 from kok_a.simulate import ANNUALIZATION, FEE_BPS, SLIPPAGE_BPS, block_ci, simulate
 from kok_a.snapshot import SNAPSHOT_READY, SNAPSHOT_SYNTHETIC, load_inputs
@@ -39,6 +40,7 @@ from kok_a.strategies import positions
 
 QUANTILES = (0.2, 0.33, 0.5, 0.67, 0.8)
 SPLITS = ("train", "validation", "test")
+SCORED = ("always_on", "cash", "simple_rule", "regime_filter", "lgbm_gate")
 EMBARGO_BARS = 2
 WALK_FORWARD_FOLDS = 4
 PAPER_HORIZON_BARS = 14 * 24
@@ -255,8 +257,8 @@ def assemble(
     version, sample = _analysis_sample(frame, strategy_id, external_positions)
     labels, thresholds = fit_regime_labels(sample)
     sample = sample.copy()
-    sample["trend_regime"] = labels["trend_regime"]
-    sample["vol_regime"] = labels["vol_regime"]
+    for column in labels.columns:
+        sample[column] = labels[column].to_numpy()
     model = _fit_lgbm(sample, seed=seed, n_estimators=n_estimators)
     quantiles = _train_quantiles(sample)
     market_hash = hash_ohlcv(ohlcv)
@@ -272,12 +274,16 @@ def assemble(
         slippage_bps=slip,
     )
     rule = rule_gate_spec(sample[sample["split"] == "train"])
+    always_path = simulate(sample, pd.Series(1.0, index=sample.index), fee_bps=fee, slippage_bps=slip)
+    regime = discover_regime_filter(sample, always_path, seed, n_boot)
     runner.rule_spec = rule
+    runner.regime_spec = regime
 
     named_policies: list[tuple[str, dict]] = [
         ("always_on", {"policy_id": "always_on", "family": "always_on"}),
         ("cash", {"policy_id": "cash", "family": "cash"}),
         ("simple_rule", rule),
+        ("regime_filter", regime),
         ("lgbm_gate", model.spec()),
     ]
     if policy_spec is not None:
@@ -286,23 +292,23 @@ def assemble(
     baselines: list[BaselineRow] = []
     scored: dict[tuple[str, str], GateEvaluation] = {}
     for name, spec in named_policies:
-        splits = SPLITS if name in ("always_on", "cash", "simple_rule", "lgbm_gate") else ("train", "validation")
+        splits = SPLITS if name in SCORED else ("train", "validation")
         if policy_spec is not None and spec is policy_spec and policy_spec.get("frozen_for_holdout"):
             splits = SPLITS
         for split in splits:
-            if split == "test" and name not in ("always_on", "cash", "simple_rule", "lgbm_gate"):
+            if split == "test" and name not in SCORED:
                 evaluation = runner.evaluate_frozen(spec)
             else:
                 evaluation = runner._score(spec, split, reveal=SPLITS)
             scored[(name, split)] = evaluation
             baselines.append(BaselineRow(split=split, policy=name, metrics=evaluation.metrics))  # type: ignore[arg-type]
 
-    always = simulate(sample, pd.Series(1.0, index=sample.index), fee_bps=fee, slippage_bps=slip)
+    always = always_path
     train_net = always.loc[sample["split"] == "train", "net"].to_numpy(dtype=float)
     horizon_range = _predictive_range(train_net, _rng(seed, "paper", "range"), n_boot)
     experiment_id = f"exp_{signal_hash[:12]}"
     n_test = int((sample["split"] == "test").sum())
-    decision = decide({name: scored[(name, "test")] for name in ("always_on", "cash", "simple_rule", "lgbm_gate")}, n_test)
+    decision = decide({name: scored[(name, "test")] for name in SCORED}, n_test)
     plan = build_paper_plan(
         experiment_id,
         strategy_id,
@@ -311,6 +317,7 @@ def assemble(
         f"{fee:.0f} bps fee + {slip:.0f} bp slippage on |change in exposure|",
         horizon_range,
     )
+    folds = _walk_forward(sample, seed, n_estimators, fee, slip)
     result = ExperimentResult(
         experiment_id=experiment_id,
         strategy_id=strategy_id,
@@ -327,32 +334,27 @@ def assemble(
         audit_ids=[
             f"market_{market_hash}",
             f"signals_{signal_hash}",
-            "pre_registered_holdout:always_on,cash,simple_rule,lgbm_gate",
+            "pre_registered_holdout:" + ",".join(SCORED),
         ],
         equity=_equity(sample, always),
         comparison_equity=_comparison_equity(sample, runner, fee, slip),
-        walk_forward=_walk_forward(sample, seed, n_estimators, fee, slip),
+        walk_forward=folds,
         fee_checks=_fee_checks(sample, fee, slip),
         provenance=provenance,
-        notes=_notes(thresholds, provenance, decision.verdict, fee, slip, imported=external_positions is not None),
+        notes=_notes(
+            thresholds,
+            provenance,
+            decision.verdict,
+            fee,
+            slip,
+            imported=external_positions is not None,
+            regime_summary=str(regime.get("summary", "")),
+            walk_forward_line=_walk_forward_line(folds),
+        ),
         decision=decision,
         paper_plan=plan,
     )
     return Bundle(result=result, runner=runner, frame=sample, lgbm=model, quantiles=quantiles, thresholds=thresholds)
-
-
-def fit_regime_labels(frame: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
-    """Three lagged-trend buckets, plus a high/low vol bucket. Cutpoints come from train only."""
-
-    train = frame[frame["split"] == "train"]
-    lo, hi = (float(v) for v in train["momentum_24h"].quantile([1.0 / 3.0, 2.0 / 3.0]))
-    vol_median = float(train["realized_vol_7d"].median())
-    momentum = frame["momentum_24h"].to_numpy(dtype=float)
-    vol = frame["realized_vol_7d"].to_numpy(dtype=float)
-    trend = np.where(momentum > hi, "bull", np.where(momentum < lo, "bear", "sideways"))
-    vol_bucket = np.where(vol > vol_median, "high", "low")
-    labels = pd.DataFrame({"trend_regime": trend, "vol_regime": vol_bucket}, index=frame.index)
-    return labels, {"momentum_terciles": [lo, hi], "vol_median": vol_median}
 
 
 def summarize(result: ExperimentResult) -> str:
@@ -494,8 +496,9 @@ def _regime_rows(frame: pd.DataFrame, always: pd.DataFrame, seed: int, n_boot: i
     rows: list[RegimeRow] = []
     for split in SPLITS:
         in_split = frame["split"] == split
-        for feature in ("trend_regime", "vol_regime"):
-            for bucket in sorted(frame.loc[in_split, feature].unique()):
+        for feature in [column for column in frame.columns if column.endswith("_regime")]:
+            buckets = [bucket for bucket in frame.loc[in_split, feature].dropna().unique()]
+            for bucket in sorted(str(item) for item in buckets):
                 mask = in_split & (frame[feature] == bucket)
                 part = always.loc[mask]
                 lo, hi = block_ci(part["net"].to_numpy(), _rng(seed, feature, split, str(bucket)), n_boot=n_boot)
@@ -603,6 +606,7 @@ def _comparison_equity(frame: pd.DataFrame, runner: GateRunner, fee_bps: float, 
         "always_on": {"policy_id": "always_on", "family": "always_on"},
         "cash": {"policy_id": "cash", "family": "cash"},
         "simple_rule": runner.rule_spec,
+        "regime_filter": runner.regime_spec,
         "lgbm_gate": runner.lgbm.spec(),
     }
     curves: dict[str, np.ndarray] = {}
@@ -618,6 +622,7 @@ def _comparison_equity(frame: pd.DataFrame, runner: GateRunner, fee_bps: float, 
             rule=float(curves["simple_rule"][i]),
             lgbm=float(curves["lgbm_gate"][i]),
             cash=float(curves["cash"][i]),
+            regime=float(curves["regime_filter"][i]),
         )
         for i in range(len(frame))
     ]
@@ -835,8 +840,10 @@ def _notes(
     fee_bps: float,
     slippage_bps: float,
     imported: bool,
+    regime_summary: str,
+    walk_forward_line: str,
 ) -> list[str]:
-    lo, hi = thresholds["momentum_terciles"]
+    lo, hi = thresholds.get("momentum_terciles", [float("nan"), float("nan")])
     cost_per_unit = (fee_bps + slippage_bps) / 10_000
     origin = (
         "Positions are the imported target_position series, aligned to this snapshot's hourly decision times. "
@@ -850,21 +857,47 @@ def _notes(
         origin,
         f"Cost is assumed, not measured: {fee_bps:.0f} bps fee + {slippage_bps:.0f} bp slippage "
         f"({cost_per_unit:.4%} of notional per unit of exposure change). No funding.",
-        f"Trend regimes are train terciles of lagged 24h momentum ({lo:.5f}, {hi:.5f}); "
-        f"vol regime splits at the train median {thresholds['vol_median']:.5f}.",
+        f"Regime cutpoints are fit on train only ({', '.join(thresholds.get('axes', []))}): "
+        f"24h momentum terciles ({lo:.5f}, {hi:.5f}), "
+        f"vol median {thresholds.get('vol_median', float('nan')):.5f}. "
+        "An axis is omitted when its train coverage is below 90%.",
         "The simple rule allocates 1 when 24h momentum is positive and 7d vol is at or below "
         "the train median, and 0 otherwise.",
+        regime_summary,
         "The label is the next open-to-open return, so the last 2 bars of train are embargoed, "
         "and so is the cut inside train. LightGBM fits on the early in-market train rows and "
-        "calibrates on the last 25% of those rows. Validation is not used to fit the calibrator.",
-        "Expanding walk-forward folds stay inside train. They are a stability check, not a way to pick the sealed-test policy.",
+        "calibrates on the last 25% of those rows. Its allocation band is that tail's base rate "
+        "plus or minus 2 points, fixed before validation. Validation is not used to fit the calibrator.",
+        walk_forward_line,
         "Fee checks resimulate always-on on validation at half, one, and double the assumed cost. The arbiter does not read them.",
         "Spot venue: funding is zero. News is omitted because this snapshot has no first-seen archive.",
         "The test split is scored inside run_experiment only for the pre-registered "
-        "always-on, cash, simple-rule and LightGBM policies. GateRunner.evaluate refuses it.",
+        "always-on, cash, simple-rule, regime-filter and LightGBM policies. GateRunner.evaluate refuses it.",
         f"Verdict {verdict} comes from the deterministic arbiter in kok_a.arbiter. "
         "An interval that still contains zero is INCONCLUSIVE. The 14-day paper plan is recorded and not started.",
     ]
+
+
+def _walk_forward_line(folds: list[WalkForwardFold]) -> str:
+    """One sentence for the notes. The folds stay inside train and do not pick the sealed policy."""
+
+    scored = [fold for fold in folds if fold.delta_net_return_vs_always_on is not None]
+    if not scored:
+        return (
+            "Walk-forward stays inside train and does not choose the sealed-test policy. "
+            "This run had no scored fold."
+        )
+    deltas = ", ".join(f"{fold.delta_net_return_vs_always_on:+.1%}" for fold in scored)
+    if all(fold.delta_net_return_vs_always_on < 0 for fold in scored):
+        return (
+            f"Honest negative: inside train, the LightGBM gate lost to always-on on all {len(scored)} "
+            f"scored walk-forward folds ({deltas}). These folds do not choose the sealed-test policy."
+        )
+    wins = sum(fold.delta_net_return_vs_always_on > 0 for fold in scored)
+    return (
+        f"Walk-forward inside train: the LightGBM gate beat always-on on {wins} of {len(scored)} "
+        f"scored folds ({deltas}). These folds do not choose the sealed-test policy."
+    )
 
 
 def _hash_signals(frame: pd.DataFrame) -> str:

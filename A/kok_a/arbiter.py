@@ -2,8 +2,8 @@
 
 Rules are pre-registered. A positive point estimate whose interval still
 contains zero is INCONCLUSIVE. A drawdown past the cap cannot be overruled
-into KEEP or ACTIVATE CONDITIONALLY. COMBINE is out of scope: one experiment
-is one strategy.
+into KEEP or MODIFY. COMBINE is a second strategy; this arbiter only sees
+overlays on the one book it was given.
 """
 
 from __future__ import annotations
@@ -17,14 +17,18 @@ DRAWDOWN_CAP = 0.40
 DRAWDOWN_SLACK = 0.05
 MIN_PARTICIPATION = 0.05
 MAX_PARTICIPATION = 0.95
-CHALLENGERS = ("simple_rule", "lgbm_gate")
-REQUIRED = ("always_on", "cash", "simple_rule", "lgbm_gate")
+CHALLENGERS = ("simple_rule", "regime_filter", "lgbm_gate")
+REQUIRED = ("always_on", "cash")
+OVERLAYS = {"MODIFY", "RESTRICT", "COMBINE"}
 
 
 def decide(by_policy: dict[str, GateEvaluation], n_test: int) -> Decision:
     missing = [name for name in REQUIRED if name not in by_policy]
     if missing:
         raise KeyError(f"arbiter needs {missing}")
+    challengers = [name for name in CHALLENGERS if name in by_policy]
+    if not challengers:
+        raise KeyError(f"arbiter needs one of {CHALLENGERS}")
     for name, evaluation in by_policy.items():
         if evaluation.split != "test":
             raise ValueError(f"{name} was scored on {evaluation.split}, not the sealed test")
@@ -39,11 +43,11 @@ def decide(by_policy: dict[str, GateEvaluation], n_test: int) -> Decision:
             evidence,
         )
 
-    qualified = [by_policy[name] for name in CHALLENGERS if _beats_always_on(by_policy[name], always)]
+    qualified = [by_policy[name] for name in challengers if _beats_always_on(by_policy[name], always)]
     if qualified:
         best = max(qualified, key=lambda item: item.delta_net_return_vs_always_on)
         return _decision(
-            "ACTIVATE CONDITIONALLY",
+            "MODIFY",
             best.policy_id,
             [
                 f"{best.policy_id} beat always-on on the sealed test. "
@@ -53,7 +57,7 @@ def decide(by_policy: dict[str, GateEvaluation], n_test: int) -> Decision:
             evidence,
         )
 
-    risky = [by_policy[name] for name in CHALLENGERS if _would_activate_except_for_drawdown(by_policy[name], always)]
+    risky = [by_policy[name] for name in challengers if _would_activate_except_for_drawdown(by_policy[name], always)]
     if risky:
         names = ", ".join(item.policy_id for item in risky)
         return _decision(
@@ -80,14 +84,20 @@ def decide(by_policy: dict[str, GateEvaluation], n_test: int) -> Decision:
         )
 
     if always.metrics.max_drawdown > DRAWDOWN_CAP:
-        rule = by_policy["simple_rule"]
-        if rule.metrics.exposure < always.metrics.exposure and rule.metrics.max_drawdown <= DRAWDOWN_CAP:
+        reducers = [
+            by_policy[name]
+            for name in challengers
+            if by_policy[name].metrics.exposure < always.metrics.exposure
+            and by_policy[name].metrics.max_drawdown <= DRAWDOWN_CAP
+        ]
+        if reducers:
+            best = min(reducers, key=lambda item: (item.metrics.max_drawdown, -item.metrics.net_return))
             return _decision(
-                "REDUCE",
-                rule.policy_id,
+                "RESTRICT",
+                best.policy_id,
                 [
                     f"Always-on drawdown {always.metrics.max_drawdown:.1%} exceeds the {DRAWDOWN_CAP:.0%} cap. "
-                    "The simple rule participates less and stays inside the cap. "
+                    f"{best.policy_id} participates less and stays inside the cap. "
                     "That is a risk reduction, not a proven improvement.",
                 ],
                 evidence,
@@ -142,12 +152,12 @@ def build_paper_plan(
     cost_assumptions: str,
     predictive_range: tuple[float, float, int] | None = None,
 ) -> PaperPlan:
-    challenger = decision.policy_id if decision.policy_id != "always_on" else "simple_rule"
+    champion, challenger = _paper_pair(decision)
     return PaperPlan(
         plan_id=f"paper_{experiment_id}",
         strategy_id=strategy_id,
         strategy_version=strategy_version,
-        champion_policy_id="always_on",
+        champion_policy_id=champion,
         challenger_policy_id=challenger,
         frozen_at_experiment=experiment_id,
         cost_assumptions=cost_assumptions,
@@ -163,8 +173,7 @@ def _plan_notes(decision: Decision, predictive_range: tuple[float, float, int] |
         "Recorded plan for a 14-day shadow run. It has not been started and it is not a result.",
         "approved is false until a person accepts this frozen champion and challenger.",
         "Retuning either policy after the window starts is a new experiment, not an edit of this plan.",
-        "COMBINE is not offered. This experiment contains one strategy.",
-        f"Arbiter verdict at freeze: {decision.verdict}. Recommended policy: {decision.policy_id}.",
+        f"Arbiter verdict at freeze: {decision.verdict}. Champion: the recommended policy. Challenger: the comparison book.",
     ]
     if predictive_range is not None:
         low, high, horizon = predictive_range
@@ -174,6 +183,18 @@ def _plan_notes(decision: Decision, predictive_range: tuple[float, float, int] |
             "A later paper result inside this range is a plausible draw from the training returns, not by itself evidence the strategy broke."
         )
     return notes
+
+
+def _paper_pair(decision: Decision) -> tuple[str, str]:
+    """The frozen pair is the policy the verdict chose, compared with the book it replaces."""
+
+    recommended = decision.policy_id
+    if decision.verdict == "KILL":
+        return "cash", "always_on"
+    if decision.verdict in OVERLAYS:
+        return recommended, "always_on"
+    challenger = recommended if recommended not in {"always_on", "cash"} else "simple_rule"
+    return "always_on", challenger
 
 
 def _beats_always_on(evaluation: GateEvaluation, always: GateEvaluation) -> bool:
@@ -225,6 +246,8 @@ def _evidence(by_policy: dict[str, GateEvaluation], n_test: int) -> dict[str, fl
         "always_on_exposure": always.exposure,
     }
     for name in CHALLENGERS:
+        if name not in by_policy:
+            continue
         evaluation = by_policy[name]
         found[f"{name}_delta"] = evaluation.delta_net_return_vs_always_on
         found[f"{name}_max_drawdown"] = evaluation.metrics.max_drawdown

@@ -24,7 +24,7 @@ export type ImportResult = { strategy: Strategy | null; issues: ValidationIssue[
 export type Metric = { label: string; value: number | null; format: "percent" | "number" | "integer"; description: string };
 export type Baseline = { id: string; name: string; net_return: number; sharpe: number; max_drawdown: number; exposure: number; turnover: number; trades: number };
 export type EquityPoint = { date: string; base: number; rule: number; proposed: number; cash: number };
-export type Regime = { id: string; trend: string; volatility: string; net_return: number; trades: number; confidence_low: number; confidence_high: number; evidence_id: string };
+export type Regime = { id: string; trend: string; volatility: string; net_return: number; trades: number; confidence_low: number; confidence_high: number; evidence_id: string; label?: string };
 export type Evidence = { id: string; title: string; kind: string; summary: string; source: string; window: string; facts: { label: string; value: string }[] };
 export type ResearchStep = { id: string; role: string; action: string; title: string; body: string; status: "complete" | "rejected" | "running" | "pending"; tool: string; evidence_ids: string[]; timestamp: string };
 export type Hypothesis = { id: string; title: string; status: "supported" | "rejected" | "inconclusive"; finding: string; evidence_ids: string[] };
@@ -36,7 +36,7 @@ export type Experiment = {
   windows: { train: string; validation: string; test: string };
   metrics: Metric[]; baselines: Baseline[]; equity: EquityPoint[]; regimes: Regime[];
   evidence: Evidence[]; steps: ResearchStep[]; hypotheses: Hypothesis[];
-  verdict: "CONDITIONAL" | "KEEP" | "KILL" | "REDUCE" | "MONITOR" | "INCONCLUSIVE";
+  verdict: "KEEP" | "MODIFY" | "COMBINE" | "RESTRICT" | "MONITOR" | "KILL" | "INCONCLUSIVE" | "CONDITIONAL" | "REDUCE";
   recommendation: string; limitations: string[];
   policy: { description: string; conditions: string[]; holdout_frozen: boolean; test_evaluated: boolean };
 };

@@ -1,9 +1,9 @@
 """LightGBM gate. Fit on early train, calibrate on the last 25% of train.
 
-Validation stays untouched, so a validation score is not an in-sample
-calibration. Thresholds that map probability to {0, 0.5, 1} are preselected,
-not searched. Only bars where the frozen strategy wants exposure are training
-rows: a flat signal has nothing to gate.
+Validation stays untouched. The map from probability to {0, 0.5, 1} is the
+train-tail base rate plus or minus a pre-registered 2 points. It is fixed
+when the calibrator is fit, and it is not searched on validation or the test.
+Only bars where the frozen strategy wants exposure are training rows.
 """
 
 from __future__ import annotations
@@ -24,7 +24,9 @@ DEFAULT_FEATURES = (
     "volume_zscore",
     "fear_greed",
 )
-LOW, HIGH = 0.45, 0.55
+# Used only before calibrate(). The scored gate replaces these with the train-tail base rate ± BAND.
+UNCALIBRATED_LOW, UNCALIBRATED_HIGH = 0.45, 0.55
+BAND = 0.02
 
 
 class LGBMGate:
@@ -47,6 +49,9 @@ class LGBMGate:
         self.fitted_on: str | None = None
         self.calibrated_on: str | None = None
         self.train_rows: int = 0
+        self.base_rate: float | None = None
+        self.low = UNCALIBRATED_LOW
+        self.high = UNCALIBRATED_HIGH
 
     @staticmethod
     def _check(split: str) -> None:
@@ -60,6 +65,8 @@ class LGBMGate:
         self.train_rows = int(len(context))
         self.calibrator = None
         self.calibrated_on = None
+        self.base_rate = None
+        self.low, self.high = UNCALIBRATED_LOW, UNCALIBRATED_HIGH
         return self
 
     def calibrate(self, context: pd.DataFrame, opportunity_return: pd.Series, split: str = "train") -> "LGBMGate":
@@ -68,7 +75,11 @@ class LGBMGate:
             raise RuntimeError("calibrate() called before fit()")
         raw = self.model.predict_proba(context[self.features])[:, 1]
         self.calibrator = IsotonicRegression(out_of_bounds="clip", y_min=0.0, y_max=1.0)
-        self.calibrator.fit(raw, (opportunity_return > 0).astype(int))
+        labels = (opportunity_return > 0).astype(int)
+        self.calibrator.fit(raw, labels)
+        self.base_rate = float(labels.mean())
+        self.low = self.base_rate - BAND
+        self.high = self.base_rate + BAND
         self.calibrated_on = "train_tail"
         return self
 
@@ -80,7 +91,7 @@ class LGBMGate:
 
     def allocation(self, context: pd.DataFrame) -> pd.Series:
         probability = self.proba(context)
-        out = np.where(probability > HIGH, 1.0, np.where(probability < LOW, 0.0, 0.5))
+        out = np.where(probability > self.high, 1.0, np.where(probability < self.low, 0.0, 0.5))
         return pd.Series(out, index=context.index, dtype=float)
 
     def model_hash(self) -> str | None:
@@ -100,7 +111,9 @@ class LGBMGate:
             "policy_id": "meta::lgbm_gate_v1",
             "family": "lgbm_gate",
             "features": self.features,
-            "thresholds": [LOW, HIGH],
+            "thresholds": [self.low, self.high],
+            "base_rate": self.base_rate,
+            "band": BAND,
             "fitted_on": self.fitted_on,
             "calibrated_on": self.calibrated_on,
             "seed": self.seed,

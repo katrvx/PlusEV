@@ -166,7 +166,7 @@ def test_btcusdt_hourly_positions_are_measured(monkeypatch: pytest.MonkeyPatch, 
     assert any(row["id"] == "always_on" for row in experiment["baselines"])
     assert experiment["equity"][0]["date"].startswith("2024-11")
     assert "illustrative" not in experiment["message"].lower()
-    assert experiment["verdict"] in {"CONDITIONAL", "KEEP", "KILL", "MONITOR", "INCONCLUSIVE", "REDUCE"}
+    assert experiment["verdict"] in {"KEEP", "MODIFY", "COMBINE", "RESTRICT", "MONITOR", "KILL", "INCONCLUSIVE", "CONDITIONAL", "REDUCE"}
     report_path = tmp_path / "experiments" / f"investigation_{experiment['experiment_id']}.json"
     assert report_path.is_file()
     report = json.loads(report_path.read_text())

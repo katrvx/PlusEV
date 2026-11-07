@@ -21,16 +21,20 @@ SNAPSHOT_ID = "binance-spot-btcusdt-1h-202411-202610"
 HOURLY = {"1h", "1hr", "1hour", "60m", "60min", "hourly"}
 VERDICT_FOR_UI = {
     "KEEP": "KEEP",
-    "KILL": "KILL",
+    "MODIFY": "MODIFY",
+    "COMBINE": "COMBINE",
+    "RESTRICT": "RESTRICT",
     "MONITOR": "MONITOR",
+    "KILL": "KILL",
     "INCONCLUSIVE": "INCONCLUSIVE",
-    "ACTIVATE CONDITIONALLY": "CONDITIONAL",
-    "REDUCE": "REDUCE",
+    "ACTIVATE CONDITIONALLY": "MODIFY",
+    "REDUCE": "RESTRICT",
 }
 POLICY_NAMES = {
     "always_on": "Original strategy",
     "cash": "Cash",
     "simple_rule": "Simple trend / vol rule",
+    "regime_filter": "Regime filter",
     "lgbm_gate": "LightGBM gate",
     "agent_gate": "Suggested rule",
 }
@@ -254,11 +258,14 @@ def _present(
 
 
 def _short_policy(policy_id: str, bundle: Any) -> str:
-    if policy_id in {"always_on", "cash", "simple_rule", "lgbm_gate"}:
+    if policy_id in {"always_on", "cash", "simple_rule", "regime_filter", "lgbm_gate"}:
         return policy_id
     rule = getattr(bundle.runner, "rule_spec", None) or {}
+    regime = getattr(bundle.runner, "regime_spec", None) or {}
     if policy_id == rule.get("policy_id"):
         return "simple_rule"
+    if policy_id == regime.get("policy_id"):
+        return "regime_filter"
     if policy_id == bundle.lgbm.spec().get("policy_id"):
         return "lgbm_gate"
     return policy_id
@@ -267,7 +274,13 @@ def _short_policy(policy_id: str, bundle: Any) -> str:
 def _equity_from_comparison(points: list[Any], selected: str) -> list[dict[str, Any]]:
     """Chart series Lane A stored. 100 is the index before the first return is applied, scaled from 1.0."""
 
-    field = {"always_on": "base", "cash": "cash", "simple_rule": "rule", "lgbm_gate": "lgbm"}.get(selected, "cash")
+    field = {
+        "always_on": "base",
+        "cash": "cash",
+        "simple_rule": "rule",
+        "lgbm_gate": "lgbm",
+        "regime_filter": "regime",
+    }.get(selected, "cash")
     count = len(points)
     if count == 0:
         return []
@@ -352,6 +365,7 @@ def _regimes(result: Any) -> list[dict[str, Any]]:
                 "id": f"train-{feature}-{bucket}",
                 "trend": bucket if feature == "trend_regime" else "all",
                 "volatility": bucket if feature == "vol_regime" else "all",
+                "label": f"{feature.removesuffix('_regime').replace('_', ' ')}: {bucket}",
                 "net_return": float(row.mean_net_return),
                 "trades": int(row.n_trades),
                 "confidence_low": float(row.ci_low),
@@ -457,7 +471,10 @@ def _recommendation(decision: Any, report: Any) -> str:
 
 def _policy_description(decision: Any, runner: Any) -> str:
     rule = getattr(runner, "rule_spec", None) or {}
-    if decision.policy_id == "simple_rule" and rule:
+    regime = getattr(runner, "regime_spec", None) or {}
+    if decision.policy_id in {regime.get("policy_id"), "regime_filter"} and regime.get("summary"):
+        return str(regime["summary"]) + " The strategy itself is unchanged."
+    if decision.policy_id in {rule.get("policy_id"), "simple_rule"} and rule:
         false_alloc = rule.get("allocation_when_false")
         return (
             "Full size only when 24h momentum is positive and 7d volatility is at or below the train median; "

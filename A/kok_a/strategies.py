@@ -9,15 +9,13 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-STRATEGY_IDS = ("btc-trend-24-72-demo", "btc-meanrev-48-demo")
-
 
 def positions(strategy_id: str, close: pd.Series) -> tuple[str, pd.Series]:
-    if strategy_id == "btc-trend-24-72-demo":
-        return "trend-sma-24-72-v1", _trend(close)
-    if strategy_id == "btc-meanrev-48-demo":
-        return "meanrev-z48-v1", _mean_reversion(close)
-    raise KeyError(f"unknown strategy {strategy_id}; known: {STRATEGY_IDS}")
+    found = STRATEGIES.get(strategy_id)
+    if found is None:
+        raise KeyError(f"unknown strategy {strategy_id}; known: {tuple(STRATEGIES)}")
+    version, generate = found
+    return version, generate(close)
 
 
 def _trend(close: pd.Series) -> pd.Series:
@@ -49,3 +47,9 @@ def _mean_reversion(close: pd.Series) -> pd.Series:
             holding = 0.0
         out[i] = holding
     return pd.Series(out, index=close.index)
+
+
+STRATEGIES = {
+    "btc-trend-24-72-demo": ("trend-sma-24-72-v1", _trend),
+    "btc-meanrev-48-demo": ("meanrev-z48-v1", _mean_reversion),
+}

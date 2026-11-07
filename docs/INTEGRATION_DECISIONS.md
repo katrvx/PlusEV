@@ -2,7 +2,7 @@
 
 Recorded while putting current `main` (Lane B), `lane-c` (the API and web app), and Lane A on one branch. The spec in `KEEP_OR_KILL_PROJECT_SPEC.md` still wins if this note disagrees with it.
 
-Lane A now also carries the spec items that were still open on this lane: 7-day momentum, 14-bar ATR, and trailing price drawdown; a 2-bar embargo on the LightGBM fit; expanding walk-forward folds inside train; a training-distribution range for a 14-day path on the unstarted paper plan; and validation fee checks at half and double cost. News stays omitted because the snapshot has no first-seen archive. Funding stays zero because the venue is spot. The screen can show `REDUCE` as its own verdict. `ACTIVATE CONDITIONALLY` is still stored as `CONDITIONAL`, which is the word the UI already uses.
+Lane A now also carries the spec items that were still open on this lane: 7-day momentum, 14-bar ATR, and trailing price drawdown; a 2-bar embargo on the LightGBM fit; expanding walk-forward folds inside train; a training-distribution range for a 14-day path on the unstarted paper plan; and validation fee checks at half and double cost. News stays omitted because the snapshot has no first-seen archive. Funding stays zero because the venue is spot. The screen shows the arbiter's words: KEEP, MODIFY, RESTRICT, MONITOR, KILL, INCONCLUSIVE. MODIFY is a regime overlay that beat always-on. RESTRICT is a smaller overlay that stays inside the drawdown cap. COMBINE is not emitted for a single book.
 
 ## Which Lane B
 
@@ -52,13 +52,7 @@ An upload's stored `fee_bps` and `slippage_bps` are passed into the simulator. T
 
 Lane A's arbiter remains the verdict. Lane B's `candidate_for_frozen_test` / `INCONCLUSIVE` says whether an agent gate earned one sealed look. It does not replace the arbiter.
 
-The TypeScript `Experiment` type has `CONDITIONAL` and has no `REDUCE`. The API stores a free object, so the mapping is:
-
-- `ACTIVATE CONDITIONALLY` is stored as `CONDITIONAL`. The UI already renders that word as "Activate conditionally".
-- `REDUCE` is stored as `REDUCE`. The pill shows that word. The overview title falls through to the generic "more evidence" line, because the UI has no REDUCE case.
-- `KEEP`, `KILL`, `MONITOR`, and `INCONCLUSIVE` are unchanged.
-
-The recommendation text keeps the arbiter's own verdict string and its reasons, including "ACTIVATE CONDITIONALLY" and "REDUCE".
+The screen stores the arbiter's verdict: `KEEP`, `MODIFY`, `COMBINE`, `RESTRICT`, `MONITOR`, `KILL`, `INCONCLUSIVE`. Older records that still say `ACTIVATE CONDITIONALLY` or `REDUCE` are shown as Modify and Restrict. The recommendation text keeps the arbiter's reasons.
 
 `holdout_frozen` is true on a completed measured run: the pre-registered policies were fixed before the test look. `test_evaluated` is true only when that verdict is not `INCONCLUSIVE`, so an abstention cannot be frozen into a 14-day paper test. Lane A's own paper plan stays `completed=false` and `approved=false`.
 

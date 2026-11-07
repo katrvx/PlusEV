@@ -48,6 +48,22 @@ def rule_gate_spec(train_context: pd.DataFrame) -> dict:
     }
 
 
+def regime_gate_allocation(spec: dict, context: pd.DataFrame) -> pd.Series:
+    """Flat buckets win over full-size buckets. Anything else gets allocation_else."""
+
+    flat = _bucket_mask(context, spec.get("flat_buckets", []))
+    full = _bucket_mask(context, spec.get("full_buckets", []))
+    else_alloc = float(spec.get("allocation_else", 0.5))
+    full_alloc = float(spec.get("allocation_full", 1.0))
+    flat_alloc = float(spec.get("allocation_flat", 0.0))
+    for value in (else_alloc, full_alloc, flat_alloc):
+        _check_multiplier(value)
+    out = np.full(len(context), else_alloc, dtype=float)
+    out = np.where(full.to_numpy(), full_alloc, out)
+    out = np.where(flat.to_numpy(), flat_alloc, out)
+    return pd.Series(out, index=context.index, dtype=float)
+
+
 def allocation(spec: dict, context: pd.DataFrame, lgbm=None) -> pd.Series:
     family = spec["family"]
     if family == "always_on":
@@ -56,11 +72,23 @@ def allocation(spec: dict, context: pd.DataFrame, lgbm=None) -> pd.Series:
         return pd.Series(0.0, index=context.index)
     if family == "threshold_gate":
         return threshold_gate_allocation(spec, context)
+    if family == "regime_gate":
+        return regime_gate_allocation(spec, context)
     if family == "lgbm_gate":
         if lgbm is None:
             raise ValueError("lgbm_gate needs a fitted LGBMGate")
         return lgbm.allocation(context)
     raise ValueError(f"unknown gate family {family}")
+
+
+def _bucket_mask(context: pd.DataFrame, buckets: list) -> pd.Series:
+    mask = pd.Series(False, index=context.index)
+    for item in buckets:
+        column = item["axis"]
+        if column not in context.columns:
+            continue
+        mask |= context[column] == item["bucket"]
+    return mask
 
 
 def _check_multiplier(value: float) -> None:

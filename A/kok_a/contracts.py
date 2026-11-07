@@ -86,10 +86,15 @@ class ComparisonPoint(BaseModel):
     rule: float
     lgbm: float
     cash: float
+    regime: float = 1.0
 
 
 class WalkForwardFold(BaseModel):
-    """One expanding fold inside the train window. It does not see validation or the sealed test."""
+    """One expanding fold inside the train window.
+
+    It does not see validation or the sealed test. A critic may read these
+    folds. The holdout stays sealed.
+    """
 
     fold: int
     n_fit: int
@@ -157,8 +162,9 @@ class GateEvaluation(BaseModel):
 
 Verdict = Literal[
     "KEEP",
-    "ACTIVATE CONDITIONALLY",
-    "REDUCE",
+    "MODIFY",
+    "COMBINE",
+    "RESTRICT",
     "MONITOR",
     "KILL",
     "INCONCLUSIVE",
