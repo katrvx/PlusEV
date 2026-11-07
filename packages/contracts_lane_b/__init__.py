@@ -83,13 +83,18 @@ class ExperimentResult(BaseModel):
 
 
 class GateEvaluation(BaseModel):
-    """Result of evaluating ONE policy spec on ONE development split (Lane A computes it)."""
+    """Result of evaluating ONE policy spec on ONE development split (Lane A computes it).
+
+    Convention: net_return is COMPOUNDED simple return over the split, after costs;
+    delta = metrics.net_return - always_on.net_return; ci_delta is a block-bootstrap 90%
+    interval of that same compounded difference (bars resampled jointly)."""
     policy_id: str
     split: Split
     metrics: Metrics
     always_on: Metrics
     delta_net_return_vs_always_on: float
     ci_delta: tuple[float, float] | None = None
+    allocation_mix: dict[str, float] = Field(default_factory=dict)   # share of decisions at 0 / 0.5 / 1
     audit_id: str
 
 

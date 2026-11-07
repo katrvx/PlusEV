@@ -10,28 +10,37 @@ ALLOWED_MULTIPLIERS = (0.0, 0.5, 1.0)
 
 def threshold_gate_allocation(spec: dict, context: pd.DataFrame) -> pd.Series:
     """All conditions true -> allocation_when_true, else allocation_when_false.
-    Missing feature values are treated conservatively: condition is False."""
+    Missing feature values are conservative: the row gets min(true, false) allocation,
+    whichever direction the gate points."""
     mask = pd.Series(True, index=context.index)
+    missing = pd.Series(False, index=context.index)
     for c in spec["conditions"]:
         x = context[c["feature"]]
-        cond = (x <= c["threshold"]) if c["op"] == "<=" else (x > c["threshold"])
+        if c["op"] == "<=":
+            cond = x <= c["threshold"]
+        elif c["op"] == ">":
+            cond = x > c["threshold"]
+        else:
+            raise ValueError(f"unknown op {c['op']!r}")
+        missing |= x.isna()
         mask &= cond.fillna(False)
-    out = np.where(mask, spec["allocation_when_true"], spec["allocation_when_false"])
+    a_t, a_f = float(spec["allocation_when_true"]), float(spec["allocation_when_false"])
+    out = np.where(mask, a_t, a_f)
+    out = np.where(missing, min(a_t, a_f), out)
     return pd.Series(out, index=context.index, dtype=float)
 
 
-def rule_gate_spec(train_context: pd.DataFrame) -> dict:
+def rule_gate_spec(train_quantiles: dict[str, dict[float, float]]) -> dict:
     """The simple rule baseline (spec: 'lagged market trend and volatility gate with a
-    small fixed parameter set'): full size when 24h momentum is positive and 7d vol is
-    below its training median, otherwise half size. Parameters fixed in advance; only
-    the median is estimated, on TRAIN only."""
-    vol_median = float(train_context["realized_vol_7d"].median())
+    small fixed parameter set'): full size when 24h momentum is positive and 7d vol is at
+    or below its TRAINING median, otherwise half size. Fixed in advance; only the median
+    is estimated, on train."""
     return {
         "policy_id": "rule::trend_up_and_vol_below_train_median",
         "family": "threshold_gate",
         "conditions": [
             {"feature": "momentum_24h", "op": ">", "threshold": 0.0},
-            {"feature": "realized_vol_7d", "op": "<=", "threshold": vol_median},
+            {"feature": "realized_vol_7d", "op": "<=", "threshold": float(train_quantiles["realized_vol_7d"][0.5])},
         ],
         "allocation_when_true": 1.0,
         "allocation_when_false": 0.5,
@@ -52,3 +61,8 @@ def allocation(spec: dict, context: pd.DataFrame, lgbm=None) -> pd.Series:
             raise ValueError("lgbm_gate needs a fitted LGBMGate")
         return lgbm.allocation(context)
     raise ValueError(f"unknown gate family {family}")
+
+
+def allocation_mix(alloc: pd.Series) -> dict[str, float]:
+    """Share of decisions at each multiplier; used to flag degenerate gates."""
+    return {str(k): float((alloc == k).mean()) for k in ALLOWED_MULTIPLIERS}

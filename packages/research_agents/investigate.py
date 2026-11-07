@@ -1,14 +1,17 @@
 """`investigate(experiment_id) -> InvestigationReport` (AGENTS.md Lane B output interface).
 
 Flow:
-  1. diagnostic agent       -> ranked hypotheses with evidence ids        (train + validation regime stats)
-  2. gate proposer          -> allowlisted gates, tested on TRAIN only     (budgeted, every attempt logged)
-  3. arbiter (code)         -> evaluates every candidate on VALIDATION, plus the simple rule and the
-                               LightGBM gate as competitors under identical conditions
-  4. critic agent           -> leakage / overfit / fragility review with evidence ids
-  5. arbiter (code)         -> pre-registered acceptance rule decides which candidates go to the
-                               ONE frozen test; the LLM's confidence cannot override it
-The sealed test split is never touched here. Lane A runs the frozen test.
+  1. diagnostic agent  -> ranked hypotheses from TRAIN regime stats, each claim verified against evidence
+  2. gate proposer     -> allowlisted gates, tested on TRAIN only (own budget, every attempt logged)
+  3. arbiter (code)    -> evaluates every proposal on VALIDATION, plus two competitors under identical
+                          conditions: the simple rule baseline and the LightGBM gate
+  4. critic agent      -> reviews each gate against its own train + validation evidence
+  5. arbiter (code)    -> PRE-REGISTERED rule: among proposals with validation delta > 0, critic approval
+                          and a non-degenerate allocation mix, the ONE with the highest validation delta
+                          becomes the agent champion. Only that champion and the competitors go to the
+                          single frozen test. No champion -> verdict INCONCLUSIVE.
+Any LLM failure (bad output after retries, tool errors, API errors) falls back to the deterministic
+agents for that stage and is recorded in `agent_failures`. The test split is never touched here.
 """
 
 from __future__ import annotations
@@ -16,19 +19,17 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Callable
 
+from packages.meta_policy import rule_gate_spec
+
 from . import fallback
-from .agents import configured_model, run_critic, run_diagnostic, run_proposer
-from .models import CritiqueSet, InvestigationReport, PolicyCandidate
-from .tools import ToolContext
+from .agents import (configured_model, model_name, run_critic, run_diagnostic, run_proposer,
+                     verify_critiques, verify_diagnostic, verify_proposals)
+from .models import CritiqueSet, InvestigationReport, PolicyCandidate, ProposalSet
+from .tools import ToolContext, spec_hash
 
-# Pre-registered rule for which candidates go to the ONE frozen test (stated before any run):
-#  - candidate improves VALIDATION net return vs always-on after costs (delta > 0)
-#  - and the critic approved it, and it is not fragile.
-# Going to the test is not a claim of success: validation CIs are wide, and whether the
-# improvement is real is decided by the sealed test (and reported with its CI) by Lane A.
+DEGENERATE_SHARE = fallback.DEGENERATE_SHARE
 
-
-Loader = Callable[[str], tuple]   # experiment_id -> (ExperimentResult, GateRunner, train_quantiles, news_store|None, lgbm|None)
+Loader = Callable[[str], tuple]   # experiment_id -> (ExperimentResult, GateRunner, train_quantiles, NewsStore|None, LGBMGate|None)
 
 
 def _fixture_loader(experiment_id: str):
@@ -37,81 +38,160 @@ def _fixture_loader(experiment_id: str):
     return exp, runner, tq, None, lgbm
 
 
-def investigate(experiment_id: str, loader: Loader = _fixture_loader, model: str | None = None,
+def _stage(name, llm_call, fallback_call, model, failures: list[str]):
+    if model is not None:
+        try:
+            return llm_call(), True
+        except Exception as exc:  # noqa: BLE001 - any LLM failure must degrade gracefully, and be disclosed
+            failures.append(f"{name}: {type(exc).__name__}: {str(exc)[:300]} -> deterministic fallback used")
+    return fallback_call(), False
+
+
+def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None,
                 force_fallback: bool = False) -> InvestigationReport:
     exp, runner, train_quantiles, news, lgbm = loader(experiment_id)
     ctx = ToolContext(experiment=exp, gate_runner=runner, news=news, train_quantiles=train_quantiles)
     model = None if force_fallback else (model or configured_model())
-    mode = "llm" if model else "deterministic_fallback"
+    failures: list[str] = []
+    limitations: list[str] = []
+    used_llm = []
 
-    # 1-2. hypotheses and proposals
-    if model:
-        diagnostic = run_diagnostic(ctx, model)
-        proposals = run_proposer(ctx, model, diagnostic)
-    else:
-        diagnostic = fallback.diagnose(ctx)
-        proposals = fallback.propose(ctx, diagnostic)
+    # 1. diagnosis
+    diagnostic, ok = _stage("diagnostic", lambda: run_diagnostic(ctx, model), lambda: fallback.diagnose(ctx), model, failures)
+    used_llm.append(ok)
+    if not ok:
+        problems = verify_diagnostic(ctx, diagnostic)
+        if problems:
+            limitations.append("fallback diagnostic verification issues: " + "; ".join(problems))
 
-    # 3. arbiter evaluates every candidate on validation, with competitors
-    competitors = []
+    # 2. proposals (train only)
+    hyp_ids = {h.hypothesis_id for h in diagnostic.hypotheses}
+    proposals, ok = _stage("proposer", lambda: run_proposer(ctx, model, diagnostic), lambda: fallback.propose(ctx, diagnostic), model, failures)
+    used_llm.append(ok)
+    problems = verify_proposals(ctx, proposals, hyp_ids)
+    if problems:   # only possible on the fallback path; drop offending proposals rather than evaluate them
+        bad = {msg.split(":")[0].split(" ")[0] for msg in problems}
+        limitations.append("proposals dropped by verification: " + "; ".join(problems))
+        proposals = ProposalSet(proposals=[p for p in proposals.proposals if p.proposal_id not in bad])
+
+    # 3. arbiter: validation runs for every proposal and both competitors (never budgeted)
     for p in proposals.proposals:
-        ctx.test_gate_train(p.to_policy_spec(), split="validation", source="agent")
+        ctx.arbiter_evaluate(p.to_policy_spec(), "validation", source="arbiter")
+    rule = rule_gate_spec(train_quantiles)
+    ctx.arbiter_evaluate(rule, "validation", source="rule_baseline")
+    competitors = [("rule_baseline", rule)]
     if lgbm is not None:
-        ctx.test_gate_train(lgbm.spec(), split="validation", source="meta_model")
+        ctx.arbiter_evaluate(lgbm.spec(), "validation", source="meta_model")
         competitors.append(("meta_model", lgbm.spec()))
 
+    def val_trial(spec):
+        h = spec_hash(spec)
+        return next((t for t in ctx.trials if t.spec_hash == h and t.split == "validation" and t.status == "evaluated"), None)
+
+    rule_t = val_trial(rule)
+    rule_delta = rule_t.delta_net_return_vs_always_on if rule_t else None
+
     # 4. critic
-    critiques: CritiqueSet = run_critic(ctx, model, proposals) if model else fallback.critique(ctx, proposals)
+    critiques = CritiqueSet.model_construct(critiques=[])
+    if proposals.proposals:
+        critiques, ok = _stage("critic", lambda: run_critic(ctx, model, proposals), lambda: fallback.critique(ctx, proposals), model, failures)
+        used_llm.append(ok)
+        problems = verify_critiques(ctx, critiques, proposals)
+        if problems:
+            limitations.append("critic verification issues: " + "; ".join(problems))
     crit = {c.proposal_id: c for c in critiques.critiques}
 
-    # 5. pre-registered acceptance
-    val = {t.policy_id: t for t in ctx.trials if t.split == "validation" and t.status == "evaluated"}
-    candidates = []
+    # 5. pre-registered selection of at most ONE agent champion
+    rows = []
     for p in proposals.proposals:
-        pid = f"agent::{p.proposal_id}"
-        t, c = val.get(pid), crit.get(p.proposal_id)
-        reasons, ok = [], True
+        spec = p.to_policy_spec()
+        t, c = val_trial(spec), crit.get(p.proposal_id)
+        reasons, eligible = [], True
+        mix = t.allocation_mix if t else {}
         if t is None:
-            ok = False
+            eligible = False
             reasons.append("no validation evaluation")
         else:
-            reasons.append(f"validation delta vs always-on {t.delta_net_return_vs_always_on:+.4f}, CI {t.ci_delta}")
+            reasons.append(f"validation delta vs always-on {t.delta_net_return_vs_always_on:+.4f}, 90% CI {t.ci_delta}")
             if t.delta_net_return_vs_always_on <= 0:
-                ok = False
+                eligible = False
                 reasons.append("does not improve validation after costs")
             if t.ci_delta and t.ci_delta[0] <= 0:
-                reasons.append("note: validation CI includes zero; the frozen test decides")
+                reasons.append("validation CI includes zero; the frozen test decides")
+            if mix and max(mix.values()) >= DEGENERATE_SHARE:
+                eligible = False
+                reasons.append(f"degenerate: one multiplier on {max(mix.values()):.0%} of validation decisions")
         if c is None or c.verdict != "approve_for_frozen_test":
-            ok = False
+            eligible = False
             reasons.append(f"critic verdict: {c.verdict if c else 'missing'}")
         if c and c.fragile_samples:
-            ok = False
+            eligible = False
             reasons.append("fragile: " + "; ".join(c.fragile_samples))
-        candidates.append(PolicyCandidate(policy_id=pid, source="agent", policy_spec=p.to_policy_spec(),
-                                          status="accepted_for_frozen_test" if ok else "rejected", reasons=reasons,
-                                          evidence_ids=[e for e in [*(p.evidence_ids), t.evidence_id if t else None] if e]))
+        rows.append((p, spec, t, c, eligible, reasons))
+
+    eligible_rows = [r for r in rows if r[4]]
+    champion = max(eligible_rows, key=lambda r: r[2].delta_net_return_vs_always_on) if eligible_rows else None
+    candidates = []
+    for p, spec, t, c, eligible, reasons in rows:
+        is_champ = champion is not None and p is champion[0]
+        if eligible and not is_champ:
+            reasons = reasons + ["eligible but not selected: only the highest-validation-delta agent policy goes to the frozen test"]
+        candidates.append(PolicyCandidate(
+            policy_id=spec["policy_id"], spec_hash=spec_hash(spec), source="agent",
+            role="agent_champion" if is_champ else "agent_not_selected",
+            policy_spec=spec, status="accepted_for_frozen_test" if is_champ else "rejected",
+            validation_delta_vs_always_on=t.delta_net_return_vs_always_on if t else None,
+            validation_ci=t.ci_delta if t else None,
+            validation_delta_vs_simple_rule=(t.delta_net_return_vs_always_on - rule_delta) if (t and rule_delta is not None) else None,
+            allocation_mix=t.allocation_mix if t else {}, reasons=reasons,
+            evidence_ids=[e for e in [*p.evidence_ids, t.evidence_id if t else None, *(c.evidence_ids if c else [])] if e],
+        ))
     for source, spec in competitors:
-        t = val.get(spec["policy_id"])
-        candidates.append(PolicyCandidate(policy_id=spec["policy_id"], source=source, policy_spec=spec,
-                                          status="accepted_for_frozen_test", reasons=["competitor: always carried to the frozen test for comparison",
-                                                                                        f"validation delta {t.delta_net_return_vs_always_on:+.4f}" if t else "not evaluated"],
-                                          evidence_ids=[t.evidence_id] if t and t.evidence_id else []))
+        t = val_trial(spec)
+        reasons = ["competitor: always carried to the frozen test for comparison"]
+        if t:
+            reasons.append(f"validation delta vs always-on {t.delta_net_return_vs_always_on:+.4f}, 90% CI {t.ci_delta}")
+            if t.allocation_mix and max(t.allocation_mix.values()) >= DEGENERATE_SHARE:
+                reasons.append(f"degenerate: one multiplier on {max(t.allocation_mix.values()):.0%} of validation decisions")
+        else:
+            reasons.append("validation evaluation failed")
+        candidates.append(PolicyCandidate(
+            policy_id=spec["policy_id"], spec_hash=spec_hash(spec), source=source, role="competitor", policy_spec=spec,
+            status="competitor", validation_delta_vs_always_on=t.delta_net_return_vs_always_on if t else None,
+            validation_ci=t.ci_delta if t else None,
+            validation_delta_vs_simple_rule=(t.delta_net_return_vs_always_on - rule_delta) if (t and rule_delta is not None) else None,
+            allocation_mix=t.allocation_mix if t else {}, reasons=reasons, evidence_ids=[t.evidence_id] if t and t.evidence_id else [],
+        ))
 
-    n_tried = sum(t.status != "refused" for t in ctx.trials)
-    limitations = [
-        f"{n_tried} policies evaluated (including refused attempts: {len(ctx.trials)} logged); results are subject to multiple-comparison risk.",
-        "Validation was used for acceptance; only the frozen test is unbiased.",
-        "Regime effects are associations under lagged features; not causal.",
+    verdict = "candidate_for_frozen_test" if champion else "INCONCLUSIVE"
+    champ_id = champion[1]["policy_id"] if champion else None
+    agent_specs = {t.spec_hash for t in ctx.trials if t.source == "agent" and t.spec_hash}
+    all_specs = {t.spec_hash for t in ctx.trials if t.status == "evaluated" and t.spec_hash}
+    limitations += [
+        f"{len(agent_specs)} distinct agent gate specs attempted ({ctx.agent_tests_used()} agent train tests logged, refused ones included); "
+        f"{len(all_specs)} distinct policies evaluated in total. Multiple-comparison risk applies to train and validation results.",
+        "Validation selected the single agent champion; only the frozen test is an unbiased estimate.",
+        "Regime effects are associations under lagged features, not causal.",
+        "Returns convention: compounded simple returns after costs; deltas and CIs use the same convention (Lane A).",
     ]
-    if mode == "deterministic_fallback":
-        limitations.append("Agents ran in deterministic fallback mode (no LLM configured).")
-    if not exp.coverage.get("news_sentiment", 0) >= 0.9:
+    if verdict == "INCONCLUSIVE":
+        limitations.append("No agent policy met the pre-registered rule; the agent layer adds nothing here. Competitors are still reported.")
+    if not any(used_llm) or model is None:
+        limitations.append("Agents ran in deterministic fallback mode (no LLM).")
+    if exp.coverage.get("news_sentiment", 0) < 0.9:
         limitations.append(f"news_sentiment coverage {exp.coverage.get('news_sentiment', 0):.0%}: not allowed in gates; market-only gating.")
+    if news is None:
+        limitations.append("No news source configured: no news context, no market-only vs market+news ablation.")
 
+    mode = "deterministic_fallback" if (model is None or not any(used_llm)) else ("llm" if all(used_llm) else "llm_with_fallback")
+    to_test = [c.policy_id for c in candidates if c.status in ("accepted_for_frozen_test", "competitor")]
     return InvestigationReport(
         experiment_id=exp.experiment_id, strategy_id=exp.strategy_id, generated_at=datetime.now(timezone.utc),
-        agent_mode=mode, model_id=model, diagnostic=diagnostic, proposals=proposals.proposals, critiques=critiques.critiques,
-        trial_log=ctx.trials, candidates=candidates,
-        test_requests=["Lane A: run always_on, cash, simple_rule and every accepted candidate ONCE on the sealed test split, same costs."],
-        limitations=limitations, evidence=ctx.store.all(), n_policies_tried=n_tried, holdout_accessed=ctx.holdout_accessed,
+        agent_mode=mode, model_id=model_name(model), agent_failures=failures, verdict=verdict, champion_policy_id=champ_id,
+        diagnostic=diagnostic, proposals=proposals.proposals, critiques=critiques.critiques, trial_log=ctx.trials,
+        candidates=candidates,
+        test_requests=[f"Lane A: run ONCE on the sealed test split with identical costs: always_on, cash, {', '.join(to_test)}. "
+                       "Report each vs always_on and vs the simple rule, with CIs. Do not change any policy after seeing the result."],
+        limitations=limitations, evidence=ctx.store.all(), n_distinct_agent_policies=len(agent_specs),
+        n_policies_tried=len(all_specs), holdout_accessed=ctx.holdout_accessed,
     )
