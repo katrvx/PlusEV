@@ -94,8 +94,10 @@ class Critique(BaseModel):
     verdict: Literal["approve_for_frozen_test", "reject", "needs_change"]
     leakage_concerns: list[str] = Field(default_factory=list)
     overfit_risks: list[str] = Field(default_factory=list)
-    fragile_samples: list[str] = Field(default_factory=list)
+    fragile_samples: list[str] = Field(default_factory=list, description="BLOCKING sample-size/fragility issues only; "
+                                                                         "the arbiter treats any entry as disqualifying")
     counterexamples: list[str] = Field(default_factory=list)
+    observations: list[str] = Field(default_factory=list, description="non-blocking remarks")
     evidence_ids: list[str] = Field(min_length=1, description="must include the gate's own evaluation evidence")
 
 

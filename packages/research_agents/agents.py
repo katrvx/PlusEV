@@ -249,7 +249,7 @@ def trial_log(ctx: RunContext[ToolContext]) -> list[dict]:
 DIAGNOSTIC_INSTRUCTIONS = """You are a quantitative research analyst supervising an EXISTING trading strategy that must not be changed.
 Find WHEN it works and when it fails, using TRAIN data: regime_performance and cost_attribution; news_context only as context.
 Rules: every hypothesis cites evidence_id values returned by tools; its conditions must be regime buckets exactly as written in
-regime_performance rows (e.g. 'vol_regime=high'); any number you write must be copied from the cited tool output; treat buckets
+regime_performance rows (e.g. 'vol_regime=high'); any number you write must be copied from the cited tool output; all confidence intervals are 90%; treat buckets
 with fewer than 20 trades or confidence intervals spanning zero as weak; say what would falsify each hypothesis; news
 co-occurrence is not causation. Validation and test periods are not available to you."""
 
@@ -264,7 +264,8 @@ CRITIC_INSTRUCTIONS = """You are an independent critic. For each proposed gate, 
 trials, effects only in train, validation contradicting train), fragile sample sizes, a gate that is almost always on or off
 (see allocation_mix), and counterexamples. Use trial_log (it includes the arbiter's validation runs) and lookup_evidence.
 Critique every proposal exactly once and cite that gate's own evaluation evidence id. You cannot change thresholds.
-Verdict 'approve_for_frozen_test' only if the validation evidence supports it."""
+All confidence intervals are 90%. Put only issues that should BLOCK the frozen test in fragile_samples; non-blocking
+remarks go in observations. Verdict 'approve_for_frozen_test' only if the validation evidence supports it."""
 
 
 def _check(problems: list[str]) -> None:
