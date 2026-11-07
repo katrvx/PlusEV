@@ -21,16 +21,39 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
+import time
 from decimal import Decimal, InvalidOperation
 
 from pydantic import ValidationError
 from pydantic_ai import Agent, ModelRetry, RunContext
+from pydantic_ai.usage import UsageLimits
 
 from .allowlist import ALLOCATIONS, GATE_FEATURES, check_gate
 from .models import CritiqueSet, DiagnosticReport, ProposalSet, ThresholdCondition
 from .tools import HoldoutAccessError, ToolContext, spec_hash
 
 MODEL_ENV = "KOK_AGENT_MODEL"
+
+# Hard bounds so a slow or looping model can never hang the run (any breach -> fallback, disclosed).
+STAGE_TIMEOUT_S = float(os.environ.get("KOK_STAGE_TIMEOUT", "240"))     # whole agent stage
+REQUEST_TIMEOUT_S = float(os.environ.get("KOK_REQUEST_TIMEOUT", "90"))  # single model request
+MAX_REQUESTS = int(os.environ.get("KOK_MAX_REQUESTS", "15"))            # model round-trips per stage
+
+
+def _log(msg: str) -> None:
+    print(f"[agents] {msg}", file=sys.stderr, flush=True)
+
+
+def _run(agent: Agent, prompt: str, ctx: ToolContext, stage: str):
+    _log(f"{stage}: start (timeout {STAGE_TIMEOUT_S:.0f}s, max {MAX_REQUESTS} model requests)")
+    t0 = time.monotonic()
+    result = agent.run_sync(prompt, deps=ctx, timeout=STAGE_TIMEOUT_S,
+                            usage_limits=UsageLimits(request_limit=MAX_REQUESTS),
+                            model_settings={"timeout": REQUEST_TIMEOUT_S, "temperature": 0.2})
+    u = result.usage() if callable(getattr(result, "usage", None)) else None
+    _log(f"{stage}: done in {time.monotonic() - t0:.0f}s" + (f", {u.requests} requests, {u.total_tokens} tokens" if u else ""))
+    return result.output
 
 
 def configured_model() -> str | None:
@@ -155,6 +178,7 @@ def _retry_on_bad_args(fn):
 
 
 def _train_only(ctx: RunContext[ToolContext], split: str) -> dict | None:
+    _log(f"  tool call: split={split!r}")
     if split == "train":
         return None
     if isinstance(split, str) and split.strip().lower() == "test":
@@ -196,6 +220,7 @@ def test_gate_train(ctx: RunContext[ToolContext], conditions: list[ThresholdCond
     """Evaluate a threshold gate on the TRAIN split only. conditions: 1-2 items of
     {"feature": str, "op": "<=" or ">", "threshold": float}; thresholds must come from feature_grid.
     Allocations must be 0.0, 0.5 or 1.0. Every call is logged and counts against a fixed budget."""
+    _log(f"  tool call: test_gate_train {policy_id}")
     spec = {"policy_id": f"agent::{policy_id}", "family": "threshold_gate",
             "conditions": [c.model_dump() if isinstance(c, ThresholdCondition) else c for c in conditions],
             "allocation_when_true": allocation_when_true, "allocation_when_false": allocation_when_false,
@@ -240,6 +265,7 @@ Verdict 'approve_for_frozen_test' only if the validation evidence supports it.""
 
 def _check(problems: list[str]) -> None:
     if problems:
+        _log("  validator rejected output: " + "; ".join(problems)[:300])
         raise ModelRetry("; ".join(problems))
 
 
@@ -281,16 +307,16 @@ def _critic_agent(model, proposals: ProposalSet) -> Agent:
 
 def run_diagnostic(ctx: ToolContext, model) -> DiagnosticReport:
     prompt = f"Strategy {ctx.experiment.strategy_id} (version {ctx.experiment.strategy_version}). Diagnose where it works and fails."
-    return _diagnostic_agent(model).run_sync(prompt, deps=ctx).output
+    return _run(_diagnostic_agent(model), prompt, ctx, "diagnostic")
 
 
 def run_proposer(ctx: ToolContext, model, diagnostic: DiagnosticReport) -> ProposalSet:
     ids = {h.hypothesis_id for h in diagnostic.hypotheses}
     prompt = "Hypotheses:\n" + json.dumps([h.model_dump() for h in diagnostic.hypotheses], indent=1)
-    return _proposer_agent(model, ids).run_sync(prompt, deps=ctx).output
+    return _run(_proposer_agent(model, ids), prompt, ctx, "proposer")
 
 
 def run_critic(ctx: ToolContext, model, proposals: ProposalSet) -> CritiqueSet:
     payload = [{**p.model_dump(), "spec_hash": spec_hash(p.to_policy_spec())} for p in proposals.proposals]
     prompt = "Proposals to critique:\n" + json.dumps(payload, indent=1)
-    return _critic_agent(model, proposals).run_sync(prompt, deps=ctx).output
+    return _run(_critic_agent(model, proposals), prompt, ctx, "critic")

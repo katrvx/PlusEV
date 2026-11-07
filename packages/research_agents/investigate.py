@@ -16,6 +16,7 @@ agents for that stage and is recorded in `agent_failures`. The test split is nev
 
 from __future__ import annotations
 
+import sys
 from datetime import datetime, timezone
 from typing import Callable
 
@@ -43,7 +44,9 @@ def _stage(name, llm_call, fallback_call, model, failures: list[str]):
         try:
             return llm_call(), True
         except Exception as exc:  # noqa: BLE001 - any LLM failure must degrade gracefully, and be disclosed
-            failures.append(f"{name}: {type(exc).__name__}: {str(exc)[:300]} -> deterministic fallback used")
+            msg = f"{name}: {type(exc).__name__}: {str(exc)[:300]} -> deterministic fallback used"
+            print(f"[agents] {msg}", file=sys.stderr, flush=True)
+            failures.append(msg)
     return fallback_call(), False
 
 
