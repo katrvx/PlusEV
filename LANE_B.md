@@ -9,7 +9,7 @@ from packages.research_agents.investigate import investigate
 report = investigate(experiment_id)        # -> InvestigationReport (pydantic), JSON via report.model_dump_json()
 ```
 
-`InvestigationReport` contains: `verdict` (`candidate_for_frozen_test` or `INCONCLUSIVE`), `champion_policy_id` (at most ONE agent policy), ranked hypotheses with evidence ids, gate proposals, critiques, the full trial log (every attempt incl. refused ones, keyed by spec hash), candidates with validation delta vs always-on AND vs the simple rule, CI and allocation mix, test requests for Lane A, limitations, every piece of evidence (raw tool output), `agent_failures`, `n_distinct_agent_policies`, `n_policies_tried`, `holdout_accessed`, and `agent_mode` (`llm`, `llm_with_fallback`, `deterministic_fallback`).
+`InvestigationReport` contains: `verdict` (`candidate_for_frozen_test` if an agent gate earned one sealed look, else `INCONCLUSIVE`; the strategy-level KEEP / ACTIVATE / KILL decision is Lane A's arbiter's, see `docs/INTEGRATION_DECISIONS.md`) with `verdict_basis`, `champion_policy_id` (at most ONE agent policy), validation always-on and cash references, ranked hypotheses with evidence ids, gate proposals, critiques, the full trial log (every attempt incl. refused ones, keyed by spec hash), candidates with validation delta vs always-on, vs cash and vs the simple rule, CI and in-position allocation mix (critic text in reasons is prefixed `critic:`), test requests for Lane A, limitations, every piece of evidence (raw tool output), `agent_failures`, `n_distinct_agent_policies`, `n_policies_tried`, `holdout_accessed`, and `agent_mode` (`llm`, `llm_with_fallback`, `deterministic_fallback`).
 
 ## What's built
 
@@ -30,18 +30,19 @@ report = investigate(experiment_id)        # -> InvestigationReport (pydantic), 
 - **Allowlisted gates only.** `threshold_gate`, 1–2 conditions, features `momentum_24h / realized_vol_7d / volume_zscore / fear_greed / news_sentiment`, allocations `{0, 0.5, 1}`, thresholds must be training-quantile values, features need ≥90% coverage. Anything else is refused and logged.
 - **Budget.** At most 12 agent train tests per investigation; the arbiter's validation runs never consume it. All attempts disclosed.
 - **Agents see train only.** Validation is used only by the arbiter (code); the critic sees validation results through the trial log.
-- **Claims are checked, not just ids.** Numbers in hypotheses/summary must match the cited tool output; regime conditions must be buckets that exist in the cited rows; critiques must cover exactly the real proposals and cite each gate's own evaluation.
+- **Claims are checked, not just ids** (`verify.py`). EVERY text field of all three agents: numbers must be copied from the cited evidence (print rounding only; `%` and `bp` are the only rescalings; integers above 10 must equal an evidence count; explicit signs must match; number words and `3.5x` count as numbers; only the CI label `90%` is free). Regime conditions must exist in the cited rows; `high` confidence needs |mean| > CI width; critiques must cover exactly the real proposals, cite each gate's own evaluation, and may not 'approve' while listing blocking fragility.
 - **Results keyed by spec hash**, so two proposals with the same name can never share a result; duplicate ids are rejected.
 - **Robust to LLM failure.** Bad tool arguments become retries; any LLM stage failure falls back to the deterministic agent and is listed in `agent_failures`.
 - **Missing data is conservative**: a row with a missing gate feature gets min(allocation_when_true, allocation_when_false).
 - **No strategy changes, no code execution, no orders.** Gates output multipliers only.
 - **News is point-in-time.** Visible only if `first_seen_at <= decision cutoff`; coverage reported; never used in a gate unless coverage ≥ 90%.
-- **The arbiter is code.** Pre-registered rule: among agent proposals with validation delta > 0, critic approval and a non-degenerate allocation mix (no multiplier on >= 95% of decisions), the ONE with the highest validation delta is the champion. Only it plus the competitors (simple rule, LightGBM) go to the single frozen test. No champion -> `INCONCLUSIVE`. LLM confidence cannot override it.
+- **The arbiter is code.** Pre-registered rule (docstring of `investigate.py`): an agent proposal is eligible iff on validation it beats always-on (finite delta > 0, finite CI), beats cash (own net return > 0), is not degenerate (no multiplier on >= 95% of IN-POSITION bars) and is not vetoed by the critic. The eligible one with the highest validation delta is the single champion; only it plus the competitors (simple rule, LightGBM) go to the frozen test. No champion -> `INCONCLUSIVE`, and `verdict_basis` tells Lane A's arbiter when the unchanged strategy loses to cash.
+- **Timeouts are honest.** Stage timeout, request timeout and request limit; tool calls that finish after their stage ended are logged (status `error`, note `abandoned: ...`) and disclosed. `agent_mode` stays within the Lane C contract (`llm` / `llm_with_fallback` / `deterministic_fallback`).
 - **LightGBM is out-of-sample on validation**: fitted on early train, calibrated on late train, band preselected around the calibration base rate.
 
 ## Adversarial review
 
-An independent agent attacked Lane B on 7 Nov (18 findings, 17 reproduced). All critical and high findings are fixed and each has a regression test (38 tests total). Remaining known gaps: no Context/News agent yet, no `get_strategy_health` / `run_bootstrap` tools, no news data, the LLM path has only been exercised with scripted models, and the Lane A stand-in is synthetic.
+Two independent agents attacked Lane B on 7 Nov. Round 1: 18 findings (17 reproduced). Round 2, after the first real Gemini 4 Argon run: 17 findings (16 reproduced), incl. a claim verifier that accepted almost any number, '95% CI' written 4 times in the Argon report, mixed return conventions in the stand-in ('strategy underperforms always-on'), and no comparison with cash. All critical/high findings of both rounds are fixed with regression tests (68 tests total). Note: with the corrected bootstrap (2000 draws, seeded by spec), the stand-in's 'high volatility' effect on train is borderline (90% CI upper bound just above zero), so the strict deterministic fallback now proposes no gate; we did not retune the synthetic data to change that. Remaining known gaps: no Context/News agent yet, no `get_strategy_health` / `run_bootstrap` tools, no news data, the LLM path has only been exercised with scripted models, and the Lane A stand-in is synthetic.
 
 ## Run on Lane A
 
@@ -59,7 +60,7 @@ python3 scripts/run_investigation.py --lane-a --fallback --frozen
 
 ```bash
 pip install "pydantic-ai-slim[google]" lightgbm scikit-learn pandas numpy pytest
-python3 -m pytest -q tests/test_lane_b.py          # 38 guardrail + regression tests
+python3 -m pytest -q tests/test_lane_b.py          # 68 guardrail + regression tests
 python3 scripts/run_investigation.py --fallback     # deterministic agents
 KOK_AGENT_MODEL=google:gemini-3.8-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
 ```

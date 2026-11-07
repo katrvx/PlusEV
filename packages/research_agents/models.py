@@ -123,9 +123,10 @@ class TrialRecord(BaseModel):
     split: Literal["train", "validation", "test"]
     delta_net_return_vs_always_on: float | None
     ci_delta: tuple[float, float] | None
+    net_return: float | None = None              # the policy's own compounded net return (= delta vs cash)
     allocation_mix: dict[str, float] = Field(default_factory=dict)
     evidence_id: str | None
-    status: Literal["evaluated", "refused", "error"]
+    status: Literal["evaluated", "refused", "error"]   # late results after a stage timeout: "error" with note "abandoned: ..."
     note: str = ""
 
 
@@ -139,8 +140,9 @@ class PolicyCandidate(BaseModel):
     validation_delta_vs_always_on: float | None = None
     validation_ci: tuple[float, float] | None = None
     validation_delta_vs_simple_rule: float | None = None
-    allocation_mix: dict[str, float] = Field(default_factory=dict)
-    reasons: list[str]
+    validation_delta_vs_cash: float | None = None
+    allocation_mix: dict[str, float] = Field(default_factory=dict, description="share of IN-POSITION decisions at each multiplier")
+    reasons: list[str] = Field(description="arbiter reasons; text quoted from the critic is prefixed 'critic:'")
     evidence_ids: list[str]
 
 
@@ -148,11 +150,15 @@ class InvestigationReport(BaseModel):
     experiment_id: str
     strategy_id: str
     generated_at: datetime
-    agent_mode: Literal["llm", "deterministic_fallback", "llm_with_fallback"]
+    agent_mode: Literal["llm", "llm_with_fallback", "deterministic_fallback"]   # Lane C / API contract
     model_id: str | None
     agent_failures: list[str] = Field(default_factory=list)
-    verdict: Literal["candidate_for_frozen_test", "INCONCLUSIVE"]
+    verdict: Literal["candidate_for_frozen_test", "INCONCLUSIVE"]   # did an agent gate earn one sealed look?
+    # (the strategy-level KEEP / ACTIVATE / KILL decision belongs to Lane A's arbiter: docs/INTEGRATION_DECISIONS.md)
+    verdict_basis: list[str] = Field(default_factory=list)
     champion_policy_id: str | None
+    validation_always_on: dict = Field(default_factory=dict)   # net return + CI of the unchanged strategy on validation
+    validation_cash_net_return: float = 0.0
     diagnostic: DiagnosticReport
     proposals: list[GateProposal]
     critiques: list[Critique]

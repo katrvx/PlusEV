@@ -10,6 +10,7 @@ features known at t, exposure earns the t -> t+1 return, cost c * |q_t - q_{t-1}
 from __future__ import annotations
 
 import hashlib
+import json
 from datetime import datetime, timedelta, timezone
 
 import numpy as np
@@ -88,7 +89,7 @@ def _compound(x: np.ndarray) -> float:
     return float(np.prod(1 + x) - 1)
 
 
-def _boot_ci(series: list[np.ndarray], stat, rng, n_boot: int = 600, block: int = 48) -> tuple[float, float]:
+def _boot_ci(series: list[np.ndarray], stat, rng, n_boot: int = 2000, block: int = 48) -> tuple[float, float]:
     """Moving-block bootstrap; all series are resampled with the SAME indices (paired)."""
     n = len(series[0])
     if n < block * 2:
@@ -98,6 +99,12 @@ def _boot_ci(series: list[np.ndarray], stat, rng, n_boot: int = 600, block: int 
         idx = _block_indices(n, rng, block)
         vals.append(stat(*[s[idx] for s in series]))
     return float(np.quantile(vals, .05)), float(np.quantile(vals, .95))
+
+
+def _spec_key(spec: dict) -> str:
+    """Seed key from what the policy DOES (name and metadata excluded), so a renamed spec gets the same CI."""
+    body = {k: v for k, v in spec.items() if k not in ("policy_id", "thresholds_selected_on")}
+    return json.dumps(body, sort_keys=True, default=lambda x: round(float(x), 12))
 
 
 def metrics(sim: pd.DataFrame, rng) -> Metrics:
@@ -136,14 +143,16 @@ class StubGateRunner:
         part = self.df[self.df["split"] == split]
         mult = allocation(policy_spec, part, lgbm=self.lgbm)
         sim, base = simulate(part, mult), simulate(part, pd.Series(1.0, index=part.index))
-        key = (sorted((k, str(v)) for k, v in policy_spec.items()), split)
-        rng = _rng_for(key)
-        m, b = metrics(sim, rng), metrics(base, _rng_for(("always_on", split)))
+        key = (_spec_key(policy_spec), split)
+        m, b = metrics(sim, _rng_for(key)), metrics(base, _rng_for(("always_on", split)))
         ci = _boot_ci([sim["net"].values, base["net"].values], lambda g, a: _compound(g) - _compound(a), _rng_for(key, "delta"))
+        in_pos = part["target_position"].values != 0
+        mult_in = mult.values[in_pos]
         aid = "audit_" + hashlib.sha256(repr(key).encode()).hexdigest()[:10]
         return GateEvaluation(policy_id=policy_spec.get("policy_id", "unnamed"), split=split, metrics=m, always_on=b,
                               delta_net_return_vs_always_on=m.net_return - b.net_return, ci_delta=ci,
-                              allocation_mix={str(k): float((mult == k).mean()) for k in (0.0, 0.5, 1.0)}, audit_id=aid)
+                              allocation_mix={str(k): float((mult_in == k).mean()) if len(mult_in) else 0.0 for k in (0.0, 0.5, 1.0)},
+                              n_decisions=int(len(part)), n_in_position=int(in_pos.sum()), audit_id=aid)
 
 
 def build(seed: int = 3):
@@ -176,13 +185,13 @@ def build(seed: int = 3):
         s = always[m]
         total_cost = float(s["cost"].sum())
         # always-on has no gate toggling, so all costs are the strategy's own fees + slippage; 'switching' is
-        # reserved for costs CAUSED by a gate and is 0 here. gross - fees - slippage - switching = net (summed).
-        costs.append(CostBreakdown(split=split, gross_return=float(s["gross"].sum()), fees=total_cost * FEE_SHARE,
-                                   slippage=total_cost * (1 - FEE_SHARE), switching=0.0, net_return=float(s["net"].sum()),
+        # reserved for costs CAUSED by a gate and is 0 here. gross/net are compounded, costs are summed fractions.
+        costs.append(CostBreakdown(split=split, gross_return=_compound(s["gross"].values), fees=total_cost * FEE_SHARE,
+                                   slippage=total_cost * (1 - FEE_SHARE), switching=0.0, net_return=_compound(s["net"].values),
                                    turnover=float(np.abs(np.diff(np.concatenate([[0], s["q"].values]))).sum())))
         for name, spec in (("always_on", {"family": "always_on"}), ("cash", {"family": "cash"}), ("simple_rule", rule)):
-            baselines.append(BaselineRow(split=split, policy=name,
-                                         metrics=metrics(simulate(part, allocation(spec, part)), _rng_for("baseline", name, split))))
+            seed = ("always_on", split) if name == "always_on" else (_spec_key(spec), split)   # same CI as the runner reports
+            baselines.append(BaselineRow(split=split, policy=name, metrics=metrics(simulate(part, allocation(spec, part)), _rng_for(seed))))
 
     lgbm = None
     if LGBMGate is not None:   # optional: needs libomp on macOS
@@ -190,7 +199,7 @@ def build(seed: int = 3):
         tr_m = (df["split"] == "train") & (df["target_position"] > 0)
         lgbm.fit(df[tr_m], df.loc[tr_m, "ret_next"], split="train")
 
-    snap = hashlib.sha256(pd.util.hash_pandas_object(df[["decision_time", "close"]]).values.tobytes()).hexdigest()[:16]
+    snap = hashlib.sha256(json.dumps([str(df["decision_time"].iloc[0]), len(df), [round(float(x), 6) for x in df["close"].values[::50]]]).encode()).hexdigest()[:16]
     exp = ExperimentResult(
         experiment_id=f"exp_fixture_{snap[:8]}", strategy_id="btc-momentum-24h-demo", strategy_version="fixture-v1",
         dataset_snapshot_id=f"synthetic:{snap}", dataset_hashes={"market": snap}, windows=windows, per_regime=rows,

@@ -107,14 +107,14 @@ def critique(ctx: ToolContext, proposals: ProposalSet) -> CritiqueSet:
             if train and train.delta_net_return_vs_always_on and val.delta_net_return_vs_always_on is not None \
                     and (train.delta_net_return_vs_always_on > 0) != (val.delta_net_return_vs_always_on > 0):
                 counter.append("train and validation disagree in sign")
+            obs = []
             if val.ci_delta and val.ci_delta[0] <= 0:
-                risks.append("validation improvement CI includes zero")
-            agent_tests = ctx.agent_tests_used()
-            if agent_tests > 6:
-                risks.append(f"{agent_tests} agent train tests; multiple-comparison risk")
+                obs.append("validation improvement CI includes zero")
+            if ctx.agent_tests_used() > 6:
+                risks.append("many agent train tests (see trial log): multiple-comparison risk")
             verdict = "approve_for_frozen_test" if (val.delta_net_return_vs_always_on or 0) > 0 and not fragile and not counter else "reject"
         out.append(Critique(proposal_id=p.proposal_id, verdict=verdict, overfit_risks=risks, fragile_samples=fragile,
-                            counterexamples=counter,
+                            counterexamples=counter, observations=obs if val is not None else [],
                             leakage_concerns=[] if all(c.feature != "news_sentiment" for c in p.conditions) else ["check news first-seen times"],
                             evidence_ids=evs or [ctx.feature_grid()["evidence_id"]]))
     return CritiqueSet(critiques=out)

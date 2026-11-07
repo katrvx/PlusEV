@@ -343,5 +343,193 @@ def test_llm_failure_falls_back_and_is_disclosed():
     def broken(messages, info):
         return ModelResponse(parts=[ToolCallPart("regime_performance", {"split": 42})])
     r = investigate("fixture", loader=fixture_loader, model=FunctionModel(broken))
-    assert r.agent_failures and r.agent_mode in ("deterministic_fallback", "llm_with_fallback")
+    assert r.agent_failures and r.agent_mode == "llm_with_fallback"
     assert r.verdict in ("candidate_for_frozen_test", "INCONCLUSIVE")
+
+
+# ------------------------------------------------------------------ second adversarial review regressions
+
+import math  # noqa: E402
+import time as _time  # noqa: E402
+
+from packages.research_agents.verify import unsupported_numbers, verify_proposals  # noqa: E402
+from packages.research_agents.tools import spec_hash  # noqa: E402
+
+
+EV = [{"rows": [{"n_decisions": 2040, "n_trades": 128, "mean_net_return": -0.000203077441542493, "ci_low": -0.000456010541493941,
+                 "ci_high": -1.05342030540653e-05, "hit_rate": 0.516003879728419, "total_cost": 0.2034}],
+       "mix": {"0.0": 0.6875, "1.0": 0.3125}, "net": -0.4906}]
+
+
+@pytest.mark.parametrize("text", ["made 9999 trades", "lost 87 bp per day", "Sharpe 4.2", "drawdown 0.07", "-0.4363", "3.5x",
+                                  "forty percent", "15bp", "95% CI", "+0.4906"])
+def test_verifier_flags_fabrications(text):
+    assert unsupported_numbers(text, EV)
+
+
+@pytest.mark.parametrize("text", ["mean -0.000203 over 128 trades (2040 decisions), 90% CI [-0.000456, -1.05e-05]",
+                                  "hit rate 51.6%, off 68.75% of the time", "loses 49.06%", "net -0.4906", "2.03 bp",
+                                  "on 2024-01-01T00:00:00 the q50 momentum_24h gate", "ev_arbiter_eval_1a557f5202"])
+def test_verifier_accepts_copied_numbers(text):
+    assert not unsupported_numbers(text, EV)
+
+
+def test_verifier_random_numbers_rarely_match():
+    rng = np.random.default_rng(0)
+    hits = sum(not unsupported_numbers(f"{x:.3f}", EV) for x in rng.uniform(-1, 1, 500))
+    assert hits / 500 < 0.05
+
+
+def test_all_proposal_text_is_checked():
+    ctx = make_ctx()
+    ev = ctx.test_gate_train(gate(ctx, pid="agent::P1"))
+    p = GateProposal(proposal_id="P1", based_on=["H1"], conditions=[ThresholdCondition(**gate(ctx)["conditions"][0])],
+                     allocation_when_true=0.0, allocation_when_false=1.0, rationale="r", evidence_ids=[ev["evidence_id"]],
+                     falsification_test="reject if the 95% CI of the validation delta includes zero")
+    assert any("95%" in x for x in verify_proposals(ctx, ProposalSet(proposals=[p]), {"H1"}))
+
+
+def test_cost_attribution_and_baselines_use_one_convention():
+    ctx = make_ctx()
+    costs = ctx.cost_attribution("train")
+    ao = next(b for b in costs["baselines"] if b["policy"] == "always_on")
+    assert costs["costs"][0]["net_return"] == pytest.approx(ao["metrics"]["net_return"], rel=1e-9)
+
+
+class _Wrap:
+    """Gate runner wrapper used to force edge cases."""
+    def __init__(self, inner, edit):
+        self.inner, self.edit = inner, edit
+
+    def evaluate(self, spec, split):
+        return self.edit(spec, self.inner.evaluate(spec, split))
+
+
+def _loader_with(edit, quantile_keys_as_str=False):
+    def loader(_):
+        exp, runner, tq, _df, lgbm = _built()
+        if quantile_keys_as_str:
+            tq = {f: {str(q): v for q, v in qs.items()} for f, qs in tq.items()}
+        return exp, _Wrap(runner, edit), tq, None, lgbm
+    return loader
+
+
+def _loader_forcing_vol_hypothesis(edit):
+    """Force a clear train effect in vol_regime=high so the fallback proposes a gate (tests the arbiter, not the fixture)."""
+    def loader(_):
+        exp, runner, tq, _df, lgbm = _built()
+        rows = [RegimeRow(**{**r.model_dump(), "ci_high": -abs(r.mean_net_return) / 4}) if (r.split == "train" and r.bucket == "high")
+                else r for r in exp.per_regime]
+        return exp.model_copy(update={"per_regime": rows}), _Wrap(runner, edit), tq, None, lgbm
+    return loader
+
+
+def test_champion_must_beat_cash():
+    def edit(spec, ev):
+        if spec.get("policy_id", "").startswith("agent::"):
+            return ev.model_copy(update={"metrics": ev.metrics.model_copy(update={"net_return": -0.01})})
+        return ev
+    r = investigate("x", loader=_loader_forcing_vol_hypothesis(edit), force_fallback=True)
+    assert any(c.source == "agent" for c in r.candidates)
+    assert r.champion_policy_id is None
+    assert any("does not beat cash" in reason for c in r.candidates if c.source == "agent" for reason in c.reasons)
+
+
+def test_strategy_losing_to_cash_is_flagged_for_lane_a():
+    def edit(spec, ev):
+        ao = ev.always_on.model_copy(update={"net_return": -0.3, "ci_net_return": (-0.5, -0.1)})
+        ev = ev.model_copy(update={"always_on": ao})
+        if spec.get("policy_id", "").startswith("agent::"):
+            ev = ev.model_copy(update={"delta_net_return_vs_always_on": -0.05})
+        return ev
+    r = investigate("x", loader=_loader_forcing_vol_hypothesis(edit), force_fallback=True)
+    assert r.verdict == "INCONCLUSIVE" and r.champion_policy_id is None
+    assert any("loses to cash" in b for b in r.verdict_basis)
+
+
+def test_nan_validation_delta_is_never_champion():
+    def edit(spec, ev):
+        if spec.get("policy_id", "").startswith("agent::"):
+            return ev.model_copy(update={"delta_net_return_vs_always_on": float("nan")})
+        return ev
+    r = investigate("x", loader=_loader_forcing_vol_hypothesis(edit), force_fallback=True)
+    assert any(c.source == "agent" for c in r.candidates)
+    assert r.champion_policy_id is None and r.model_dump_json()
+
+
+def test_quantile_keys_from_json_strings_work():
+    r = investigate("x", loader=_loader_with(lambda s, e: e, quantile_keys_as_str=True), force_fallback=True)
+    assert r.candidates
+
+
+def test_critic_approve_with_blocking_fragility_is_contradictory():
+    from packages.research_agents.models import Critique, CritiqueSet
+    ctx = make_ctx()
+    spec = gate(ctx, pid="agent::P1")
+    ev = ctx.arbiter_evaluate(spec, "validation")
+    props = ProposalSet(proposals=[GateProposal(proposal_id="P1", based_on=["H1"], conditions=[ThresholdCondition(**spec["conditions"][0])],
+                                                allocation_when_true=0.0, allocation_when_false=1.0, rationale="r",
+                                                evidence_ids=[ev["evidence_id"]], falsification_test="f")])
+    bad = CritiqueSet(critiques=[Critique(proposal_id="P1", verdict="approve_for_frozen_test", fragile_samples=["thin"],
+                                          evidence_ids=[ev["evidence_id"]])])
+    assert any("contradictory" in x for x in agents.verify_critiques(ctx, bad, props))
+
+
+def test_agent_news_capped_at_train_end():
+    ctx = make_ctx()
+    val = next(w for w in ctx.experiment.windows if w.split == "validation")
+    s, e = (val.start + timedelta(days=1)).isoformat(), (val.start + timedelta(days=2)).isoformat()
+    with pytest.raises(ValueError):
+        ctx.news_context(s, e, agent=True)
+    assert "evidence_id" in ctx.news_context(s, e)          # the arbiter may read validation news
+
+
+def test_equivalent_gates_share_a_hash_and_ci():
+    ctx = make_ctx()
+    q = ctx.train_quantiles["realized_vol_7d"][0.5]
+    a = {"policy_id": "a", "family": "threshold_gate", "conditions": [{"feature": "realized_vol_7d", "op": "<=", "threshold": q}],
+         "allocation_when_true": 1, "allocation_when_false": 0.0}
+    b = {"policy_id": "b", "family": "threshold_gate", "conditions": [{"feature": "realized_vol_7d", "op": ">", "threshold": q}],
+         "allocation_when_true": 0.0, "allocation_when_false": 1.0}
+    assert spec_hash(a) == spec_hash(b)
+    c1 = ctx.arbiter_evaluate({**a, "policy_id": "name1"}, "validation")["evaluation"]["ci_delta"]
+    c2 = ctx.arbiter_evaluate({**a, "policy_id": "name2"}, "validation")["evaluation"]["ci_delta"]
+    assert c1 == c2
+
+
+def test_allocation_mix_counts_in_position_bars_only():
+    ctx = make_ctx()
+    g = gate(ctx, feature="momentum_24h", op="<=", q=0.5, a_t=0.0, a_f=1.0, pid="agent::mom")
+    mix = ctx.arbiter_evaluate(g, "validation")["evaluation"]["allocation_mix"]
+    assert max(mix.values()) >= 0.95          # the strategy is flat when momentum is low: this gate barely touches it
+
+
+@needs_lgbm
+def test_lgbm_spec_is_reproducible():
+    spec = _built()[4].spec()
+    assert spec["seed"] is not None and spec["model_sha256_16"]
+
+
+def test_late_tool_calls_after_timeout_are_logged_as_abandoned(monkeypatch):
+    monkeypatch.setattr(agents, "STAGE_TIMEOUT_S", 1.0)
+
+    def edit(spec, ev):
+        if spec.get("policy_id", "").startswith("agent::") and ev.split == "train":
+            _time.sleep(2.0)
+        return ev
+
+    def fn(messages, info):
+        parts = [p for msg in messages for p in getattr(msg, "parts", [])]
+        if not any(isinstance(p, ToolReturnPart) for p in parts):
+            return ModelResponse(parts=[ToolCallPart("regime_performance", {})])
+        rets = [p for p in parts if isinstance(p, ToolReturnPart) and isinstance(p.content, dict) and "evidence_id" in p.content]
+        if info.output_tools[0].name and any(t.name == "test_gate_train" for t in info.function_tools):
+            q = _built()[2]["realized_vol_7d"][0.5]
+            return ModelResponse(parts=[ToolCallPart("test_gate_train", {"conditions": [{"feature": "realized_vol_7d", "op": ">", "threshold": q}],
+                                                                       "allocation_when_true": 0.0, "allocation_when_false": 1.0,
+                                                                       "policy_id": "slow"})])
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, _hyp(rets[-1].content["evidence_id"]))])
+
+    r = investigate("x", loader=_loader_with(edit), model=FunctionModel(fn))
+    assert any(t.note.startswith("abandoned") for t in r.trial_log)
+    assert any("abandoned" in lim for lim in r.limitations)
