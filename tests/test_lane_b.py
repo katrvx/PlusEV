@@ -16,7 +16,9 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from fixtures.lane_a_stub import build
 from packages.contracts_lane_b import RegimeRow
-from packages.meta_policy import LGBMGate, threshold_gate_allocation
+from packages.meta_policy import LGBM_UNAVAILABLE, LGBMGate, threshold_gate_allocation
+
+needs_lgbm = pytest.mark.skipif(LGBMGate is None, reason=f"LightGBM unavailable: {LGBM_UNAVAILABLE}")
 from packages.research_agents import agents
 from packages.research_agents.investigate import investigate
 from packages.research_agents.models import GateProposal, ProposalSet, ThresholdCondition
@@ -93,6 +95,7 @@ def test_news_accepts_naive_and_date_only_times():
     assert "evidence_id" in out
 
 
+@needs_lgbm
 def test_lgbm_trains_and_calibrates_on_train_only():
     _exp, _r, _tq, df, lgbm = _built()
     for split in ("test", "validation"):
@@ -101,6 +104,7 @@ def test_lgbm_trains_and_calibrates_on_train_only():
     assert lgbm.fitted_on.startswith("train[")
 
 
+@needs_lgbm
 def test_lgbm_competitor_is_not_degenerate():
     _exp, _r, _tq, df, lgbm = _built()
     alloc = lgbm.allocation(df[df["split"] == "validation"])
@@ -319,7 +323,8 @@ def test_investigate_fallback_end_to_end():
     assert all(set(h.evidence_ids) <= ids for h in r.diagnostic.hypotheses)
     assert all(set(c.evidence_ids) <= ids for c in r.candidates)
     assert sum(c.status == "accepted_for_frozen_test" for c in r.candidates) <= 1            # at most ONE agent champion
-    assert {c.source for c in r.candidates if c.role == "competitor"} == {"rule_baseline", "meta_model"}
+    expected = {"rule_baseline", "meta_model"} if LGBMGate is not None else {"rule_baseline"}
+    assert {c.source for c in r.candidates if c.role == "competitor"} == expected
     assert all(c.validation_delta_vs_simple_rule is not None for c in r.candidates if c.validation_delta_vs_always_on is not None)
     assert not any(t.split == "test" for t in r.trial_log)
     assert r.model_dump_json()

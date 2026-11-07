@@ -184,9 +184,11 @@ def build(seed: int = 3):
             baselines.append(BaselineRow(split=split, policy=name,
                                          metrics=metrics(simulate(part, allocation(spec, part)), _rng_for("baseline", name, split))))
 
-    lgbm = LGBMGate()
-    tr_m = (df["split"] == "train") & (df["target_position"] > 0)
-    lgbm.fit(df[tr_m], df.loc[tr_m, "ret_next"], split="train")
+    lgbm = None
+    if LGBMGate is not None:   # optional: needs libomp on macOS
+        lgbm = LGBMGate()
+        tr_m = (df["split"] == "train") & (df["target_position"] > 0)
+        lgbm.fit(df[tr_m], df.loc[tr_m, "ret_next"], split="train")
 
     snap = hashlib.sha256(pd.util.hash_pandas_object(df[["decision_time", "close"]]).values.tobytes()).hexdigest()[:16]
     exp = ExperimentResult(

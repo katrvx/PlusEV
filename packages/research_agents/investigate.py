@@ -19,7 +19,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Callable
 
-from packages.meta_policy import rule_gate_spec
+from packages.meta_policy import LGBM_UNAVAILABLE, rule_gate_spec
 
 from . import fallback
 from .agents import (configured_model, model_name, run_critic, run_diagnostic, run_proposer,
@@ -182,6 +182,8 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
         limitations.append(f"news_sentiment coverage {exp.coverage.get('news_sentiment', 0):.0%}: not allowed in gates; market-only gating.")
     if news is None:
         limitations.append("No news source configured: no news context, no market-only vs market+news ablation.")
+    if lgbm is None:
+        limitations.append(f"LightGBM competitor not run ({LGBM_UNAVAILABLE or 'not provided by loader'}).")
 
     mode = "deterministic_fallback" if (model is None or not any(used_llm)) else ("llm" if all(used_llm) else "llm_with_fallback")
     to_test = [c.policy_id for c in candidates if c.status in ("accepted_for_frozen_test", "competitor")]
