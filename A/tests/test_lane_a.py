@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 from kok_a.binance import normalize_binance_epoch, read_binance_klines
-from kok_a.experiment import GateRunner, assemble, fit_regime_labels
+from kok_a.experiment import GateRunner, agent_view, assemble, fit_regime_labels
 from kok_a.features import (
     MARKET_FEATURES,
     TemporalLeakError,
@@ -425,6 +425,18 @@ def test_arbiter_keeps_a_strategy_whose_interval_is_above_zero():
     decision = decide(_panel(always, rule, model), n_test=400)
     assert decision.verdict == "KEEP"
     assert decision.policy_id == "always_on"
+
+
+def test_agent_view_drops_sealed_test_numbers_and_keeps_the_window(bundle):
+    view = agent_view(bundle.result)
+    assert any(window.split == "test" for window in view.windows)
+    assert view.decision is None and view.paper_plan is None
+    assert all(row.split != "test" for row in view.baselines)
+    assert all(row.split != "test" for row in view.per_regime)
+    assert all(row.split != "test" for row in view.costs)
+    assert all(point.split != "test" for point in view.equity)
+    assert any(row.split == "test" for row in bundle.result.baselines)
+    assert bundle.result.decision is not None
 
 
 def test_experiment_records_an_unstarted_paper_plan(bundle):

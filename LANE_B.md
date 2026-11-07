@@ -33,6 +33,18 @@ report = investigate(experiment_id)        # -> InvestigationReport (pydantic), 
 - **News is point-in-time.** Visible only if `first_seen_at <= decision cutoff`; coverage reported; never used in a gate unless coverage ≥ 90%.
 - **The arbiter is code.** A pre-registered rule decides which candidates go to the frozen test (validation delta > 0, critic approves, not fragile). The LightGBM gate is always carried as a competitor. LLM confidence cannot override it.
 
+## Run on Lane A
+
+The default loader is still `fixtures/lane_a_stub.py`, so `tests/test_lane_b.py` does not need the Binance snapshot.
+
+```bash
+python3 scripts/run_investigation.py --lane-a --fallback
+python3 scripts/run_investigation.py --lane-a --fallback --experiment-id synthetic-btcusdt-1h-v1
+python3 scripts/run_investigation.py --lane-a --fallback --frozen
+```
+
+`load_for_lane_b` returns train and validation metrics only. `GateRunner.evaluate` refuses `test`. `--frozen` is the one sealed look, and only for candidates the arbiter already accepted. The pre-registered simple rule is scored as a competitor with the allowlist skipped: its momentum threshold is the fixed sign `0`, not a training quantile.
+
 ## Run
 
 ```bash

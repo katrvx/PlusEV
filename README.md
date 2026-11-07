@@ -68,7 +68,7 @@ existing strategy (immutable) ─► import / validate / hash
 | Lane | Owns | Output interface | Status |
 |---|---|---|---|
 | **A · Quant / Data** | `A/` on this branch (target layout was `packages/ingestion`, `feature_store`, `strategies`, `quant`, `evaluation`) | `run_experiment(...) -> ExperimentResult`, including a deterministic verdict and a recorded 14-day plan | branch `a` |
-| **B · Agents / Context** (Kate) | `packages/research_agents`, `meta_policy`, news enrichment | `investigate(experiment_id) -> InvestigationReport` | first version on branch [`lane-b`](https://github.com/katrvx/PlusEV/tree/lane-b): agents, 4 allowlisted tools, evidence store, rule + LightGBM gates, 14 guardrail tests; runs on a labelled synthetic Lane A stand-in |
+| **B · Agents / Context** (Kate) | `packages/research_agents`, `meta_policy`, news enrichment | `investigate(experiment_id) -> InvestigationReport` | merged here from [`lane-b`](https://github.com/katrvx/PlusEV/tree/lane-b). Default loader is still the synthetic stand-in. `--lane-a` uses Lane A's development view, which omits sealed-test metrics |
 | **C · API / UI / Demo** | `apps/api`, `apps/web`, docs, paper-run interface | consumes `ExperimentResult` + `InvestigationReport` | in progress |
 
 Work on branches per lane; don't edit another lane's directories without coordinating. Freeze shared Pydantic contracts before integrating.
@@ -87,7 +87,9 @@ experiments/        run manifests, hashes, outputs
 tests/              no-future-data, execution lag, switching costs, holdout isolation, baselines
 ```
 
-Lane A’s code is in [`A/`](A/). The simple rule can allocate 0. A deterministic arbiter returns KEEP, ACTIVATE CONDITIONALLY, REDUCE, MONITOR, KILL, or INCONCLUSIVE from the sealed test, and a 14-day paper plan is stored with `completed=false`. News is still omitted. The lanes are not wired together yet.
+Lane A’s code is in [`A/`](A/). The simple rule can allocate 0. A deterministic arbiter returns KEEP, ACTIVATE CONDITIONALLY, REDUCE, MONITOR, KILL, or INCONCLUSIVE from the sealed test, and a 14-day paper plan is stored with `completed=false`. News is still omitted.
+
+`python3 scripts/run_investigation.py --lane-a --fallback` runs Lane B's deterministic agents on Lane A's loader. That view keeps the test window's dates and drops its metrics, the verdict, and the paper plan. `--frozen` then scores each accepted candidate once. `main` still has neither lane; `plusev/` and the Streamlit app are the earlier kit and do not call this path.
 
 The repo root also holds the earlier prototype (`plusev/`, `app/`, `scripts/build.py`, `scripts/paired_challenge.py`, `eval/`): regime tagging, a kit-exact simulator and a governor tested in the organisers' challenge mode. That prototype is unchanged on this branch. See [`archive/`](archive/).
 

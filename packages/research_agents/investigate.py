@@ -44,21 +44,32 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model: str
     model = None if force_fallback else (model or configured_model())
     mode = "llm" if model else "deterministic_fallback"
 
-    # 1-2. hypotheses and proposals
+    # 1. diagnosis, then the pre-registered competitors on validation.
+    # The simple rule's momentum threshold is the fixed sign 0, not a training
+    # quantile, so the agent allowlist does not apply to it.
     if model:
         diagnostic = run_diagnostic(ctx, model)
-        proposals = run_proposer(ctx, model, diagnostic)
     else:
         diagnostic = fallback.diagnose(ctx)
-        proposals = fallback.propose(ctx, diagnostic)
-
-    # 3. arbiter evaluates every candidate on validation, with competitors
-    competitors = []
-    for p in proposals.proposals:
-        ctx.test_gate_train(p.to_policy_spec(), split="validation", source="agent")
+    competitors: list[tuple[str, dict]] = []
+    rule_spec = getattr(runner, "rule_spec", None)
+    if rule_spec is not None:
+        ctx.test_gate_train(rule_spec, split="validation", source="rule_baseline", enforce_allowlist=False)
+        competitors.append(("rule_baseline", rule_spec))
     if lgbm is not None:
         ctx.test_gate_train(lgbm.spec(), split="validation", source="meta_model")
         competitors.append(("meta_model", lgbm.spec()))
+
+    # 2. proposals. No allowlisted gate is an abstention, not a crash.
+    try:
+        proposals = run_proposer(ctx, model, diagnostic) if model else fallback.propose(ctx, diagnostic)
+    except ValueError as exc:
+        if "no testable hypothesis" not in str(exc):
+            raise
+        return _inconclusive(exp, ctx, diagnostic, mode, model, str(exc), competitors)
+
+    for p in proposals.proposals:
+        ctx.test_gate_train(p.to_policy_spec(), split="validation", source="agent")
 
     # 4. critic
     critiques: CritiqueSet = run_critic(ctx, model, proposals) if model else fallback.critique(ctx, proposals)
@@ -90,12 +101,7 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model: str
         candidates.append(PolicyCandidate(policy_id=pid, source="agent", policy_spec=p.to_policy_spec(),
                                           status="accepted_for_frozen_test" if ok else "rejected", reasons=reasons,
                                           evidence_ids=[e for e in [*(p.evidence_ids), t.evidence_id if t else None] if e]))
-    for source, spec in competitors:
-        t = val.get(spec["policy_id"])
-        candidates.append(PolicyCandidate(policy_id=spec["policy_id"], source=source, policy_spec=spec,
-                                          status="accepted_for_frozen_test", reasons=["competitor: always carried to the frozen test for comparison",
-                                                                                        f"validation delta {t.delta_net_return_vs_always_on:+.4f}" if t else "not evaluated"],
-                                          evidence_ids=[t.evidence_id] if t and t.evidence_id else []))
+    candidates.extend(_competitor_candidates(val, competitors))
 
     n_tried = sum(t.status != "refused" for t in ctx.trials)
     limitations = [
@@ -114,4 +120,50 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model: str
         trial_log=ctx.trials, candidates=candidates,
         test_requests=["Lane A: run always_on, cash, simple_rule and every accepted candidate ONCE on the sealed test split, same costs."],
         limitations=limitations, evidence=ctx.store.all(), n_policies_tried=n_tried, holdout_accessed=ctx.holdout_accessed,
+    )
+
+
+def _competitor_candidates(validation: dict, competitors: list[tuple[str, dict]]) -> list[PolicyCandidate]:
+    rows = []
+    for source, spec in competitors:
+        trial = validation.get(spec["policy_id"])
+        rows.append(PolicyCandidate(
+            policy_id=spec["policy_id"],
+            source=source,  # type: ignore[arg-type]
+            policy_spec=spec,
+            status="accepted_for_frozen_test",
+            reasons=[
+                "competitor: always carried to the frozen test for comparison",
+                f"validation delta {trial.delta_net_return_vs_always_on:+.4f}" if trial else "not evaluated",
+            ],
+            evidence_ids=[trial.evidence_id] if trial and trial.evidence_id else [],
+        ))
+    return rows
+
+
+def _inconclusive(exp, ctx: ToolContext, diagnostic, mode: str, model: str | None, reason: str,
+                  competitors: list[tuple[str, dict]]) -> InvestigationReport:
+    """A diagnosis with no allowlisted gate. Do not open the sealed test."""
+
+    validation = {t.policy_id: t for t in ctx.trials if t.split == "validation" and t.status == "evaluated"}
+    return InvestigationReport(
+        experiment_id=exp.experiment_id,
+        strategy_id=exp.strategy_id,
+        generated_at=datetime.now(timezone.utc),
+        agent_mode=mode,  # type: ignore[arg-type]
+        model_id=model,
+        diagnostic=diagnostic,
+        proposals=[],
+        critiques=[],
+        trial_log=ctx.trials,
+        candidates=_competitor_candidates(validation, competitors),
+        test_requests=[],
+        limitations=[
+            reason,
+            "No allowlisted gate was proposed. Pre-registered competitors stay on the validation split; the sealed test is not opened.",
+            "Regime effects are associations under lagged features; not causal.",
+        ],
+        evidence=ctx.store.all(),
+        n_policies_tried=sum(t.status != "refused" for t in ctx.trials),
+        holdout_accessed=ctx.holdout_accessed,
     )

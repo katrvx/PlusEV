@@ -87,7 +87,7 @@ class ToolContext:
         eid = self.store.add("news_context", {"start": start, "end": end, "cutoff": cutoff.isoformat()}, payload)
         return {"evidence_id": eid, **payload}
 
-    def test_gate_train(self, policy_spec: dict, split: str = "train", source: str = "agent") -> dict:
+    def test_gate_train(self, policy_spec: dict, split: str = "train", source: str = "agent", enforce_allowlist: bool = True) -> dict:
         pid = policy_spec.get("policy_id", "unnamed")
         try:
             _guard(split)
@@ -100,7 +100,7 @@ class ToolContext:
             self.trials.append(TrialRecord(policy_id=pid, source=source, split=split, delta_net_return_vs_always_on=None,
                                            ci_delta=None, evidence_id=None, status="refused", note="gate-test budget exhausted"))
             return {"refused": "gate-test budget exhausted", "budget": self.max_gate_tests}
-        if policy_spec.get("family") == "threshold_gate":
+        if enforce_allowlist and policy_spec.get("family") == "threshold_gate":
             problems = check_gate(policy_spec.get("conditions", []), policy_spec.get("allocation_when_true"),
                                   policy_spec.get("allocation_when_false"), self.experiment.coverage, self.train_quantiles)
             if problems:

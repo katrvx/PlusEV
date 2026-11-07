@@ -31,7 +31,7 @@ from kok_a.gates import allocation, rule_gate_spec
 from kok_a.lgbm_gate import LGBMGate
 from kok_a.market import hash_ohlcv
 from kok_a.simulate import ANNUALIZATION, COST_PER_UNIT, FEE_BPS, SLIPPAGE_BPS, block_ci, simulate
-from kok_a.snapshot import SNAPSHOT_READY, load_inputs
+from kok_a.snapshot import SNAPSHOT_READY, SNAPSHOT_SYNTHETIC, load_inputs
 from kok_a.strategies import positions
 
 QUANTILES = (0.2, 0.33, 0.5, 0.67, 0.8)
@@ -131,14 +131,61 @@ def run_experiment(
 def load_for_lane_b(experiment_id: str = ""):
     """(ExperimentResult, GateRunner, train quantiles, news store, LGBMGate).
 
-    Uses the frozen Binance spot snapshot. `experiment_id` is accepted so this
-    matches Lane B's loader signature; the returned result carries its own id.
-    News is None because this lane has no first-seen news archive.
+    This is the loader `investigate` calls. The result is the development view:
+    train and validation only. Sealed-test metrics, the verdict, and the paper
+    plan are left off, because those are computed from the holdout.
+    `experiment_id` selects the run. News is None: this lane has no first-seen archive.
     """
 
-    del experiment_id
-    bundle = assemble("btc-trend-24-72-demo", SNAPSHOT_READY)
-    return bundle.result, bundle.runner, bundle.quantiles, None, bundle.lgbm
+    strategy_id = "btc-trend-24-72-demo"
+    snapshot_id = SNAPSHOT_READY
+    kwargs: dict = {}
+    if experiment_id in {"", SNAPSHOT_READY, strategy_id}:
+        pass
+    elif experiment_id == "btc-meanrev-48-demo":
+        strategy_id = experiment_id
+    elif experiment_id in {SNAPSHOT_SYNTHETIC, "synthetic"}:
+        snapshot_id = SNAPSHOT_SYNTHETIC
+        kwargs = {"n": 1100, "seed": 7, "n_boot": 30, "n_estimators": 40}
+    else:
+        known = ", ".join([SNAPSHOT_READY, "btc-trend-24-72-demo", "btc-meanrev-48-demo", SNAPSHOT_SYNTHETIC])
+        raise KeyError(f"unknown experiment_id {experiment_id!r}; known: {known}")
+    bundle = assemble(strategy_id, snapshot_id, **kwargs)
+    return agent_view(bundle.result), bundle.runner, bundle.quantiles, None, bundle.lgbm
+
+
+def agent_view(result: ExperimentResult) -> ExperimentResult:
+    """Copy a result with sealed-test performance removed.
+
+    The test window's dates stay, so a news request that crosses into the
+    holdout can still be refused. The runner itself is unchanged and still
+    refuses `evaluate(..., "test")`.
+    """
+
+    note = (
+        "Sealed-test metrics, the verdict, and the paper plan are omitted from this view. "
+        "GateRunner.evaluate refuses split='test'."
+    )
+    notes = list(result.notes)
+    if note not in notes:
+        notes.append(note)
+    return result.model_copy(
+        update={
+            "baselines": [row for row in result.baselines if row.split != "test"],
+            "per_regime": [row for row in result.per_regime if row.split != "test"],
+            "costs": [row for row in result.costs if row.split != "test"],
+            "equity": [point for point in result.equity if point.split != "test"],
+            "decision": None,
+            "paper_plan": None,
+            "notes": notes,
+        }
+    )
+
+
+def score_frozen(runner: GateRunner, policy_specs: list[dict]) -> list[GateEvaluation]:
+    """One sealed-test look per policy. A changed body under the same id is refused."""
+
+    return [runner.evaluate_frozen(spec) for spec in policy_specs]
 
 
 def assemble(
@@ -163,11 +210,13 @@ def assemble(
     market_hash = hash_ohlcv(ohlcv)
     signal_hash = _hash_signals(sample)
     runner = GateRunner(sample, model, seed=seed, n_boot=n_boot, snapshot_id=market_hash, thresholds=thresholds)
+    rule = rule_gate_spec(sample[sample["split"] == "train"])
+    runner.rule_spec = rule
 
     named_policies: list[tuple[str, dict]] = [
         ("always_on", {"policy_id": "always_on", "family": "always_on"}),
         ("cash", {"policy_id": "cash", "family": "cash"}),
-        ("simple_rule", rule_gate_spec(sample[sample["split"] == "train"])),
+        ("simple_rule", rule),
         ("lgbm_gate", model.spec()),
     ]
     if policy_spec is not None:
