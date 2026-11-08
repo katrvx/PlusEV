@@ -54,8 +54,11 @@ class ContextFinding(BaseModel):
     statement: str = Field(description="what co-occurred in time; never a causal claim")
     episode_ids: list[str] = Field(default_factory=list, description="worst_week_n / best_week_n from sentiment_episodes")
     evidence_ids: list[str] = Field(min_length=1)
+    tally: Literal["worst_weeks_after_greed_to_fear_flip", "best_weeks_after_fear_to_greed_flip",
+                   "worst_weeks_after_fear_to_greed_flip", "best_weeks_after_greed_to_fear_flip"] | None = Field(
+        default=None, description="the sentiment_episodes tally this finding reports, if any")
     strength: Literal["none", "weak", "moderate"] = Field(
-        description="'moderate' only when a cited binomial_p_value is below 0.10; with 4 weeks per side, usually 'weak' or 'none'")
+        description="'moderate' only for a PRIMARY tally whose binomial_p_value is below 0.05; usually 'weak' or 'none'")
     caveats: list[str] = Field(default_factory=list)
 
 

@@ -13,6 +13,11 @@ Pre-registered definitions (fixed before any run):
 - base rate = the share of all train start bars that have such a flip in the 72 bars before them;
   a one-sided binomial tail says whether K weeks with that many flips are more than chance.
 Small samples: with K = 4 even 4/4 is weak evidence; findings must say so. Co-occurrence is not causation.
+Multiple comparisons: four tallies are reported, but only the two PRIMARY ones (worst weeks after a
+greed-to-fear flip, best weeks after a fear-to-greed flip) may support a 'moderate' finding, and only at
+p < 0.05 (0.10 Bonferroni-corrected for the two). The other two are descriptive.
+The base rate is train-wide; where flips cluster (early 2018 flipped about twice as often), a week there
+is more likely than the base rate says to follow a flip.
 """
 
 from __future__ import annotations
@@ -24,6 +29,12 @@ LOOKBACK = 72
 NEUTRAL = 50.0
 EXTREME_FEAR, EXTREME_GREED = 25.0, 75.0
 K = 4
+PRIMARY_TALLIES = ("worst_weeks_after_greed_to_fear_flip", "best_weeks_after_fear_to_greed_flip")
+MODERATE_P = 0.05          # 0.10 / 2 primary tallies
+TALLY_FLAG = {"worst_weeks_after_greed_to_fear_flip": ("worst_weeks", "greed_to_fear_flip_in_prior_3_days"),
+              "best_weeks_after_fear_to_greed_flip": ("best_weeks", "fear_to_greed_flip_in_prior_3_days"),
+              "worst_weeks_after_fear_to_greed_flip": ("worst_weeks", "fear_to_greed_flip_in_prior_3_days"),
+              "best_weeks_after_greed_to_fear_flip": ("best_weeks", "greed_to_fear_flip_in_prior_3_days")}
 
 
 def _binom_tail(k: int, n: int, p: float) -> float:
@@ -50,7 +61,7 @@ def _flip_flags(fg):
     return g2f, f2g
 
 
-def _windows(rets, k, worst: bool):
+def _windows(rets, k, worst: bool, exclude=()):
     n = len(rets)
     if n < WEEK:
         return []
@@ -62,7 +73,7 @@ def _windows(rets, k, worst: bool):
     scores.sort(key=lambda s: s[0], reverse=not worst)
     chosen = []
     for s, i in scores:
-        if all(abs(i - j) >= WEEK for _, j in chosen):
+        if all(abs(i - j) >= WEEK for _, j in chosen) and all(abs(i - j) >= WEEK for j in exclude):
             chosen.append((s, i))
         if len(chosen) == k:
             break
@@ -75,15 +86,22 @@ def sentiment_episodes(experiment, runner, train_end=None, k: int = K) -> dict:
     equity = [p for p in (getattr(experiment, "equity", None) or []) if p.split == "train"]
     if fs is None or not equity:
         return {"error": "no train Fear & Greed series or per-bar equity from this loader"}
+    from .news import as_utc
     try:
         series = fs("fear_greed", "train")
+        by_time = {as_utc(t): v for t, v in series}
     except Exception as exc:  # noqa: BLE001
         return {"error": f"fear_greed series unavailable: {type(exc).__name__}"}
-    by_time = {t: v for t, v in series}
     if train_end is not None:
-        equity = [p for p in equity if p.decision_time <= train_end]
-    times = [p.decision_time for p in equity]
-    rets = [float(p.net_return) for p in equity]
+        train_end = as_utc(train_end)
+        equity = [p for p in equity if as_utc(p.decision_time) <= train_end]
+    times = [as_utc(p.decision_time) for p in equity]
+    try:
+        rets = [float(p.net_return) for p in equity]
+    except (TypeError, ValueError):
+        return {"error": "train equity has a missing net return"}
+    if not all(math.isfinite(r) for r in rets):
+        return {"error": "train equity has non-finite net returns"}
     fg = _ffill([by_time.get(t) for t in times])
     if sum(v is not None for v in fg) < WEEK:
         return {"error": "too little Fear & Greed coverage on train"}
@@ -118,7 +136,8 @@ def sentiment_episodes(experiment, runner, train_end=None, k: int = K) -> dict:
                 "extreme_greed_share_in_week": (sum(v > EXTREME_GREED for v in w) / len(w)) if w else None}
 
     worst = [describe("worst_week", s, i, n) for n, (s, i) in enumerate(_windows(rets, k, worst=True), 1)]
-    best = [describe("best_week", s, i, n) for n, (s, i) in enumerate(_windows(rets, k, worst=False), 1)]
+    worst_idx = [i for _, i in _windows(rets, k, worst=True)]
+    best = [describe("best_week", s, i, n) for n, (s, i) in enumerate(_windows(rets, k, worst=False, exclude=worst_idx), 1)]
 
     def tally(eps, flag, p0):
         hits = sum(e[flag] for e in eps)
@@ -133,4 +152,6 @@ def sentiment_episodes(experiment, runner, train_end=None, k: int = K) -> dict:
             "best_weeks_after_fear_to_greed_flip": tally(best, "fear_to_greed_flip_in_prior_3_days", base_f2g),
             "worst_weeks_after_fear_to_greed_flip": tally(worst, "fear_to_greed_flip_in_prior_3_days", base_f2g),
             "best_weeks_after_greed_to_fear_flip": tally(best, "greed_to_fear_flip_in_prior_3_days", base_g2f),
-            "note": "co-occurrence in time, not causation; with 4 weeks per side even 4/4 is weak evidence"}
+            "primary_tallies": list(PRIMARY_TALLIES), "moderate_p_threshold": MODERATE_P,
+            "note": ("co-occurrence in time, not causation; with 4 weeks per side even 4/4 is weak evidence; only the two "
+                     "primary tallies can support 'moderate', at p < 0.05 (Bonferroni over two); the base rate is train-wide")}

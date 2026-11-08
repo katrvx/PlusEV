@@ -43,7 +43,7 @@ report = investigate(experiment_id)        # -> InvestigationReport (pydantic), 
 
 ## Adversarial review
 
-Two independent agents attacked Lane B on 7 Nov. Round 1: 18 findings (17 reproduced). Round 2, after the first real Gemini 4 Argon run: 17 findings (16 reproduced), incl. a claim verifier that accepted almost any number, '95% CI' written 4 times in the Argon report, mixed return conventions in the stand-in ('strategy underperforms always-on'), and no comparison with cash. All critical/high findings of both rounds are fixed with regression tests (68 tests after round 2). Note: with the corrected bootstrap (2000 draws, seeded by spec), the stand-in's 'high volatility' effect on train is borderline (90% CI upper bound just above zero), so the strict deterministic fallback now proposes no gate; we did not retune the synthetic data to change that. Remaining known gaps: no Context/News agent yet, no `run_bootstrap` tool (CIs come from Lane A), no news data, and the default loader in tests is the synthetic stand-in.
+Two independent agents attacked Lane B on 7 Nov. Round 1: 18 findings (17 reproduced). Round 2, after the first real Gemini 4 Argon run: 17 findings (16 reproduced), incl. a claim verifier that accepted almost any number, '95% CI' written 4 times in the Argon report, mixed return conventions in the stand-in ('strategy underperforms always-on'), and no comparison with cash. All critical/high findings of both rounds are fixed with regression tests (68 tests after round 2). Note: with the corrected bootstrap (2000 draws, seeded by spec), the stand-in's 'high volatility' effect on train is borderline (90% CI upper bound just above zero), so the strict deterministic fallback now proposes no gate; we did not retune the synthetic data to change that. Remaining known gaps: no news agent (the context agent works on Fear & Greed only), no `run_bootstrap` tool (CIs come from Lane A), no news data, and the default loader in tests is the synthetic stand-in.
 
 Round 3 (7 Nov evening) started from the first full `mode=llm` runs on Lane A's real BTCUSDT data with Gemini 4 Argon. In the first one (19:24, not committed), all three agents ran with no fallback, and the holdout was not accessed. The verifier made the proposer and the critic retry three times: once for an invented number, and once for real numbers cited from the wrong gate's evidence. The critic found that one gate switched more often than always-on (70 vs 50 on validation), that its validation Sharpe failed the proposal's own falsification test, and that the other gate's validation gain came from lower exposure in a falling market. Both gates were rejected; neither beats cash on validation. Fixed after that run:
 - the verifier no longer rejects numbers the agents were given (`20` in the instructions, `24`/`72` in `btc-trend-24-72-demo`);
@@ -64,6 +64,21 @@ A third independent review (round 3) then attacked everything above: 13 findings
 - trial records now carry a structured `fold`;
 - Lane A's notes, which quote the sealed-test verdict, are dropped from what agents can see.
 
+Round 4 (8 Nov, after the reruns on the 2018–2026 book): 16 findings, 15 reproduced. Three change what we can claim, and are disclosed rather than fixed:
+- **The test window was not unseen by the team.** Lane A's test period (2025-02 → 2026-10) overlaps the earlier two-year window we developed on. On it, the agents had already proposed a similar idea for mean reversion (cut size in calm markets). The single look is pre-registered and recorded, but it is not a look at data nobody had seen. A clean test needs data after 2026-10-31.
+- **Lane A's arbiter never scored the Lane B champion.** Its KILL is for the strategy. Under its rule, the champion would have qualified as MODIFY even with a −29% net, because MODIFY does not require beating cash. That is reported to Lane A. We had not pre-registered how a test result maps to a Lane B verdict; by our own selection bar (beat cash), the champion fails on test.
+- **The improvement is mostly lower exposure.** The champion is at half size on about 87% of bars. A constant half size gives +11.1 pp on validation, and on the research period it beats the champion. Every report now carries a constant-half-size reference, and each agent gate shows its delta against it.
+- **The critic acted as a selector.** It vetoed a sibling gate with the same condition (size 0 instead of 0.5) that scored higher on validation.
+
+Fixed in round 4:
+- the sealed look is ledgered on disk by spec hash (`experiments/frozen_ledger.json`), and only `scripts/frozen_look.py` takes it, from a committed report; `--frozen` no longer re-runs an investigation and looks;
+- the context verifier ties `moderate` to a primary tally at p < 0.05, checks the named weeks, catches more causal wording and allows negated caveats;
+- quantile and allocation levels are citable only when named as such;
+- the 20-trade threshold phrasing requires the word "trades";
+- best and worst weeks no longer overlap;
+- bad loader data no longer crashes the context stage;
+- the docs are corrected (pp instead of %, "trailed by 48 pp" instead of "lost 48%").
+
 ## Agent 4: context (`context.py`)
 
 The spec's fourth agent is a context and news analyst. There is no news archive with first-seen timestamps, so this agent works on market sentiment (Fear & Greed), which Lane A joins point-in-time (each daily value as of its next-day availability). Code (`sentiment_episodes`, TRAIN only) picks the unchanged strategy's 4 worst and 4 best non-overlapping weeks (168 bars). For each week it records the Fear & Greed level, its 7-day change, and whether a greed-to-fear or fear-to-greed flip (across 50) happened in the 3 days before the week started. It also gives the train base rate of such flips and a one-sided binomial p-value. The agent writes findings that cite this evidence and name the weeks they use. The verifier rejects:
@@ -74,13 +89,13 @@ The spec's fourth agent is a context and news analyst. There is no news archive 
 
 The findings go to the proposer as context only; gates are still based on the diagnostic hypotheses. Without a sentiment series (the stand-in), the stage is skipped and disclosed.
 
-On real data, for both strategies, sentiment flips do not line up with the best or worst weeks more often than chance (0 or 1 of 4 against base rates around 0.12). That is reported as a finding.
+Only the two primary tallies (worst weeks after a greed-to-fear flip, best weeks after a fear-to-greed flip) can support a `moderate` finding, and only at p < 0.05, which is 0.10 Bonferroni-corrected for the two; the other two tallies are descriptive. A finding that names a tally must set `tally`, and the weeks it names must carry that flag. On the 2018–2026 book neither primary tally is notable for either strategy. In the trend report, Argon labelled a non-primary tally `moderate`: 2 of 4 best weeks followed a greed-to-fear flip, p 0.048 against base rates of 0.093–0.096. One of those weeks is in early 2018, when flips were about twice as frequent. Corrected for four tallies, that finding is weak, and the verifier now refuses that label (round 4).
 
 ## Bad luck vs broken (`health.py`)
 
 Spec section 8: a poor result alone is not proof that a strategy broke. Code, not an agent, cuts the unchanged strategy's validation period into 14-day blocks. It compares each block with Lane A's train-only 14-day range (5th to 95th percentile of block-bootstrapped train paths). About 5% of blocks should fall below that range by chance. If more do (one-sided binomial p < 0.05), the result is `outside_training_range`; otherwise it is `within_training_range`. It also checks which assumption changed between train and validation: exposure, turnover per bar, cost per bar, bar volatility (ratio outside 2/3–3/2), and how often each regime occurs (total variation ≥ 0.25). The thresholds are fixed in the module. Because the check reads validation, only the critic can call it (`strategy_health` tool) and it appears in the report (`strategy_health`, plus a line in `verdict_basis`). The fallback critic notes when the regime behind a gate's feature shifted.
 
-On the 2018–2026 book: for trend, 43 of 45 validation blocks fall inside the range and 2 above it. For mean reversion, all 45 fall inside, but its normal range is a losing one (research net −90%). It is not unlucky and not broken: it never worked, and Lane A's sealed test says KILL. On the earlier 2-year window, the check had separated the two (10/10 inside vs 3/10 below).
+On the 2018–2026 book: for trend, 43 of 45 validation blocks fall inside the range and 2 above it. For mean reversion, all 45 fall inside its research range (−16.2% to +12.4% per two weeks), and over that research period it lost 90%. It behaves as it always did, and it always lost money. Lane A's arbiter says KILL for the strategy. On the earlier 2-year window, the check had separated the two (10/10 inside vs 3/10 below).
 
 ## Two strategies on real data
 
@@ -90,9 +105,9 @@ Lane A's 2018-02 → 2026-10 hourly BTCUSDT book (research → 2023-05, validati
 |---|---|---|
 | Always-on | research +276%, validation +134% | research −90%, validation −19% |
 | Strategy health (validation) | `within_training_range`, 43/45 blocks inside, 2 above. Sentiment, volatility and cost per bar changed | `within_training_range`, 45/45 inside. Its normal range is a losing one |
-| Context agent | 2 of 4 best weeks followed a greed-to-fear flip (p 0.048, one of four tallies, so weak); worst weeks show no flips | Sentiment does not separate good and bad weeks |
-| Agent gates | 3 proposed, all vetoed. `fear_greed > 28` beat always-on by 32% on validation, but it was on 97% of the time after the sentiment shift (fear 51% → 10%) and lost 48% on the first research fold | Champion `vol_median_05_1` (half size when `realized_vol_7d` ≤ research median): validation +26.8% vs always-on (90% CI +1.1% … +40.9%), +7.3% vs cash, 3/3 folds, critic approved |
-| Sealed test (one look) | Lane A arbiter: INCONCLUSIVE | Gate vs always-on +27.3% (90% CI +15.3% … +36.2%), max drawdown 60.4% → 36.2%, but net −28.9%. Lane A arbiter: KILL |
+| Context agent | 2 of 4 best weeks followed a greed-to-fear flip (p 0.048; a non-primary tally, so weak after correction, though the report says `moderate`); worst weeks show no flips | Sentiment does not separate good and bad weeks |
+| Agent gates | 3 proposed, all vetoed. `fear_greed > 28` beat always-on by 32 pp on validation, but it was on 97% of the time after the sentiment shift (fear 51% → 10%), and on the first research fold it trailed always-on by 48 pp (+5.1% vs +52.8%) | Champion `vol_median_05_1` (half size when `realized_vol_7d` ≤ research median): validation +26.8 pp vs always-on (90% CI +1.1 … +40.9), +7.3 pp vs cash, 3/3 folds, critic approved. Constant half size alone: +11.1 pp |
+| Test (one look) | Lane A arbiter: INCONCLUSIVE | Gate vs always-on +27.3 pp (90% CI +15.3 … +36.2), max drawdown 60.4% → 36.2%, average size 0.55× always-on, net −28.9%. Lane A's arbiter scored only its own candidates: KILL for the strategy |
 
 Reports: `experiments/investigation_argon_lane_a.json`, `experiments/investigation_argon_meanrev.json`. The sealed look is `experiments/frozen_look_btc-meanrev-48-demo.json`. It was taken after the report that chose the champion was committed (`ad3dff1`).
 
@@ -116,7 +131,7 @@ Walk-forward: every agent gate and competitor is also scored with Lane A's `Gate
 
 ```bash
 pip install "pydantic-ai-slim[google]" lightgbm scikit-learn pandas numpy pytest
-python3 -m pytest -q tests/test_lane_b.py          # 126 guardrail + regression tests
+python3 -m pytest -q tests/test_lane_b.py          # 140 guardrail + regression tests
 python3 scripts/run_investigation.py --fallback     # deterministic agents
 KOK_AGENT_MODEL=google:gemini-3.8-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
 ```

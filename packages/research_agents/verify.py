@@ -32,16 +32,18 @@ NUM_RE = re.compile(r"(?<![A-Za-z_\d.])([-+]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][-+]?
 DASHES = str.maketrans({"\u2212": "-", "\u2013": "-", "\u2014": "-", "\u2012": "-", "\ufe63": "-", "\uff0d": "-"})
 # the instruction threshold may be quoted as a threshold ("fewer than 20 trades", "<20 trades"), not as a measurement
 THRESHOLD_RE = re.compile(r"(?:\b(?:fewer than|less than|under|below|at least|minimum of|min\.?)\s*|[<>]=?\s*|\u2265\s*|\u2264\s*)"
-                          rf"{MIN_TRADES}(?![\d.])(?=\s*(?:trades?\b|$|[).,;]))"
+                          rf"{MIN_TRADES}(?![\d.])(?=\s*trades?\b)"
                           rf"|\b{MIN_TRADES}[\s-]*trades?\s+(?:threshold|minimum|cutoff|floor|rule|bar)\b"
-                          rf"|\b(?:threshold|minimum|cutoff|floor) of {MIN_TRADES}\b(?![\d.])", re.I)
+                          rf"|\b(?:threshold|minimum|cutoff|floor) of {MIN_TRADES}(?![\d.])(?=\s*trades?\b)", re.I)
+# numbers that are dict KEYS (quantile levels '0.33', allocation levels '0.5') count only when the text says what they are
+KEY_CONTEXT_RE = re.compile(r"quantile|percentile|allocation|multiplier|\bsize\b|\bq\s*=|\bq\d", re.I)
 NUM_KEY_RE = re.compile(r"[-+]?\d+(?:\.\d+)?")
 REL_TOL = 0.01           # a copied number may differ from the evidence by print rounding AND by at most 1% of its size
 WORD_NUM_RE = re.compile(r"\b(eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|"
                          r"fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|percent)\b", re.I)
 
 
-def _collect(obj, floats: list[float], ints: set[int], zero: list[bool]) -> None:
+def _collect(obj, floats: list[float], ints: set[int], zero: list[bool], keys: list[float] | None = None) -> None:
     if isinstance(obj, bool) or obj is None:
         return
     if isinstance(obj, (int, float)) and obj == 0:
@@ -57,14 +59,14 @@ def _collect(obj, floats: list[float], ints: set[int], zero: list[bool]) -> None
                 ints.add(abs(int(obj)))
     elif isinstance(obj, dict):
         for k, v in obj.items():
-            if isinstance(k, str) and NUM_KEY_RE.fullmatch(k):   # quantile levels / allocation keys ('0.33', '0.5') are tool output too
-                _collect(float(k), floats, ints, zero)
-            elif isinstance(k, (int, float)) and not isinstance(k, bool):
-                _collect(k, floats, ints, zero)
-            _collect(v, floats, ints, zero)
+            if keys is not None and isinstance(k, str) and NUM_KEY_RE.fullmatch(k):
+                keys.append(float(k))                # quantile / allocation levels: see KEY_CONTEXT_RE
+            elif keys is not None and isinstance(k, (int, float)) and not isinstance(k, bool):
+                keys.append(float(k))
+            _collect(v, floats, ints, zero, keys)
     elif isinstance(obj, (list, tuple)):
         for v in obj:
-            _collect(v, floats, ints, zero)
+            _collect(v, floats, ints, zero, keys)
 
 
 def unsupported_numbers(text: str, payloads: list) -> list[str]:
@@ -74,7 +76,8 @@ def unsupported_numbers(text: str, payloads: list) -> list[str]:
     floats: list[float] = []
     ints: set[int] = set()
     zero = [False]
-    _collect(payloads, floats, ints, zero)
+    keys: list[float] = []
+    _collect(payloads, floats, ints, zero, keys)
     text = text.translate(DASHES)          # a Unicode minus must not hide a sign
     bad = [m.group(0) for m in WORD_NUM_RE.finditer(text)]
     clean = THRESHOLD_RE.sub(" ", DATE_RE.sub(" ", text))
@@ -109,6 +112,9 @@ def unsupported_numbers(text: str, payloads: list) -> list[str]:
             if abs(ref - t) <= min(tol, REL_TOL * abs(ref)) + 1e-12 * abs(ref):
                 ok = True
                 break
+        if not ok and any(abs(k - abs(target)) <= 1e-12 + min(tol, REL_TOL * abs(k)) for k in keys):
+            window = clean[max(0, m.start() - 30):m.end() + 30]
+            ok = bool(KEY_CONTEXT_RE.search(window))
         if not ok:
             bad.append(m.group(0).strip())
     return bad
@@ -195,8 +201,15 @@ def verify_critiques(ctx, out: CritiqueSet, proposals: ProposalSet) -> list[str]
     return problems
 
 
-CAUSAL_RE = re.compile(r"\b(caus\w*|because|due to|drove|drives|driven by|led to|leads to|triggered|resulted in|explains why)\b", re.I)
-MODERATE_P = 0.10
+CAUSAL_RE = re.compile(r"\b(caus\w*|because|due to|owing to|thanks to|drove|drives|driven by|led to|leads to|lead to|"
+                       r"triggered|trigger(?:s|ing)?|sparked|spark(?:s|ing)?|resulted in|results in|resulting in|"
+                       r"responsible for|consequence of|as a result|produced|produces|explains why)\b", re.I)
+# negated mentions are caveats, not claims: "not evidence of causation", "no causal link", "not a cause"
+NEGATED_CAUSAL_RE = re.compile(r"\b(?:not|no|never|nor)\b(?:\s+\w+){0,3}?\s+(?:caus\w*)", re.I)
+
+
+def _causal(text: str):
+    return CAUSAL_RE.search(NEGATED_CAUSAL_RE.sub(" ", text or ""))
 
 
 def verify_context(ctx, out: ContextReport) -> list[str]:
@@ -215,17 +228,25 @@ def verify_context(ctx, out: ContextReport) -> list[str]:
         bad_eps = [e for e in f.episode_ids if e not in episodes]
         if bad_eps:
             problems.append(f"{f.finding_id}: episode_ids {bad_eps} are not in the cited evidence {sorted(episodes)}")
+        from .context import MODERATE_P, PRIMARY_TALLIES, TALLY_FLAG
+        if f.tally:
+            side, flag = TALLY_FLAG[f.tally]
+            flagged = {e["episode_id"]: e.get(flag) for p in cited for e in p.get(side, [])}
+            wrong = [e for e in f.episode_ids if e in episodes and not flagged.get(e)]
+            if wrong:
+                problems.append(f"{f.finding_id}: episodes {wrong} do not have {flag} in the cited evidence")
         if f.strength == "moderate":
-            pvals = [v["binomial_p_value"] for p in cited for v in p.values()
-                     if isinstance(v, dict) and isinstance(v.get("binomial_p_value"), float)]
-            if not any(pv < MODERATE_P for pv in pvals):
-                problems.append(f"{f.finding_id}: 'moderate' needs a cited binomial_p_value below {MODERATE_P}; use 'weak' or 'none'")
-        if CAUSAL_RE.search(f.statement):
-            problems.append(f"{f.finding_id}: the statement makes a causal claim ({CAUSAL_RE.search(f.statement).group(0)!r}); "
-                            "describe co-occurrence in time only")
+            pv = next((p[f.tally]["binomial_p_value"] for p in cited if f.tally and isinstance(p.get(f.tally), dict)), None)
+            if f.tally not in PRIMARY_TALLIES or not isinstance(pv, float) or not pv < MODERATE_P:
+                problems.append(f"{f.finding_id}: 'moderate' needs `tally` set to a primary tally {list(PRIMARY_TALLIES)} whose "
+                                f"binomial_p_value is below {MODERATE_P} (Bonferroni over the two); use 'weak' or 'none'")
+        hit = _causal(f.statement)
+        if hit:
+            problems.append(f"{f.finding_id}: the statement makes a causal claim ({hit.group(0)!r}); describe co-occurrence in time only")
         problems += _check_texts(f.finding_id, [f.statement, *f.caveats], cited)
-    if CAUSAL_RE.search(out.summary):
-        problems.append(f"summary makes a causal claim ({CAUSAL_RE.search(out.summary).group(0)!r}); describe co-occurrence only")
+    hit = _causal(out.summary)
+    if hit:
+        problems.append(f"summary makes a causal claim ({hit.group(0)!r}); describe co-occurrence only")
     everything = [e.payload for e in ctx.store.all()] + [context_numbers(ctx)]
     problems += _check_texts("context summary/limitations", [out.summary, *out.limitations], everything)
     return problems
