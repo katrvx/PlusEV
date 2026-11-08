@@ -145,3 +145,50 @@ def test_mixed_model_run_keeps_its_failure_provenance(monkeypatch: pytest.Monkey
     result = team_reports.get_investigation(report["experiment_id"])
     assert result["report"] == report
     assert team_reports.list_investigations()[0]["agent_mode"] == "llm_with_fallback"
+
+
+def test_frozen_look_is_attached_only_to_its_own_report(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    experiments = tmp_path / "experiments"
+    experiments.mkdir(parents=True)
+    report = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    report.update(experiment_id="exp_with_look", strategy_id="btc-look-demo")
+    (experiments / "investigation_with_look.json").write_text(json.dumps(report), encoding="utf-8")
+    other = dict(report, experiment_id="exp_other_run")
+    (experiments / "investigation_other.json").write_text(json.dumps(other), encoding="utf-8")
+    look = {
+        "experiment_id": "exp_with_look",
+        "strategy_id": "btc-look-demo",
+        "champion_policy_id": "agent::gate",
+        "evaluation": {
+            "split": "test",
+            "metrics": {"net_return": -0.2, "max_drawdown": 0.3},
+            "always_on": {"net_return": -0.5, "max_drawdown": 0.6},
+            "delta_net_return_vs_always_on": 0.3,
+            "ci_delta": [0.1, 0.4],
+        },
+    }
+    (experiments / "frozen_look_btc-look-demo.json").write_text(json.dumps(look), encoding="utf-8")
+    configure(monkeypatch, tmp_path, tmp_path / "missing_bundled.json")
+
+    matched = team_reports.get_investigation("exp_with_look")
+    assert matched["frozen_look"] == look
+    assert matched["report"] == report
+    assert {"source", "synthetic", "source_path", "report"} <= set(matched)
+
+    # Same strategy, different experiment: that look belongs to another run.
+    assert "frozen_look" not in team_reports.get_investigation("exp_other_run")
+
+
+def test_report_without_frozen_look_keeps_its_shape(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    fixture = tmp_path / "apps" / "api" / "fixtures" / "lane_b_investigation.json"
+    copy_fixture(tmp_path, fixture)
+    configure(monkeypatch, tmp_path, fixture)
+    experiment_id = team_reports.list_investigations()[0]["experiment_id"]
+    assert set(team_reports.get_investigation(experiment_id)) == {"source", "synthetic", "source_path", "report"}
+
+
+def test_checked_in_meanrev_report_carries_its_frozen_look() -> None:
+    result = team_reports.get_investigation("exp_a79497cf70ec")
+    assert result["report"]["strategy_id"] == "btc-meanrev-48-demo"
+    assert result["frozen_look"]["evaluation"]["split"] == "test"
+    assert "frozen_look" not in team_reports.get_investigation("exp_dea9445d0576")

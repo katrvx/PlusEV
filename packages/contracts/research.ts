@@ -40,6 +40,44 @@ export type TeamTrial = {
   evidence_id: string | null;
   status: "evaluated" | "refused" | "error";
   note: string;
+  net_return?: number | null;
+  /** Walk-forward train fold (arbiter stability check); null for every policy attempt. */
+  fold?: number | null;
+};
+export type TeamContextFinding = {
+  finding_id: string;
+  statement: string;
+  episode_ids?: string[];
+  evidence_ids: string[];
+  tally?: string | null;
+  strength: "none" | "weak" | "moderate";
+  caveats?: string[];
+};
+export type TeamContext = { summary: string; findings: TeamContextFinding[]; limitations?: string[] };
+export type TeamLookMetrics = {
+  net_return: number;
+  max_drawdown: number;
+  sharpe?: number;
+  exposure?: number;
+  ci_net_return?: [number, number] | null;
+  [key: string]: unknown;
+};
+/** One pre-registered look at the test window (experiments/frozen_look_<strategy_id>.json). */
+export type TeamFrozenLook = {
+  what?: string;
+  experiment_id: string;
+  strategy_id: string;
+  champion_policy_id?: string | null;
+  looked_at?: string;
+  evaluation: {
+    policy_id?: string;
+    split: "train" | "validation" | "test";
+    metrics: TeamLookMetrics;
+    always_on: TeamLookMetrics;
+    delta_net_return_vs_always_on: number | null;
+    ci_delta: [number, number] | null;
+    allocation_mix?: Record<string, number>;
+  };
 };
 export type TeamCandidate = {
   policy_id: string;
@@ -83,11 +121,13 @@ export type TeamReport = {
   strategy_health?: {
     status: string;
     summary: string;
-    train_range?: { low: number; high: number; horizon_bars: number; source?: string };
+    changed_assumptions?: string[];
+    train_range?: { low: number; high: number; horizon_bars: number; horizon_days?: number; source?: string };
     validation_blocks: { start: string; net_return: number; position: "inside" | "below" | "above" }[];
   } | null;
+  context?: TeamContext | null;
 };
-export type InvestigationWrapper = { source: "team_artifact" | "bundled_lane_b_fixture"; synthetic: boolean; source_path: string; report: TeamReport };
+export type InvestigationWrapper = { source: "team_artifact" | "bundled_lane_b_fixture"; synthetic: boolean; source_path: string; report: TeamReport; frozen_look?: TeamFrozenLook | null };
 export type InvestigationSummary = {
   experiment_id: string;
   strategy_id: string;

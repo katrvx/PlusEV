@@ -20,6 +20,7 @@ FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "lane_b_investigat
 CHECKED_IN_SYNTHETIC_ARTIFACT = Path("experiments") / "investigation_fixture.json"
 REPORT_NAME_PATTERN = re.compile(r"^investigation_[A-Za-z0-9._-]+\.json$")
 REPORT_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+FROZEN_LOOK_PREFIX = "frozen_look_"
 VALID_AGENT_MODES = {"llm", "llm_with_fallback", "deterministic_fallback"}
 
 router = APIRouter(prefix="/api", tags=["investigations"])
@@ -107,6 +108,32 @@ def _validate_report(report: Any, path: Path) -> dict[str, Any]:
     return report
 
 
+def _frozen_look(report: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the one pre-registered test-window look recorded for this report, if any.
+
+    The file is ``experiments/frozen_look_<strategy_id>.json``. It is attached only
+    when it names the same strategy and experiment as the report, so a look from
+    an older or different investigation is never shown against this one.
+    """
+    strategy_id = report.get("strategy_id")
+    if not isinstance(strategy_id, str) or not REPORT_ID_PATTERN.fullmatch(strategy_id):
+        return None
+    path = ROOT / "experiments" / f"{FROZEN_LOOK_PREFIX}{strategy_id}.json"
+    if not path.is_file():
+        return None
+    try:
+        look = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=500, detail=f"Invalid frozen-look artifact {_relative(path)}: {exc.msg} at line {exc.lineno}") from exc
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Could not read frozen-look artifact {_relative(path)}: {exc}") from exc
+    if not isinstance(look, dict) or not isinstance(look.get("evaluation"), dict):
+        raise HTTPException(status_code=500, detail=f"Invalid frozen-look artifact {_relative(path)}: missing evaluation object")
+    if look.get("strategy_id") != strategy_id or look.get("experiment_id") != report.get("experiment_id"):
+        return None
+    return look
+
+
 def _load_wrapper(path: Path, synthetic: bool, source: str) -> dict[str, Any]:
     try:
         report = json.loads(path.read_text(encoding="utf-8"))
@@ -120,12 +147,16 @@ def _load_wrapper(path: Path, synthetic: bool, source: str) -> dict[str, Any]:
         validated = _validate_report(report, path)
     except ValueError as exc:
         raise HTTPException(status_code=500, detail=f"Invalid investigation artifact {_relative(path)}: {exc}") from exc
-    return {
+    wrapper: dict[str, Any] = {
         "source": source,
         "synthetic": synthetic,
         "source_path": _relative(path),
         "report": validated,
     }
+    frozen_look = _frozen_look(validated)
+    if frozen_look is not None:
+        wrapper["frozen_look"] = frozen_look
+    return wrapper
 
 
 def _load_wrappers() -> list[dict[str, Any]]:
