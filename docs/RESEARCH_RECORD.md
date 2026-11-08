@@ -34,4 +34,3 @@ Reproduce: `python3 scripts/kok_challenge.py challenge --strategy mean_reversion
 **Show one control live (offline):** `python3 scripts/demo_controls.py` runs 4 controls: the sealed test split is refused to an agent; an invented number is rejected and the agent retries with copied numbers; a money-losing gate the AI critic approved is rejected by code; and a second look at the test split is refused even under a new name. `--only 2` runs one. It exits 1 if any control fails.
 
 The agents propose and explain; **code computes every number and makes every decision.**
-
