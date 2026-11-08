@@ -33,11 +33,11 @@ from typing import Callable
 from packages.meta_policy import LGBM_UNAVAILABLE, rule_gate_spec
 
 from . import fallback
-from .agents import configured_model, model_name, run_critic, run_diagnostic, run_proposer
+from .agents import configured_model, model_name, run_context, run_critic, run_diagnostic, run_proposer
 from .models import CritiqueSet, InvestigationReport, PolicyCandidate, ProposalSet
 from .health import strategy_health
 from .tools import ToolContext, spec_hash
-from .verify import verify_critiques, verify_diagnostic, verify_proposals
+from .verify import verify_context, verify_critiques, verify_diagnostic, verify_proposals
 
 DEGENERATE_SHARE = fallback.DEGENERATE_SHARE
 
@@ -85,10 +85,22 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
         if problems:
             limitations.append("fallback diagnostic verification issues: " + "; ".join(problems))
 
+    # 1b. context (agent 4): sentiment around the best/worst train weeks; skipped (and disclosed) without a series
+    context = None
+    if "error" in ctx.sentiment_context():
+        limitations.append("Context agent skipped: the loader has no train Fear & Greed series or per-bar equity.")
+    else:
+        context, ok = _stage("context", lambda: run_context(ctx, model), lambda: fallback.context(ctx), model, failures, ctx)
+        used_llm.append(ok)
+        if not ok:
+            problems = verify_context(ctx, context)
+            if problems:
+                limitations.append("fallback context verification issues: " + "; ".join(problems))
+
     # 2. proposals (train only)
     hyp_ids = {h.hypothesis_id for h in diagnostic.hypotheses}
     tests_at_start = ctx.agent_tests_used()
-    proposals, ok = _stage("proposer", lambda: run_proposer(ctx, model, diagnostic), lambda: fallback.propose(ctx, diagnostic),
+    proposals, ok = _stage("proposer", lambda: run_proposer(ctx, model, diagnostic, context), lambda: fallback.propose(ctx, diagnostic),
                            model, failures, ctx)
     used_llm.append(ok)
     if not ok and model is not None:
@@ -340,5 +352,5 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
                        "Report each vs always_on, vs cash and vs the simple rule, with CIs. Do not change any policy after seeing the result."],
         limitations=limitations, evidence=ctx.store.all(), n_distinct_agent_policies=len(agent_specs),
         n_policies_tried=len(all_specs), holdout_accessed=ctx.holdout_accessed,
-        strategy_health=ctx.health,
+        strategy_health=ctx.health, context=context,
     )

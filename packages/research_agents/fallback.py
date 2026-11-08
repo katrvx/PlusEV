@@ -6,7 +6,7 @@ agents must at least match. Like the agents, it reads TRAIN data only.
 
 from __future__ import annotations
 
-from .models import Critique, CritiqueSet, DiagnosticReport, GateProposal, Hypothesis, ProposalSet, ThresholdCondition
+from .models import ContextFinding, ContextReport, Critique, CritiqueSet, DiagnosticReport, GateProposal, Hypothesis, ProposalSet, ThresholdCondition
 from .health import feature_shift
 from .tools import ToolContext, is_fold, spec_hash
 
@@ -132,3 +132,31 @@ def critique(ctx: ToolContext, proposals: ProposalSet) -> CritiqueSet:
                             leakage_concerns=[] if all(c.feature != "news_sentiment" for c in p.conditions) else ["check news first-seen times"],
                             evidence_ids=evs or [ctx.feature_grid()["evidence_id"]]))
     return CritiqueSet(critiques=out)
+
+
+def context(ctx: ToolContext) -> ContextReport:
+    """Deterministic agent 4: state the two pre-registered tallies with their base rates; no causal language."""
+    out = ctx.sentiment_context()
+    if "error" in out:
+        return ContextReport(summary="Sentiment context was not available for this loader.", limitations=[out["error"]])
+    eid = out["evidence_id"]
+    specs = [("C1", "worst_weeks_after_greed_to_fear_flip", "worst_weeks", "worst", "a greed-to-fear flip"),
+             ("C2", "best_weeks_after_fear_to_greed_flip", "best_weeks", "best", "a fear-to-greed flip")]
+    findings = []
+    for fid, key, eps_key, word, flip in specs:
+        t = out[key]
+        p = t["binomial_p_value"]
+        strength = "moderate" if p is not None and p < 0.10 else ("weak" if t["n_with_flip"] else "none")
+        flag = "greed_to_fear_flip_in_prior_3_days" if word == "worst" else "fear_to_greed_flip_in_prior_3_days"
+        findings.append(ContextFinding(
+            finding_id=fid, evidence_ids=[eid], strength=strength,
+            episode_ids=[e["episode_id"] for e in out[eps_key] if e[flag]],
+            statement=(f"{t['n_with_flip']} of {t['n_weeks']} {word} train weeks started within 3 days after {flip}; "
+                       f"the train base rate is {t['base_rate']:.3g} (binomial p {p:.3g})."),
+            caveats=["small sample of weeks per side", "co-occurrence in time, not a cause"]))
+    separated = any(f.strength == "moderate" for f in findings)
+    summary = ("Sentiment flips line up with the strategy's extreme weeks more often than chance on train."
+               if separated else
+               "On train, sentiment flips do not line up with the strategy's best or worst weeks more often than chance.")
+    return ContextReport(summary=summary, findings=findings,
+                         limitations=["Fear & Greed only; no news archive with first-seen timestamps is available"])

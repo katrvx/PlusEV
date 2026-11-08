@@ -849,3 +849,105 @@ def test_health_evidence_states_the_block_length_in_days():
     from packages.research_agents.health import strategy_health
     h = strategy_health(_health_exp(lambda i, r: 0.003 * (-1) ** i - 0.00002))
     assert h["train_range"]["horizon_days"] == 14 and not unsupported_numbers("each 14-day block", [h])
+
+
+# ------------------------------------------------------------------ agent 4: context (sentiment around best/worst weeks)
+
+def _context_ctx(planted=True):
+    """Stand-in ctx plus a train Fear & Greed series and per-bar equity. With planted=True, four greed-to-fear
+    flips are each followed by a losing week, so the tally must find 4/4 against a small base rate."""
+    from types import SimpleNamespace as NS
+    exp, runner, tq, _df, _lgbm = build()
+    t0 = datetime(2024, 1, 9, 8, tzinfo=timezone.utc)   # the stand-in's train window starts here
+    n = 3000
+    fg = [62.0] * n
+    rets = [0.0004 * (-1) ** i for i in range(n)]
+    for k, start in enumerate((300, 900, 1500, 2100)):
+        for i in range(start, start + 200):
+            fg[i] = 30.0                                  # flip to fear at `start`, back to greed later
+        if planted:
+            for i in range(start + 1, start + 1 + 168):
+                rets[i] = -0.001                          # the worst weeks start right after each flip
+    times = [t0 + timedelta(hours=i) for i in range(n)]
+    eq = [NS(split="train", decision_time=t, net_return=r, exposure=1.0) for t, r in zip(times, rets)]
+    eq += [NS(split="validation", decision_time=t0 + timedelta(hours=n + i), net_return=-0.5, exposure=1.0) for i in range(500)]
+
+    class R:
+        def __init__(self):
+            self.splits = []
+
+        def feature_series(self, name, split="train"):
+            self.splits.append(split)
+            assert name == "fear_greed"
+            return list(zip(times, fg))
+
+        def __getattr__(self, name):
+            return getattr(runner, name)
+
+    ctx = ToolContext(experiment=exp.model_copy(update={"equity": eq}), gate_runner=R(), news=None, train_quantiles=tq)
+    return ctx
+
+
+def test_sentiment_episodes_find_a_planted_pattern_and_read_train_only():
+    ctx = _context_ctx(planted=True)
+    out = ctx.sentiment_context()
+    t = out["worst_weeks_after_greed_to_fear_flip"]
+    assert t["n_with_flip"] == 4 and t["n_weeks"] == 4 and t["binomial_p_value"] < 0.01
+    assert ctx.gate_runner.splits == ["train"]
+    assert all(e["net_return"] > -0.5 for e in out["worst_weeks"])          # validation bars never enter
+
+
+def test_fallback_context_passes_its_own_verifier_and_says_moderate_only_when_earned():
+    from packages.research_agents import fallback
+    from packages.research_agents.verify import verify_context
+    for planted, strength in ((True, "moderate"), (False, None)):
+        ctx = _context_ctx(planted)
+        rep = fallback.context(ctx)
+        assert not verify_context(ctx, rep)
+        c1 = next(f for f in rep.findings if f.finding_id == "C1")
+        assert (c1.strength == "moderate") is (strength == "moderate")
+
+
+@pytest.mark.parametrize("statement,strength,episodes,fragment", [
+    ("Losing weeks happened because sentiment flipped to fear.", "weak", [], "causal"),
+    ("The flip base rate is 0.731.", "weak", [], "not copied"),
+    ("Worst weeks often follow a flip.", "moderate", [], None),        # 'moderate' allowed only on the planted ctx
+    ("Worst weeks often follow a flip.", "weak", ["worst_week_9"], "episode_ids"),
+])
+def test_context_verifier_rejects_causal_claims_invented_numbers_and_fake_episodes(statement, strength, episodes, fragment):
+    from packages.research_agents.models import ContextFinding, ContextReport
+    from packages.research_agents.verify import verify_context
+    ctx = _context_ctx(planted=False)
+    eid = ctx.sentiment_context()["evidence_id"]
+    rep = ContextReport(summary="Context.", findings=[ContextFinding(finding_id="C1", statement=statement, strength=strength,
+                                                                       episode_ids=episodes, evidence_ids=[eid])])
+    problems = verify_context(ctx, rep)
+    if fragment is None:
+        assert any("'moderate' needs" in p for p in problems)
+    else:
+        assert any(fragment in p for p in problems)
+
+
+def test_llm_context_agent_is_made_to_retry_a_causal_claim():
+    from packages.research_agents.models import ContextReport
+
+    def build_output(returns, cheat):
+        eid = returns[-1].content["evidence_id"]
+        stmt = "Worst weeks were caused by greed-to-fear flips." if cheat else "Worst weeks started right after greed-to-fear flips."
+        return {"summary": "Flips line up with the worst weeks on train.",
+                "findings": [{"finding_id": "C1", "statement": stmt, "strength": "moderate", "evidence_ids": [eid],
+                              "episode_ids": ["worst_week_1"]}]}
+
+    model, state = _script(build_output, first_call=("sentiment_episodes", {}), cheat_first=True)
+    out = agents.run_context(_context_ctx(planted=True), model)
+    assert isinstance(out, ContextReport) and "caused" not in out.findings[0].statement and state["calls"] >= 3
+
+
+def test_context_agent_has_one_train_only_tool_and_feeds_the_proposer():
+    tools = set(agents._context_agent("test")._function_toolset.tools)
+    assert tools == {"sentiment_episodes"}
+
+
+def test_context_is_skipped_and_disclosed_without_a_sentiment_series():
+    rep = investigate("x", model=None, loader=fixture_loader)
+    assert rep.context is None and any(l.startswith("Context agent skipped") for l in rep.limitations)

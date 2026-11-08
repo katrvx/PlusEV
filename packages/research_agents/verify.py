@@ -22,7 +22,7 @@ import math
 import re
 from decimal import Decimal, InvalidOperation
 
-from .models import CritiqueSet, DiagnosticReport, ProposalSet
+from .models import ContextReport, CritiqueSet, DiagnosticReport, ProposalSet
 
 CI_LEVEL = 90
 MIN_TRADES = 20          # 'treat buckets with fewer than 20 trades as weak' (agent instructions)
@@ -192,4 +192,40 @@ def verify_critiques(ctx, out: CritiqueSet, proposals: ProposalSet) -> list[str]
                             "Move non-blocking remarks to observations, or change the verdict.")
         problems += _check_texts(c.proposal_id, [*c.leakage_concerns, *c.overfit_risks, *c.fragile_samples, *c.counterexamples,
                                                  *c.observations], _payloads(ctx, c.evidence_ids))
+    return problems
+
+
+CAUSAL_RE = re.compile(r"\b(caus\w*|because|due to|drove|drives|driven by|led to|leads to|triggered|resulted in|explains why)\b", re.I)
+MODERATE_P = 0.10
+
+
+def verify_context(ctx, out: ContextReport) -> list[str]:
+    """Agent 4: cite sentiment_episodes evidence, name only real episodes, copy numbers, no causal claims,
+    and 'moderate' strength only when a cited binomial p-value is below 0.10."""
+    problems = []
+    for f in out.findings:
+        missing = ctx.store.missing(f.evidence_ids)
+        if missing:
+            problems.append(f"{f.finding_id}: unknown evidence ids {missing}")
+            continue
+        cited = _payloads(ctx, f.evidence_ids)
+        episodes = {e["episode_id"] for p in cited for e in p.get("worst_weeks", []) + p.get("best_weeks", [])}
+        if not episodes:
+            problems.append(f"{f.finding_id}: cite the sentiment_episodes evidence_id")
+        bad_eps = [e for e in f.episode_ids if e not in episodes]
+        if bad_eps:
+            problems.append(f"{f.finding_id}: episode_ids {bad_eps} are not in the cited evidence {sorted(episodes)}")
+        if f.strength == "moderate":
+            pvals = [v["binomial_p_value"] for p in cited for v in p.values()
+                     if isinstance(v, dict) and isinstance(v.get("binomial_p_value"), float)]
+            if not any(pv < MODERATE_P for pv in pvals):
+                problems.append(f"{f.finding_id}: 'moderate' needs a cited binomial_p_value below {MODERATE_P}; use 'weak' or 'none'")
+        if CAUSAL_RE.search(f.statement):
+            problems.append(f"{f.finding_id}: the statement makes a causal claim ({CAUSAL_RE.search(f.statement).group(0)!r}); "
+                            "describe co-occurrence in time only")
+        problems += _check_texts(f.finding_id, [f.statement, *f.caveats], cited)
+    if CAUSAL_RE.search(out.summary):
+        problems.append(f"summary makes a causal claim ({CAUSAL_RE.search(out.summary).group(0)!r}); describe co-occurrence only")
+    everything = [e.payload for e in ctx.store.all()] + [context_numbers(ctx)]
+    problems += _check_texts("context summary/limitations", [out.summary, *out.limitations], everything)
     return problems

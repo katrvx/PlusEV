@@ -314,6 +314,15 @@ class ToolContext:
             out.append({"evidence_id": eid, **payload})
         return out
 
+    def sentiment_context(self) -> dict:
+        """TRAIN-only Fear & Greed around the strategy's 4 best and 4 worst weeks (context.py). Stored as evidence."""
+        from .context import sentiment_episodes
+        payload = sentiment_episodes(self.experiment, self.gate_runner, train_end=self.train_end())
+        if "error" in payload:
+            return payload
+        eid = self.store.add("sentiment_episodes", {"split": "train"}, payload)
+        return {"evidence_id": eid, **payload}
+
     def feature_grid(self) -> dict:
         """Allowed thresholds (training-quantile grid) per allowlisted feature, with coverage."""
         payload = {"train_quantiles": {f: {str(q): v for q, v in qs.items()} for f, qs in self.train_quantiles.items()},
