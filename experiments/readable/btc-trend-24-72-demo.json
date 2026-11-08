@@ -1084,7 +1084,7 @@
    "actor_kind": "Code",
    "action": "decided",
    "title": "No filter earned the held-out test",
-   "summary": "The rule was fixed before the run: beat the original with an interval above zero, beat cash, change something real, and not be rejected by the critic.",
+   "summary": "The rule was fixed before the run: beat the original and cash on Validation after costs, change something real, and not be rejected by the critic. Only the best such filter goes on.",
    "items": [
     "Selected: none",
     "no agent gate met the pre-registered rule"

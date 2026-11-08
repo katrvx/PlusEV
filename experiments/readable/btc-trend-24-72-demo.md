@@ -68,7 +68,7 @@ Source: `experiments/conditions_check/timing_btc-trend-24-72-demo.json`. Diagnos
    - Half size when Fear & Greed index is low (≤ 28): rejected — Because sentiment_regime shifted sharply between train and validation, this gate is almost always on at full size in validation: allocation_mix is 1.0 for 96.58% of in-position decisions and 0.5 for…
    - Half size when 7-day price momentum is low (≤ -0.02482): rejected — The proposal is partly motivated by H1/H4 regime performance in trend_regime, where the bear bucket has only n_trades = 2 across 15278 decisions.
    - *Changed the conclusion:* The filter with the best Validation number (Flat when Fear & Greed index is low (≤ 28), +32.0 pp) was rejected by the critic, so it could not be selected.
-7. **Code: selection rule** (Code) — No filter earned the held-out test. The rule was fixed before the run: beat the original with an interval above zero, beat cash, change something real, and not be rejected by the critic.
+7. **Code: selection rule** (Code) — No filter earned the held-out test. The rule was fixed before the run: beat the original and cash on Validation after costs, change something real, and not be rejected by the critic. Only the best such filter goes on.
    - Selected: none
    - no agent gate met the pre-registered rule
 8. **Lane A arbiter** (Code) — Strategy verdict: INCONCLUSIVE. the held-out intervals still contain zero, and the critic rejected every proposed filter.
