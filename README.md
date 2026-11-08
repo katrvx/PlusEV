@@ -10,6 +10,8 @@ AI agents investigate the market conditions behind a strategy's wins and losses,
 
 Built for **prop firms, copy-trading platforms and bot marketplaces**, which decide every day which strategies keep their capital.
 
+**▶ [Watch the demo video (2 min)](https://youtu.be/hjLU1_4BD2I)**
+
 ![+EV: Good strategy. Wrong market?](docs/media/homepage.png)
 
 <details>
@@ -21,7 +23,7 @@ Built for **prop firms, copy-trading platforms and bot marketplaces**, which dec
 
 *AgentVerse 2026 · UCL · Finance track · Research prototype · Paper only, no live orders*
 
-[Results](#what-we-found-honestly) · [Demo](#the-two-minute-demo) · [How it decides](#how-a-decision-is-made) · [Testing](#testing-on-data-the-research-never-touched) · [Risk controls](#risk-controls-enforced-in-code-shown-live) · [Run it](#run-ev-locally)
+[Demo video](https://youtu.be/hjLU1_4BD2I) · [Results](#what-we-found-honestly) · [Demo](#the-two-minute-demo) · [How it decides](#how-a-decision-is-made) · [Testing](#testing-on-data-the-research-never-touched) · [Risk controls](#risk-controls-enforced-in-code-shown-live) · [Run it](#run-ev-locally)
 
 ---
 
@@ -50,6 +52,8 @@ The full record, every interval and the caveats: [docs/RESEARCH_RECORD.md](docs/
 ---
 
 ## The two-minute demo
+
+Video walkthrough: [youtu.be/hjLU1_4BD2I](https://youtu.be/hjLU1_4BD2I).
 
 Start the app and select **Try an example**, then pick **BTC mean reversion · 48h** from the strategy switcher.
 
