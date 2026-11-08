@@ -12,6 +12,13 @@ Built for **prop firms, copy-trading platforms and bot marketplaces**, which dec
 
 ![+EV: Good strategy. Wrong market?](docs/media/homepage.png)
 
+<details>
+<summary>View the mobile landing page</summary>
+
+![+EV landing page on mobile.](docs/media/homepage-mobile.png)
+
+</details>
+
 *AgentVerse 2026 · UCL · Finance track · Research prototype · Paper only, no live orders*
 
 [Results](#what-we-found-honestly) · [Demo](#the-two-minute-demo) · [How it decides](#how-a-decision-is-made) · [Testing](#testing-on-data-the-research-never-touched) · [Risk controls](#risk-controls-enforced-in-code-shown-live) · [Run it](#run-ev-locally)
