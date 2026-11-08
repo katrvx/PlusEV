@@ -111,6 +111,17 @@ Lane A's 2018-02 → 2026-10 hourly BTCUSDT book (research → 2023-05, validati
 
 Reports: `experiments/investigation_argon_lane_a.json`, `experiments/investigation_argon_meanrev.json`. The sealed look is `experiments/frozen_look_btc-meanrev-48-demo.json`. It was taken after the report that chose the champion was committed (`ad3dff1`).
 
+## Readable reports and the conditions behind gates
+
+- `presentation.py` adds an optional plain-language view to every report. It contains one finding and the next step, the three stages (Training, Validation, Held-out test), every checked filter with its outcome, the agent trace, and a takeaway (strategy definition or reference, exact filter settings, evidence).
+  - It is built by code from the report and adds no numbers or decisions.
+  - "Checked" never reads as "passed". Outcomes are rejected, not run, selected for further testing, approved, or comparison only.
+  - Judge-readable copies are in `experiments/readable/`.
+- `vol_ratio_24h_7d` (24-hour volatility vs its 7-day baseline) is now allowlisted. `volume_zscore` is called a volume proxy. No spread or order-book data exists.
+- Every proposal is also compared on Validation with constant half size and with a constant at its average Training size (timing vs less risk). This is diagnostic; the selection rule is unchanged.
+- One held-out look per test window, whatever the policy (`frozen.check_window`).
+- Results and the full audit: `experiments/conditions_check/README.md`.
+
 ## The organisers' kit challenge
 
 The same gate (half size when 7-bar realized volatility is at or below its expanding median of earlier bars) runs as a kit adapter, `packages/kit_adapter/kok.py`. Pre-registered in `eval/challenge/kok-preregistration.md` (2327e45) before any run; one `challenge` per strategy, then a raw replay on the revealed cases. The kit executes all-in or flat, so 0.5 rounds to flat.

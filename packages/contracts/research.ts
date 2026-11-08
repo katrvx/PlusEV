@@ -1,6 +1,37 @@
 /** Native Lane B investigation report shape consumed by Part C. */
 export type AgentMode = "llm" | "llm_with_fallback" | "deterministic_fallback";
 
+export type NativeStrategyHealth = {
+  status: string;
+  summary: string;
+  changed_assumptions: string[];
+  train_range: { low: number; high: number; horizon_bars: number; horizon_days: number; source: string };
+  validation_blocks: { start: string; net_return: number; position: "inside" | "below" | "above" }[];
+  n_blocks: number;
+  n_below: number;
+  n_above: number;
+  validation_net_return: number;
+  checks: { assumption: string; train: number | Record<string, number>; validation: number | Record<string, number>; ratio?: number; total_variation?: number; changed: boolean; note: string }[];
+  evidence_id: string;
+};
+
+export type NativeMetrics = {
+  net_return: number; sharpe: number; sortino: number; max_drawdown: number;
+  turnover: number; n_switches: number; exposure: number; ci_net_return: [number, number];
+  cvar_05?: number; avg_holding_bars?: number;
+};
+export type NativeEvaluation = {
+  policy_id: string; split: string; metrics: NativeMetrics; always_on: NativeMetrics;
+  delta_net_return_vs_always_on: number; ci_delta: [number, number];
+  allocation_mix: Record<string, number>; n_decisions: number; n_in_position: number;
+  fold: number | null; audit_id: string;
+};
+export type FrozenEvaluation = {
+  what: string; experiment_id: string; strategy_id: string;
+  champion_policy_id: string; champion_spec_hash: string; selected_in_report: string;
+  report_committed_before_look: string; looked_at: string; evaluation: NativeEvaluation;
+};
+
 export type TeamEvidence = {
   evidence_id: string;
   tool: string;
@@ -44,6 +75,7 @@ export type TeamTrial = {
   /** Walk-forward train fold (arbiter stability check); null for every policy attempt. */
   fold?: number | null;
 };
+/** One finding of agent 4 (market sentiment around the best and worst training weeks). */
 export type TeamContextFinding = {
   finding_id: string;
   statement: string;
@@ -54,31 +86,6 @@ export type TeamContextFinding = {
   caveats?: string[];
 };
 export type TeamContext = { summary: string; findings: TeamContextFinding[]; limitations?: string[] };
-export type TeamLookMetrics = {
-  net_return: number;
-  max_drawdown: number;
-  sharpe?: number;
-  exposure?: number;
-  ci_net_return?: [number, number] | null;
-  [key: string]: unknown;
-};
-/** One pre-registered look at the test window (experiments/frozen_look_<strategy_id>.json). */
-export type TeamFrozenLook = {
-  what?: string;
-  experiment_id: string;
-  strategy_id: string;
-  champion_policy_id?: string | null;
-  looked_at?: string;
-  evaluation: {
-    policy_id?: string;
-    split: "train" | "validation" | "test";
-    metrics: TeamLookMetrics;
-    always_on: TeamLookMetrics;
-    delta_net_return_vs_always_on: number | null;
-    ci_delta: [number, number] | null;
-    allocation_mix?: Record<string, number>;
-  };
-};
 export type TeamCandidate = {
   policy_id: string;
   spec_hash?: string | null;
@@ -102,6 +109,11 @@ export type TeamReport = {
   agent_failures?: string[];
   verdict?: "candidate_for_frozen_test" | "INCONCLUSIVE";
   champion_policy_id?: string | null;
+  verdict_basis?: string[];
+  strategy_health?: NativeStrategyHealth | null;
+  validation_always_on?: Pick<NativeMetrics, "net_return" | "ci_net_return">;
+  validation_cash_net_return?: number;
+  context?: TeamContext | null;
   diagnostic: {
     summary: string;
     hypotheses: TeamHypothesis[];
@@ -118,21 +130,37 @@ export type TeamReport = {
   n_distinct_agent_policies?: number;
   n_policies_tried: number;
   holdout_accessed: boolean;
-  strategy_health?: {
-    status: string;
-    summary: string;
-    changed_assumptions?: string[];
-    train_range?: { low: number; high: number; horizon_bars: number; horizon_days?: number; source?: string };
-    validation_blocks: { start: string; net_return: number; position: "inside" | "below" | "above" }[];
-  } | null;
-  context?: TeamContext | null;
-  validation_always_on?: { net_return: number; ci_net_return?: [number, number] | null } | null;
+};
+export type TeamLookMetrics = {
+  net_return: number;
+  max_drawdown: number;
+  sharpe?: number;
+  exposure?: number;
+  ci_net_return?: [number, number] | null;
+  [key: string]: unknown;
+};
+/** One pre-registered look at the test window (experiments/frozen_look_<strategy_id>.json), served as `frozen_look`. */
+export type TeamFrozenLook = {
+  what?: string;
+  experiment_id: string;
+  strategy_id: string;
+  champion_policy_id?: string | null;
+  looked_at?: string;
+  evaluation: {
+    policy_id?: string;
+    split: "train" | "validation" | "test";
+    metrics: TeamLookMetrics;
+    always_on: TeamLookMetrics;
+    delta_net_return_vs_always_on: number | null;
+    ci_delta: [number, number] | null;
+    allocation_mix?: Record<string, number>;
+  };
 };
 /**
  * Plain-language view of one report (packages/research_agents/presentation.py).
  * Built by code from the report; it adds no numbers and no decisions.
  * Every `_pp` field is a fraction: 0.273 means +27.3 percentage points (pp).
- * Returns and drawdowns are fractions too: -0.289 means -28.9%.
+ * Returns, drawdowns and sizes are fractions too: -0.289 means -28.9%.
  */
 export type PresentationStageName = "Training" | "Validation" | "Held-out test";
 export type PresentationOutcome = "rejected" | "not_run" | "selected_for_further_testing" | "approved" | "reference";
@@ -163,6 +191,18 @@ export type PresentationHeldOut = {
   summary: string;
   source?: string | null;
 };
+/** Did the filter choose WHEN, or just hold less? Validation, identical costs. A diagnostic, not the selection rule. */
+export type PresentationTiming = {
+  vs_half_size_pp?: number | null;
+  vs_same_average_size_pp?: number | null;
+  /** Constant size equal to the filter's average Training size. */
+  same_average_size?: number | null;
+  vs_validation_size_pp?: number | null;
+  validation_size?: number | null;
+  size_note?: string | null;
+  read: string;
+  source: string;
+};
 export type PresentationFilter = {
   policy_id: string;
   label: string;
@@ -178,6 +218,8 @@ export type PresentationFilter = {
   validation_own_return?: number | null;
   average_size_on_validation?: number | null;
   held_out?: PresentationHeldOut | null;
+  /** Agent filters only, when a timing check was recorded. */
+  timing?: PresentationTiming | null;
   details: string[];
   spec: Record<string, unknown>;
   evidence_ids: string[];
@@ -235,6 +277,7 @@ export type InvestigationWrapper = {
   synthetic: boolean;
   source_path: string;
   report: TeamReport;
+  /** Optional: the one pre-registered test-window look for this exact report. */
   frozen_look?: TeamFrozenLook | null;
   /** Optional plain-language view; null or absent for reports it cannot describe. */
   presentation?: ReportPresentation | null;

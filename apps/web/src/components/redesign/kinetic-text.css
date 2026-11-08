@@ -1,0 +1,45 @@
+.kt-root {
+  display: inline;
+  line-height: inherit;
+}
+
+.kt-visual {
+  display: inline;
+  white-space: normal;
+}
+
+.kt-word-mask {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  line-height: 1.08;
+}
+
+.kt-word {
+  display: inline-block;
+  transform-origin: 0 100%;
+}
+
+.kt-root.kt-ready .kt-word {
+  will-change: transform, opacity;
+}
+
+.kt-space {
+  white-space: pre;
+}
+
+.kt-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kt-root.kt-ready .kt-word { opacity: 1; transform: none; }
+}

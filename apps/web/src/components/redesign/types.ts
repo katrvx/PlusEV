@@ -1,6 +1,6 @@
 import type { Experiment, Strategy, PaperPlan, Health, Evidence, EquityPoint } from "../../../../../packages/contracts/types";
 export type { Experiment, Strategy, PaperPlan, Health, Evidence, EquityPoint };
-export type MainView = "strategy" | "explore" | "compare" | "observe";
+export type MainView = "portfolio" | "strategy" | "explore" | "compare" | "observe";
 export type ExploreTab = "overview" | "conditions" | "evidence";
 export type MotionPreference = "system" | "reduced" | "full";
 export type SharedResearchProps = {
@@ -23,6 +23,6 @@ export type ResearchChartProps = {
   compact?: boolean;
   /** Quiet first-view mode for overview charts; details stay available below. */
   presentation?: "default" | "overview";
-  /** Names supplied by the evaluator. Defaults stay in place when a series is omitted. */
+  /** Names supplied by the evaluator; omitted series retain their default labels. */
   seriesLabels?: Partial<Record<ChartSeries, string>>;
 };

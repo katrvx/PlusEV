@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 166 72" role="img" aria-labelledby="title desc">
+  <title id="title">+EV</title>
+  <desc id="desc">+EV, a strategy verification workspace.</desc>
+  <path d="M18 36h24M30 24v24" stroke="#ff681b" stroke-width="9" stroke-linecap="round"/>
+  <path d="M61 12h36M61 36h28M61 60h36M61 12v48M116 12l15 48 15-48" fill="none" stroke="#241626" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

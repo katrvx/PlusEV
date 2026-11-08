@@ -14,8 +14,10 @@ OPS = ("<=", ">")
 
 # Lagged, point-in-time features Lane A's feature store provides (spec section 7).
 # fear_greed / news_sentiment are only allowed where coverage is reported >= MIN_COVERAGE.
-GATE_FEATURES = ("momentum_24h", "momentum_7d", "realized_vol_7d", "atr_14", "price_drawdown", "volume_zscore",
-                 "fear_greed", "news_sentiment")   # a feature the loader does not cover is refused (coverage 0)
+# vol_ratio_24h_7d: last-24h volatility / 7-day volatility (Lane A, point in time): "is volatility rising vs its baseline".
+# volume_zscore is traded volume vs its own 7-day baseline: a volume PROXY, not liquidity (no spread or depth data exists).
+GATE_FEATURES = ("momentum_24h", "momentum_7d", "realized_vol_7d", "vol_ratio_24h_7d", "atr_14", "price_drawdown",
+                 "volume_zscore", "fear_greed", "news_sentiment")   # a feature the loader does not cover is refused (coverage 0)
 MIN_COVERAGE = 0.9
 
 # Thresholds must be quantiles of the feature's TRAINING distribution, from this grid.

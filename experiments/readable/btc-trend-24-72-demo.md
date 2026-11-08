@@ -2,7 +2,7 @@
 
 **Strategy verdict: Not proven** — applies to the original strategy, always on (Lane A arbiter)
 
-**Finding.** Not proven. No filter passed, so the strategy stays unchanged.
+**Finding.** Not proven. No filter earned the held-out test, so the strategy stays unchanged.
 
 **What it means.** The held-out intervals still contain zero, and the critic rejected every proposed filter. The agents proposed 3 filters; 3 were rejected. The critic rejected all of them; the reasons are listed with each filter.
 
@@ -29,7 +29,17 @@ A filter only changes position size (none, half or full). Checked does not mean 
 | LightGBM model filter | Reference rule (Lane A) | Validation | **Comparison only** | -171.2 pp | -36.8% | A comparison the agents' filters must beat. Never a candidate. |
 | Lane A regime filter | Reference rule (Lane A) | Training folds, Validation | **Comparison only** | -20.3 pp | +114.1% | A comparison the agents' filters must beat. Never a candidate. |
 
-Also tried on Training only and not taken further (16): Flat when 7-day volatility is high (> 0.00753); Flat when trading volume vs normal is low (≤ -0.07709); Flat when Fear & Greed index is low (≤ 39); Flat when 7-day price momentum is low (≤ 0.004282); Half size when trading volume vs normal is low (≤ -0.2419); Half size when 7-day volatility is high (> 0.00753); Half size when Fear & Greed index is low (≤ 39); Flat when distance below the recent high is low (≤ -0.04068); Flat when 7-day price momentum is low (≤ -0.02482); Half size when Fear & Greed index is low (≤ 28); Flat when Fear & Greed index is low (≤ 28); Half size when 7-day price momentum is low (≤ -0.02482); p13 rvol q80 half; p14 fg q33 rvol q80 half; p15 mom7d volz q20 half; p16 volz q20 half.
+Also tried on Training only and not taken further (16): Flat when 7-day volatility is high (> 0.00753); Flat when trading volume vs its 7-day normal (a volume proxy, not liquidity) is low (≤ -0.07709); Flat when Fear & Greed index is low (≤ 39); Flat when 7-day price momentum is low (≤ 0.004282); Half size when trading volume vs its 7-day normal (a volume proxy, not liquidity) is low (≤ -0.2419); Half size when 7-day volatility is high (> 0.00753); Half size when Fear & Greed index is low (≤ 39); Flat when distance below the recent high is low (≤ -0.04068); Flat when 7-day price momentum is low (≤ -0.02482); Half size when Fear & Greed index is low (≤ 28); Flat when Fear & Greed index is low (≤ 28); Half size when 7-day price momentum is low (≤ -0.02482); p13 rvol q80 half; p14 fg q33 rvol q80 half; p15 mom7d volz q20 half; p16 volz q20 half.
+
+## Timing or just less risk? (Validation, same costs)
+
+| Filter | vs constant half size | vs constant at its Training size | vs constant at its Validation size | Read |
+|---|---|---|---|---|
+| Flat when Fear & Greed index is low (≤ 28) | +109.4 pp | +81.6 pp (constant 0.70x) | +38.0 pp (constant 0.97x) | Beat constant half size and a constant of the same average size on Validation: some evidence of timing, not proof (Validation was also used to select). Its average size changed between Training and Validation, so treat the comparison with care. |
+| Half size when Fear & Greed index is low (≤ 28) | +93.1 pp | +41.5 pp (constant 0.85x) | +18.7 pp (constant 0.98x) | Beat constant half size and a constant of the same average size on Validation: some evidence of timing, not proof (Validation was also used to select). Its average size changed between Training and Validation, so treat the comparison with care. |
+| Half size when 7-day price momentum is low (≤ -0.02482) | +49.4 pp | -13.4 pp (constant 0.91x) | -17.4 pp (constant 0.94x) | Did not beat a constant position of the same average size: the gain came from holding less, not timing. |
+
+Source: `experiments/conditions_check/timing_btc-trend-24-72-demo.json`. Diagnostic only: the selection rule fixed before the run is unchanged.
 
 ## How the agents got there
 

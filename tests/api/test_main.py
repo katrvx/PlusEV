@@ -50,7 +50,9 @@ def test_health_and_demo_seed_are_explicit() -> None:
     listed = strategies()
     assert any(item["strategy_id"] == "demo_btc_trend_v1" and item["status"] == "demo" for item in listed)
     ids = {item["strategy_id"] for item in listed}
-    assert {"demo_btc_trend_v1", "demo_btc_mean_reversion_v1", "btc-trend-24-72-demo", "btc-meanrev-48-demo"} <= ids
+    assert ids == {"demo_btc_trend_v1", "demo_btc_mean_reversion_v1"}
+    opted_in = strategies(include_native_example=True)
+    assert {"btc-trend-24-72-demo", "btc-meanrev-48-demo"} <= {item["strategy_id"] for item in opted_in}
     for strategy in listed:
         if not strategy["strategy_id"].startswith("demo_"):
             continue
@@ -66,17 +68,29 @@ def test_health_and_demo_seed_are_explicit() -> None:
     assert trend[0]["experiment_id"] == trend_report["experiment_id"]
     assert trend[0]["verdict"] == "INCONCLUSIVE"
     assert trend[0]["strategy_id"] == trend_report["strategy_id"]
-    assert len(trend[0]["regimes"]) == 9
-    assert any(item["id"] == "always_on_train" and item["sortino"] is not None for item in trend[0]["baselines"])
+    assert trend[0]["native_report"]["n_policies_tried"] == trend_report["n_policies_tried"] == 15
+    assert trend[0]["strategy_health"]["n_blocks"] == 45
+    assert trend[0]["strategy_health"]["n_above"] == 2
     meanrev = api.experiments(strategy_id="btc-meanrev-48-demo")
     assert meanrev[0]["experiment_id"] == meanrev_report["experiment_id"]
     assert meanrev[0]["strategy_id"] == meanrev_report["strategy_id"]
     assert meanrev[0]["verdict"] == "KILL"
-    assert any(item["id"] == "sealed_gate" and item["net_return"] < 0 for item in meanrev[0]["baselines"])
+    assert meanrev[0]["native_report"]["n_policies_tried"] == meanrev_report["n_policies_tried"] == 9
+    assert meanrev[0]["strategy_health"]["n_blocks"] == 45
+    assert meanrev[0]["frozen_evaluation"]["evaluation"]["metrics"]["net_return"] < 0
 
 
-def test_recorded_runs_describe_the_selected_filter_honestly() -> None:
-    meanrev = api.experiments(strategy_id="btc-meanrev-48-demo")[0]
+def test_recorded_fallback_describes_the_selected_filter_honestly() -> None:
+    # The served rows for these runs come from the native-report bundle; _recorded_experiment is the
+    # fallback when that bundle is unavailable. It must say the same thing as the agent report.
+    root = Path(__file__).parents[2]
+    runs = {strategy_id: (relative, frozen, verdict, reason) for strategy_id, _, relative, frozen, verdict, reason in api.RECORDED_INVESTIGATIONS}
+
+    def fallback(strategy_id: str) -> dict:
+        relative, frozen, verdict, reason = runs[strategy_id]
+        return api._recorded_experiment(json.loads((root / relative).read_text()), verdict, reason, frozen, relative)
+
+    meanrev = fallback("btc-meanrev-48-demo")
     assert meanrev["verdict"] == "KILL"
     assert meanrev["recommendation"].startswith("Kill the original strategy.")
     assert "not running" in meanrev["recommendation"]
@@ -88,7 +102,7 @@ def test_recorded_runs_describe_the_selected_filter_honestly() -> None:
     assert meanrev["steps"] and all(step["evidence_ids"] == [] for step in meanrev["steps"])
     assert meanrev["steps"][-1]["title"] == "Strategy verdict: KILL"
 
-    trend = api.experiments(strategy_id="btc-trend-24-72-demo")[0]
+    trend = fallback("btc-trend-24-72-demo")
     assert trend["verdict"] == "INCONCLUSIVE"
     assert trend["policy"]["description"] == "No filter was selected. The original strategy is unchanged."
     assert trend["recommendation"].startswith("Not proven.")

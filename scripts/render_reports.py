@@ -49,6 +49,17 @@ def markdown(sid: str, p) -> str:
     if nr:
         lines += ["", f"Also tried on Training only and not taken further ({len(nr)}): "
                   + "; ".join(f.label for f in nr) + "."]
+    timed = [f for f in p.filters if f.timing]
+    if timed:
+        lines += ["", "## Timing or just less risk? (Validation, same costs)", "",
+                  "| Filter | vs constant half size | vs constant at its Training size | vs constant at its Validation size | Read |", "|---|---|---|---|---|"]
+        for f in timed:
+            t = f.timing
+            same = f"{_pp(t.vs_same_average_size_pp)} (constant {t.same_average_size:.2f}x)" if t.same_average_size is not None else _pp(t.vs_same_average_size_pp)
+            vs = (f"{_pp(t.vs_validation_size_pp)} (constant {t.validation_size:.2f}x)" if t.validation_size is not None
+                  else "Not recorded")
+            lines.append(f"| {f.label} | {_pp(t.vs_half_size_pp)} | {same} | {vs} | {t.read} |")
+        lines += ["", f"Source: `{timed[0].timing.source}`. Diagnostic only: the selection rule fixed before the run is unchanged."]
     champ = next((f for f in p.filters if f.held_out), None)
     if champ:
         lines += ["", "## The one held-out look", "", champ.held_out.summary,

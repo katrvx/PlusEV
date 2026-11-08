@@ -2,9 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, ChevronDown, Menu, Plus, Settings2, X } from "lucide-react";
-import type { Evidence, Experiment, Health, PaperPlan, Strategy } from "../../../../../packages/contracts/types";
+import type { Evidence, Experiment, Health, PaperPlan, Strategy, StrategyDefinition } from "../../../../../packages/contracts/types";
 import { api } from "@/lib/api";
 import ImportWizard from "../import-wizard";
+import StrategyIntake from "../strategy-intake";
+import WorkspaceGuide from "./workspace-guide";
+import { MascotCallout } from "./mascot";
 import StrategyView from "./strategy-view";
 import ResearchOverview from "./overview";
 import ConditionsView from "./conditions";
@@ -13,34 +16,41 @@ import ComparisonView from "./comparison";
 import PaperReview from "./paper-review";
 import ObserveView from "./observe";
 import StrategyEntry from "./strategy-entry";
+import PortfolioView from "./portfolio";
+import StrategyVerdict from "./strategy-verdict";
+import KineticText from "./kinetic-text";
 import { ActiveIndicator, InterfaceMotion, Reveal } from "./ui-motion";
-import { verdictHeadline, verdictLabel } from "./decision";
 import type { ExploreTab, MainView, MotionPreference, SharedResearchProps } from "./types";
 import "./workspace.css";
 
-function recordedExample(items: Strategy[]) {
-  return items.find(item => item.strategy_id === "btc-trend-24-72-demo") || items.find(item => item.status === "demo");
-}
-
-const PORTFOLIO = [
-  { id: "btc-trend-24-72-demo", name: "BTC trend 24/72", verdict: "Not proven", detail: "Sealed intervals contain zero. The critic vetoed every gate." },
-  { id: "btc-meanrev-48-demo", name: "BTC mean reversion 48", verdict: "Kill", detail: "Always-on is a kill. The accepted gate beat it on the sealed look and still lost money." },
-];
-
 const topViews: { id: MainView; label: string; hint: string }[] = [
   { id: "strategy", label: "Strategy", hint: "Add, check and test your strategy" },
-  { id: "explore", label: "Explore", hint: "Read patterns and evidence" },
+  { id: "explore", label: "Verdict", hint: "Read the verdict, its reason and the agent evidence" },
   { id: "compare", label: "Compare", hint: "Test a proposed filter" },
   { id: "observe", label: "Plans", hint: "Review saved paper plans" },
 ];
 
 const exploreTabs: { id: ExploreTab; label: string }[] = [
-  { id: "overview", label: "Overview" },
+  { id: "overview", label: "Summary" },
   { id: "conditions", label: "Conditions" },
-  { id: "evidence", label: "Evidence" },
+  { id: "evidence", label: "Agent trail" },
 ];
 
+const workflow = [
+  { key: "verdict", label: "Verdict", view: "explore", tab: "overview" },
+  { key: "conditions", label: "Conditions", view: "explore", tab: "conditions" },
+  { key: "evidence", label: "Evidence", view: "explore", tab: "evidence" },
+  { key: "compare", label: "Compare", view: "compare", tab: "overview" },
+  { key: "review", label: "Paper plan", view: "compare", tab: "overview" },
+] as const;
+
 const errorText = (value: unknown) => value instanceof Error ? value.message : "Something went wrong. Please retry.";
+function recordedExample(items: Strategy[]) {
+  return items.find(item => item.source === "native_report" && item.strategy_id === "btc-meanrev-48-demo")
+    || items.find(item => item.strategy_id === "btc-trend-24-72-demo")
+    || items.find(item => item.source === "recorded_investigation")
+    || items.find(item => item.status === "demo");
+}
 type UrlState = { view: MainView; tab: ExploreTab; strategy: string; experiment: string; date: string; compare: boolean; viewExplicit: boolean };
 
 const EMPTY_URL_STATE: UrlState = { view: "strategy", tab: "overview", strategy: "", experiment: "", date: "", compare: false, viewExplicit: false };
@@ -50,7 +60,8 @@ function readUrl(): UrlState {
   const params = new URLSearchParams(window.location.search);
   const view = params.get("view");
   const tab = params.get("tab");
-  const resolvedView = topViews.some(item => item.id === view) ? view as MainView : "strategy";
+  const knownView = view === "portfolio" || topViews.some(item => item.id === view);
+  const resolvedView = knownView ? view as MainView : "strategy";
   return {
     view: resolvedView,
     tab: exploreTabs.some(item => item.id === tab) ? tab as ExploreTab : "overview",
@@ -61,7 +72,7 @@ function readUrl(): UrlState {
     // view/tab/strategy/experiment/date query contract. Accept the old
     // compare key too so existing bookmarks continue to work.
     compare: (resolvedView === "compare" && tab === "review") || params.get("compare") === "review",
-    viewExplicit: topViews.some(item => item.id === view),
+    viewExplicit: knownView,
   };
 }
 
@@ -83,7 +94,9 @@ function writeUrl(state: Partial<UrlState>, replace = false) {
   if (next.strategy) params.set("strategy", next.strategy);
   if (next.experiment) params.set("experiment", next.experiment);
   if (next.date) params.set("date", next.date);
-  const url = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}${window.location.hash}`;
+  // The landing story anchor belongs to that surface; keep other integration anchors.
+  const hash = window.location.hash === "#research-story" ? "" : window.location.hash;
+  const url = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}${hash}`;
   if (replace) window.history.replaceState(null, "", url);
   else window.history.pushState(null, "", url);
 }
@@ -106,14 +119,13 @@ function Toast({ message, onClose }: { message: string; onClose: () => void }) {
 }
 
 function EmptyStage({ title, body, action, onAction }: { title: string; body: string; action?: string; onAction?: () => void }) {
-  return <section className="kk-empty-stage" aria-live="polite"><p className="kk-kicker">KEEP OR KILL</p><h1>{title}</h1><p>{body}</p>{action && onAction && <button type="button" className="kk-action kk-action-primary" onClick={onAction}>{action} <ArrowUpRight size={15} /></button>}</section>;
+  return <section className="kk-empty-stage" aria-live="polite"><h1><KineticText trigger="mount">{title}</KineticText></h1><MascotCallout pose="bear-question" className="kk-empty-character">{body}</MascotCallout>{action && onAction && <button type="button" className="kk-action kk-primary-button" onClick={onAction}>{action} <ArrowUpRight size={15} /></button>}</section>;
 }
 
 function ResearchLoading({ strategy }: { strategy: Strategy }) {
   return <section className="kk-empty-stage kk-research-loading" role="status" aria-live="polite">
-    <p className="kk-kicker">CHECKING THE RESEARCH RECORD</p>
     <h1>Opening {strategy.name}.</h1>
-    <p>Checking the latest saved run before showing results. Nothing is being recalculated.</p>
+    <p>Loading the latest saved research.</p>
     <div className="kk-status-rule" aria-hidden="true"><span /></div>
   </section>;
 }
@@ -136,7 +148,7 @@ function ExperimentStatus({ experiment }: { experiment: Experiment }) {
         : "The evaluator stopped before it produced a complete report.";
   const visibleSteps = experiment.steps.filter(step => step.status === "complete" || step.status === "running" || step.status === "rejected");
   return <section className={`kk-run-status kk-run-${experiment.status}`} role="status" aria-live="polite">
-    <div className="kk-run-status-head"><span className="kk-run-dot" aria-hidden="true" /><div><p className="kk-kicker">RESEARCH STATUS</p><h2>{statusLabel}</h2></div></div>
+    <div className="kk-run-status-head"><span className="kk-run-dot" aria-hidden="true" /><div><h2>{statusLabel}</h2></div></div>
     <p className="kk-run-message">{experiment.message || fallbackMessage}</p>
     {activeStep && <p className="kk-run-stage"><span>Current step</span>{activeStep.title}</p>}
     {visibleSteps.length > 0 && <ul className="kk-run-steps" aria-label="Research steps">{visibleSteps.map(step => <li key={step.id} className={`kk-run-step-${step.status}`}><span aria-hidden="true" />{step.title}</li>)}</ul>}
@@ -144,9 +156,9 @@ function ExperimentStatus({ experiment }: { experiment: Experiment }) {
 }
 
 function ConnectionNotice({ strategy, health, onExample }: { strategy: Strategy | null; health: Health | null; onExample?: () => void }) {
-  if (!strategy || strategy.status === "demo" || !health || health.research_engine) return null;
+  if (!strategy || strategy.definition || strategy.status === "demo" || strategy.source === "native_report" || !health || health.research_engine) return null;
   return <aside className="kk-connection-note" role="note">
-    <div><p className="kk-kicker">RESEARCH ENGINE NOT CONNECTED</p><p>Your imported data is saved and ready. A measured backtest cannot run until the research service is online.</p></div>
+    <div><p className="kk-kicker">Research isn’t connected yet</p><p>Your strategy is saved. Results will be available when the research service is online.</p></div>
     {onExample && <button type="button" className="kk-action" onClick={onExample}>Replay the example <ArrowUpRight size={15} /></button>}
   </aside>;
 }
@@ -160,6 +172,9 @@ export default function Workspace() {
   const [urlExperimentId, setUrlExperimentId] = useState(initial.experiment);
   const [experiment, setExperiment] = useState<Experiment | null>(null);
   const [exampleExperiment, setExampleExperiment] = useState<Experiment | null>(null);
+  const [portfolioExperiments, setPortfolioExperiments] = useState<Experiment[]>([]);
+  const [portfolioLoading, setPortfolioLoading] = useState(false);
+  const [portfolioError, setPortfolioError] = useState("");
   const [health, setHealth] = useState<Health | null>(null);
   const [plans, setPlans] = useState<PaperPlan[]>([]);
   const [view, setView] = useState<MainView>(initial.view);
@@ -172,6 +187,8 @@ export default function Workspace() {
   const [running, setRunning] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [initialImportFile, setInitialImportFile] = useState<File | null>(null);
+  const [intakeOpen, setIntakeOpen] = useState(false);
+  const [initialStrategyFile, setInitialStrategyFile] = useState<File | null>(null);
   const [strategyMenu, setStrategyMenu] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [displayMenu, setDisplayMenu] = useState(false);
@@ -180,7 +197,7 @@ export default function Workspace() {
   const [evidence, setEvidence] = useState<Evidence | null>(null);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
-  const navRefs = useRef<Record<MainView, HTMLButtonElement | null>>({ strategy: null, explore: null, compare: null, observe: null });
+  const navRefs = useRef<Record<MainView, HTMLButtonElement | null>>({ portfolio: null, strategy: null, explore: null, compare: null, observe: null });
   const strategyTriggerRef = useRef<HTMLButtonElement | null>(null);
   const strategyPanelRef = useRef<HTMLDivElement | null>(null);
   const displayTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -194,7 +211,6 @@ export default function Workspace() {
   const selected = strategies.find(item => item.strategy_id === selectedId) || null;
   const filteredStrategies = strategies.filter(strategy => `${strategy.name} ${strategy.symbol} ${strategy.timeframe}`.toLowerCase().includes(strategyQuery.trim().toLowerCase()));
   const exampleStrategy = recordedExample(strategies);
-  const portfolio = PORTFOLIO.filter(item => strategies.some(strategy => strategy.strategy_id === item.id));
   const selectedIdRef = useRef(selectedId);
   selectedIdRef.current = selectedId;
   const dismissToast = useCallback(() => setToast(""), []);
@@ -207,13 +223,13 @@ export default function Workspace() {
     setEntryOpen(!state.viewExplicit && !state.strategy);
     if (state.strategy) setSelectedId(state.strategy);
     const stored = localStorage.getItem("kok.motion") as MotionPreference | null;
-    if (stored === "system" || stored === "reduced" || stored === "full") setMotion(stored);
+    if (stored === "system" || stored === "reduced") setMotion(stored);
   }, []);
 
   const applyUrl = useCallback((state: UrlState, focus = false) => {
     setView(state.view); setTab(state.tab); setSelectedDate(state.date || null); setCompareReview(state.compare); setUrlExperimentId(state.experiment); setEntryOpen(!state.viewExplicit && !state.strategy);
     if (state.strategy && strategies.some(item => item.strategy_id === state.strategy)) setSelectedId(state.strategy);
-    if (focus) requestAnimationFrame(() => navRefs.current[state.view]?.focus());
+    if (focus) requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(".kk-nav [aria-current='step']")?.focus());
   }, [strategies]);
 
   useEffect(() => {
@@ -231,18 +247,34 @@ export default function Workspace() {
       const currentUrl = readUrl();
       const remembered = currentUrl.strategy || localStorage.getItem("kok.selected") || "";
       const fallback = items.find(item => item.strategy_id === remembered)?.strategy_id || items.find(item => item.status !== "demo")?.strategy_id || items.find(item => item.strategy_id.includes("trend"))?.strategy_id || items[0]?.strategy_id || "";
+      const missingRequestedStrategy = !!currentUrl.strategy && !items.some(item => item.strategy_id === currentUrl.strategy);
       setSelectedId(fallback);
-      setUrlExperimentId(currentUrl.experiment);
+      setUrlExperimentId(missingRequestedStrategy ? "" : currentUrl.experiment);
+      if (missingRequestedStrategy) {
+        setSelectedDate(null); setCompareReview(false);
+        setError(`The strategy in this link is unavailable.${fallback ? ` Showing ${items.find(item => item.strategy_id === fallback)?.name || "an available strategy"}.` : " Add a strategy to continue."}`);
+      }
       const atEntry = !currentUrl.viewExplicit && !currentUrl.strategy;
       // A saved strategy opens on Explore by default. An explicit view in a
       // bookmark still wins, including the setup view for a new strategy.
       const nextView = currentUrl.viewExplicit ? currentUrl.view : (fallback ? "explore" : "strategy");
       setEntryOpen(atEntry);
       if (!atEntry) setView(nextView);
-      if (fallback && !atEntry && (!currentUrl.strategy || !currentUrl.viewExplicit)) writeUrl({ strategy: fallback, view: nextView }, true);
+      if (!atEntry && (missingRequestedStrategy || !currentUrl.strategy || !currentUrl.viewExplicit)) writeUrl({ strategy: fallback, view: nextView, ...(missingRequestedStrategy ? { experiment: "", date: "", compare: false } : {}) }, true);
     }).catch(failure => { if (!cancelled) setError(errorText(failure)); }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [initial.strategy]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPortfolioLoading(true); setPortfolioError("");
+    api.allExperiments().then(items => {
+      if (!cancelled) setPortfolioExperiments(items);
+    }).catch(failure => {
+      if (!cancelled) setPortfolioError(errorText(failure));
+    }).finally(() => { if (!cancelled) setPortfolioLoading(false); });
+    return () => { cancelled = true; };
+  }, [strategies]);
 
   useEffect(() => {
     const example = recordedExample(strategies);
@@ -259,7 +291,7 @@ export default function Workspace() {
     api.experiments(selectedId).then(items => {
       if (cancelled || selectedIdRef.current !== selectedId) return;
       const found = (urlExperimentId ? items.find(item => item.experiment_id === urlExperimentId) : undefined) || items[0] || null; setExperiment(found);
-      if (found?.experiment_id && !entryOpenRef.current) writeUrl({ strategy: selectedId, experiment: found.experiment_id }, true);
+      if (found?.experiment_id && !entryOpenRef.current && readUrl().view !== "portfolio") writeUrl({ strategy: selectedId, experiment: found.experiment_id }, true);
     }).catch(failure => { if (!cancelled) setError(errorText(failure)); }).finally(() => { if (!cancelled) setExperimentLoading(false); });
     return () => { cancelled = true; };
   }, [selectedId, urlExperimentId]);
@@ -280,17 +312,55 @@ export default function Workspace() {
     return () => { cancelled = true; clearInterval(timer); };
   }, [active, experiment?.experiment_id]);
 
-  const openImport = (file?: File) => { setInitialImportFile(file || null); setImportOpen(true); setStrategyMenu(false); };
-  const closeImport = () => { setImportOpen(false); setInitialImportFile(null); };
+  const openHistoryImport = (file?: File) => { setIntakeOpen(false); setInitialStrategyFile(null); setInitialImportFile(file || null); setImportOpen(true); setStrategyMenu(false); };
+  const openRuleDraft = (file?: File) => {
+    setInitialStrategyFile(file || null); setIntakeOpen(true); setStrategyMenu(false);
+  };
+  const openImport = (file?: File) => {
+    if (file && /\.json$/i.test(file.name)) { openRuleDraft(file); return; }
+    openHistoryImport(file);
+  };
+  const closeIntake = useCallback(() => {
+    setIntakeOpen(false); setInitialStrategyFile(null);
+    requestAnimationFrame(() => {
+      if (document.activeElement === document.body || !document.activeElement?.isConnected) {
+        const heading = document.querySelector<HTMLElement>("#kk-main h1");
+        heading?.setAttribute("tabindex", "-1"); heading?.focus({ preventScroll: true });
+      }
+    });
+  }, []);
+  const saveDefinition = async (definition: StrategyDefinition): Promise<Strategy> => {
+    const result = await api.saveStrategyDefinition(definition);
+    if (!result.valid || !result.strategy) throw new Error(result.issues.map(item => item.message).join(" ") || "The strategy could not be saved.");
+    return result.strategy;
+  };
+  const closeImport = () => {
+    setImportOpen(false); setInitialImportFile(null);
+    requestAnimationFrame(() => {
+      // A successful import replaces the landing surface, so its old file
+      // trigger may no longer exist when the dialog returns keyboard focus.
+      if (document.activeElement === document.body || !document.activeElement?.isConnected) {
+        const heading = document.querySelector<HTMLElement>("#kk-main h1");
+        heading?.setAttribute("tabindex", "-1");
+        heading?.focus({ preventScroll: true });
+      }
+    });
+  };
   const scrollTop = () => { if (typeof window !== "undefined") window.scrollTo(0, 0); };
   const selectView = (next: MainView) => { scrollTop(); setEntryOpen(false); setView(next); setTab(next === "explore" ? tab : "overview"); setMobileNav(false); setStrategyMenu(false); setDisplayMenu(false); writeUrl({ view: next, tab: next === "explore" ? tab : "overview", compare: false }); setCompareReview(false); };
-  const selectStrategy = (strategy: Strategy) => { scrollTop(); localStorage.setItem("kok.selected", strategy.strategy_id); setEntryOpen(false); setSelectedId(strategy.strategy_id); setUrlExperimentId(""); setSelectedDate(null); setTab("overview"); setCompareReview(false); setView("explore"); setStrategyMenu(false); setStrategyQuery(""); writeUrl({ strategy: strategy.strategy_id, view: "explore", tab: "overview", experiment: "", date: "", compare: false }); };
+  const selectStrategy = (strategy: Strategy) => {
+    const currentExperimentId = experiment?.strategy_id === strategy.strategy_id ? experiment.experiment_id : "";
+    const nextView = strategy.definition ? "strategy" : "explore";
+    scrollTop(); localStorage.setItem("kok.selected", strategy.strategy_id); setEntryOpen(false); setSelectedId(strategy.strategy_id); setUrlExperimentId(currentExperimentId); setSelectedDate(null); setTab("overview"); setCompareReview(false); setView(nextView); setStrategyMenu(false); setStrategyQuery("");
+    writeUrl({ strategy: strategy.strategy_id, view: nextView, tab: "overview", experiment: currentExperimentId, date: "", compare: false });
+  };
   const onSelectDate = (date: string | null) => { setSelectedDate(date); writeUrl({ date: date || "" }, true); };
   const onExploreTab = (next: ExploreTab) => { scrollTop(); setTab(next); writeUrl({ view: "explore", tab: next }); };
   const shared: SharedResearchProps | null = experiment && selected ? { experiment, strategy: selected, selectedDate, onSelectDate, onEvidence: setEvidenceById } : null;
   function setEvidenceById(id: string) { const item = experiment?.evidence.find(candidate => candidate.id === id); if (item) setEvidence(item); else setToast("That evidence is not available in this run."); }
   const onRun = async () => {
     if (!selected || running || active || runInFlightRef.current) return;
+    if (selected.source === "native_report_example" || selected.source === "native_report") { selectView("explore"); onExploreTab("overview"); return; }
     if (selected.status !== "demo" && !health?.research_engine) { setToast("The research engine is not connected for uploaded strategies yet."); return; }
     runInFlightRef.current = true; setEntryOpen(false); setRunning(true); setError("");
     try { const result = await api.investigate(selected.strategy_id); if (selectedIdRef.current === selected.strategy_id) { setUrlExperimentId(result.experiment_id); setExperiment(result); setView("explore"); setTab("overview"); writeUrl({ strategy: selected.strategy_id, view: "explore", tab: "overview", experiment: result.experiment_id }); } }
@@ -323,32 +393,34 @@ export default function Workspace() {
   return <InterfaceMotion preference={motion}><div className="kk-app" data-motion={motion} data-view={view}>
     <a className="kk-skip" href="#kk-main">Skip to main content</a>
     <header className="kk-header">
-      <button className="kk-wordmark" type="button" onClick={() => { scrollTop(); setEntryOpen(true); setMobileNav(false); setStrategyMenu(false); setDisplayMenu(false); writeUrl({ view: "strategy", tab: "overview", strategy: "", experiment: "", date: "", compare: false }); }} aria-label="Keep or Kill home"><span>keep<span className="kk-slash">/</span>kill</span></button>
+      <button className="kk-wordmark" type="button" onClick={() => { scrollTop(); setEntryOpen(true); setMobileNav(false); setStrategyMenu(false); setDisplayMenu(false); writeUrl({ view: "strategy", tab: "overview", strategy: "", experiment: "", date: "", compare: false }); }} aria-label="+EV home"><span><span className="kk-slash">+</span>EV</span></button>
       <div className="kk-header-context">
-        {selected ? <button ref={strategyTriggerRef} type="button" className="kk-strategy-trigger" title={selected.name} aria-label={`Switch strategy: ${selected.name}`} aria-expanded={strategyMenu} aria-haspopup="dialog" onClick={() => setStrategyMenu(value => !value)}>Your strategies<ChevronDown size={15} /></button> : <span className="kk-context-quiet">No strategy selected</span>}
-        {strategyMenu && <div ref={strategyPanelRef} className="kk-switcher" role="dialog" aria-label="Switch strategy"><div className="kk-switcher-head"><span>Switch strategy</span><button type="button" onClick={() => { setStrategyMenu(false); strategyTriggerRef.current?.focus(); }} aria-label="Close strategy switcher"><X size={15} /></button></div><label className="kk-switcher-search"><span className="kk-sr-only">Find a strategy</span><input value={strategyQuery} onChange={event => setStrategyQuery(event.target.value)} placeholder="Find a strategy" aria-label="Find a strategy" /></label><div className="kk-switcher-list">{filteredStrategies.map(strategy => <button type="button" key={strategy.strategy_id} className={strategy.strategy_id === selectedId ? "selected" : ""} onClick={() => selectStrategy(strategy)}><span><strong>{strategy.name}</strong><small>{strategy.symbol} · {strategy.timeframe} · {strategy.source === "recorded_investigation" ? "Recorded" : strategy.status === "demo" ? "Example" : "Imported"}</small></span><ArrowUpRight size={14} /></button>)}{filteredStrategies.length === 0 && <p className="kk-switcher-empty">No matching strategy.</p>}<button type="button" className="kk-switcher-add" onClick={() => openImport()}><Plus size={15} />Add strategy</button></div></div>}
+        {selected ? <button ref={strategyTriggerRef} type="button" className="kk-strategy-trigger" title={selected.name} aria-label={`Switch strategy: ${selected.name}`} aria-expanded={strategyMenu} aria-haspopup="dialog" onClick={() => setStrategyMenu(value => !value)}>Strategies<ChevronDown size={15} /></button> : <span className="kk-context-quiet">No strategy selected</span>}
+        {strategyMenu && <div ref={strategyPanelRef} className="kk-switcher" role="dialog" aria-label="Switch strategy"><div className="kk-switcher-head"><span>Switch strategy</span><button type="button" onClick={() => { setStrategyMenu(false); strategyTriggerRef.current?.focus(); }} aria-label="Close strategy switcher"><X size={15} /></button></div><label className="kk-switcher-search"><span className="kk-sr-only">Find a strategy</span><input value={strategyQuery} onChange={event => setStrategyQuery(event.target.value)} placeholder="Find a strategy" aria-label="Find a strategy" /></label><div className="kk-switcher-list">{filteredStrategies.map(strategy => <button type="button" key={strategy.strategy_id} className={strategy.strategy_id === selectedId ? "selected" : ""} onClick={() => selectStrategy(strategy)}><span><strong>{strategy.name}</strong><small>{strategy.symbol} · {strategy.timeframe} · {strategy.source === "recorded_investigation" || strategy.source === "native_report" || strategy.source === "native_report_example" ? "Recorded" : strategy.status === "demo" ? "Example" : strategy.definition ? "Saved rules" : "Imported"}</small></span><ArrowUpRight size={14} /></button>)}{filteredStrategies.length === 0 && <p className="kk-switcher-empty">No matching strategy.</p>}<button type="button" className="kk-switcher-add" onClick={() => openImport()}><Plus size={15} />Verify a strategy</button><button type="button" onClick={() => selectView("strategy")}>Source &amp; inputs<ArrowUpRight size={14} /></button><button type="button" onClick={() => selectView("observe")}>Saved paper plans<ArrowUpRight size={14} /></button><button type="button" onClick={() => selectView("portfolio")}>All strategies<ArrowUpRight size={14} /></button><button type="button" onClick={() => openRuleDraft()}>Draft strategy rules<ArrowUpRight size={14} /></button></div></div>}
       </div>
-      <nav className={`kk-nav ${mobileNav ? "open" : ""}`} aria-label="Primary navigation">{topViews.map(item => <button type="button" key={item.id} ref={node => { navRefs.current[item.id] = node; }} className={view === item.id ? "active" : ""} aria-current={view === item.id ? "page" : undefined} onClick={() => selectView(item.id)} title={item.hint}>{view === item.id && <ActiveIndicator group="primary" />}<span className="kk-nav-label">{item.label}</span></button>)}<button ref={navDisplayRef} className="kk-nav-display" type="button" aria-label="Display settings" title="Display settings" aria-expanded={displayMenu} aria-haspopup="dialog" onClick={() => { displayFocusRef.current = navDisplayRef.current; setDisplayMenu(value => !value); setMobileNav(false); }}><Settings2 size={17} /></button></nav>
-      <div className="kk-header-actions"><button ref={displayTriggerRef} className="kk-display" type="button" aria-expanded={displayMenu} aria-haspopup="dialog" onClick={() => { displayFocusRef.current = displayTriggerRef.current; setDisplayMenu(value => !value); }}><Settings2 size={16} /><span>Display</span></button><button ref={mobileMenuRef} className="kk-mobile-menu" type="button" aria-expanded={mobileNav} aria-haspopup="menu" onClick={() => setMobileNav(value => !value)} aria-label="Navigate"><Menu size={21} /><span>Navigate</span></button></div>
-      {displayMenu && <div ref={displayPanelRef} className="kk-display-menu" role="dialog" aria-label="Display settings"><span>Motion</span>{(["system", "reduced", "full"] as MotionPreference[]).map(option => <button type="button" key={option} className={motion === option ? "selected" : ""} onClick={() => { setMotionPreference(option); setDisplayMenu(false); displayFocusRef.current?.focus(); }}>{option[0].toUpperCase() + option.slice(1)}</button>)}</div>}
+      <nav id="kk-primary-nav" className={`kk-nav ${mobileNav ? "open" : ""}`} aria-label="Verification workflow">{workflow.map((item, index) => {
+        const current = item.key === "review" ? view === "compare" && compareReview : view === item.view && !compareReview && (view !== "explore" || tab === item.tab);
+        return <button type="button" key={item.key} className={current ? "active" : ""} aria-current={current ? "step" : undefined} onClick={() => {
+          if (item.key === "review") { setMobileNav(false); showReview(); }
+          else { selectView(item.view); if (item.view === "explore") onExploreTab(item.tab); }
+        }}>{current && <ActiveIndicator group="primary" />}<span className="kk-nav-label"><span className="kk-step-number" aria-hidden="true">{index + 1}</span>{item.label}</span></button>;
+      })}<button className="kk-nav-all" type="button" onClick={() => selectView("portfolio")}>All strategies</button><button ref={navDisplayRef} className="kk-nav-display" type="button" aria-label="Display settings" title="Display settings" aria-expanded={displayMenu} aria-haspopup="dialog" onClick={() => { displayFocusRef.current = navDisplayRef.current; setDisplayMenu(value => !value); setMobileNav(false); }}><Settings2 size={17} /></button></nav>
+      <div className="kk-header-actions"><button ref={displayTriggerRef} className="kk-display" type="button" aria-expanded={displayMenu} aria-haspopup="dialog" onClick={() => { displayFocusRef.current = displayTriggerRef.current; setDisplayMenu(value => !value); }}><Settings2 size={16} /><span>Display</span></button><button ref={mobileMenuRef} className="kk-mobile-menu" type="button" aria-expanded={mobileNav} aria-controls="kk-primary-nav" onClick={() => setMobileNav(value => !value)} aria-label="Navigate"><Menu size={21} /><span>Navigate</span></button></div>
+      {displayMenu && <div ref={displayPanelRef} className="kk-display-menu" role="dialog" aria-label="Display settings"><span>Motion</span>{(["system", "reduced"] as MotionPreference[]).map(option => <button type="button" key={option} className={motion === option ? "selected" : ""} onClick={() => { setMotionPreference(option); setDisplayMenu(false); displayFocusRef.current?.focus(); }}>{option[0].toUpperCase() + option.slice(1)}</button>)}</div>}
     </header>
     <main id="kk-main" className="kk-main">
       {error && <div className="kk-error" role="alert"><span>{error}</span><button type="button" onClick={() => setError("")}>Dismiss</button></div>}
-      {entryOpen ? <StrategyEntry example={exampleExperiment} triage={portfolio} onOpen={id => { const strategy = strategies.find(item => item.strategy_id === id); if (strategy) selectStrategy(strategy); }} onImport={openImport} onExample={() => { if (exampleStrategy) selectStrategy(exampleStrategy); }} onResume={selected ? () => selectStrategy(selected) : undefined} /> : loading ? <div className="kk-loading" role="status"><span className="kk-loading-line" />Preparing your research workspace</div> : <>
-        <ConnectionNotice strategy={selected} health={health} onExample={exampleStrategy ? () => selectStrategy(exampleStrategy) : undefined} />
-        {view !== "observe" && selected && experimentLoading ? <ResearchLoading strategy={selected} /> : <>
+      {entryOpen ? <StrategyEntry example={exampleExperiment} onImport={openImport} onExample={() => { if (exampleStrategy) selectStrategy(exampleStrategy); }} onResume={() => selectView("portfolio")} /> : loading ? <div className="kk-loading" role="status"><span className="kk-loading-line" />Preparing your research workspace</div> : <>
+        {view === "portfolio" && <>{portfolioError && <p className="kk-error" role="alert">Research records could not be loaded. {portfolioError}</p>}<PortfolioView strategies={strategies} experiments={portfolioExperiments} loading={portfolioLoading} onSelect={selectStrategy} onImport={() => openImport()} /></>}
+        {view !== "portfolio" && view !== "observe" && selected && !experimentLoading && <StrategyVerdict strategy={selected} experiment={experiment} compact={!(view === "explore" && tab === "overview")} />}
+        {view !== "portfolio" && <ConnectionNotice strategy={selected} health={health} onExample={exampleStrategy ? () => selectStrategy(exampleStrategy) : undefined} />}
+        {view !== "observe" && view !== "portfolio" && selected && experimentLoading ? <ResearchLoading strategy={selected} /> : <>
           {view === "strategy" && <Reveal key={selectedId}><StrategyView strategy={selected} experiment={experiment} health={health} onImport={openImport} onExample={() => { if (exampleStrategy) selectStrategy(exampleStrategy); }} onRun={onRun} running={running || !!active} />{incompleteResearch && experiment && <ExperimentStatus experiment={experiment} />}</Reveal>}
-          {view === "explore" && !shared && <EmptyStage title="Start with your strategy." body="Upload your signals or positions to begin the research." action="Add your strategy" onAction={() => openImport()} />}
+          {view === "explore" && !shared && <EmptyStage title={selected?.definition ? "Your rules are saved." : "The evidence starts here."} body={selected?.definition ? "Review the saved rules. Results need market data and a connected evaluator." : selected ? "This strategy has no completed research yet. Review its inputs before testing." : "Share timestamped positions to verify a strategy. Its source code stays private."} action={selected ? "Review strategy inputs" : "Import strategy positions"} onAction={() => selected ? selectView("strategy") : openImport()} />}
           {view === "explore" && shared && <>
-            <section className="kk-verdict-lead" aria-label="Decision">
-              <p className="kk-verdict-kicker">{verdictLabel(shared.experiment.verdict)}</p>
-              <h2>{shared.experiment.mode === "pending" ? "Research is pending." : verdictHeadline(shared.experiment.verdict)}</h2>
-              {shared.experiment.recommendation && <p>{shared.experiment.recommendation}</p>}
-            </section>
-            <div className="kk-local-nav" role="tablist" aria-label="Explore views">{exploreTabs.map(item => <button type="button" key={item.id} role="tab" aria-selected={tab === item.id} className={tab === item.id ? "active" : ""} onClick={() => onExploreTab(item.id)}>{tab === item.id && <ActiveIndicator group="explore" />}<span className="kk-nav-label">{item.label}</span></button>)}</div>
             {incompleteResearch && <ExperimentStatus experiment={shared.experiment} />}
-            {!incompleteResearch && tab === "overview" && <Reveal key="overview"><ResearchOverview {...shared} onConditions={() => onExploreTab("conditions")} onCompare={() => selectView("compare")} /></Reveal>}
-            {!incompleteResearch && tab === "conditions" && <Reveal key="conditions"><ConditionsView {...shared} /></Reveal>}
+            {!incompleteResearch && tab === "overview" && <Reveal key="overview"><ResearchOverview {...shared} onHealthEvidence={shared.onEvidence} onConditions={() => onExploreTab("conditions")} onCompare={() => selectView("compare")} /></Reveal>}
+            {!incompleteResearch && tab === "conditions" && <Reveal key="conditions"><ConditionsView {...shared} /><div className="kk-flow-next"><span>Next, inspect how the agents checked this pattern.</span><button className="kk-primary-button" type="button" onClick={() => onExploreTab("evidence")}>Follow the evidence<ArrowUpRight size={16} /></button></div></Reveal>}
             {!incompleteResearch && tab === "evidence" && <Reveal key="evidence"><EvidenceView {...shared} onCompare={() => selectView("compare")} /></Reveal>}
           </>}
           {view === "compare" && !shared && <EmptyStage title="There is nothing to compare yet." body="Run a backtest and find a candidate rule before comparing it on unseen history." action="Go to Strategy" onAction={() => selectView("strategy")} />}
@@ -359,6 +431,8 @@ export default function Workspace() {
       {!entryOpen && !(view === "explore" && tab === "overview") && <footer className="kk-footer"><span>Research only · no live trading</span></footer>}
     </main>
     {importOpen && <ImportWizard initialFile={initialImportFile} onClose={closeImport} onImported={onImported} />}
+    {intakeOpen && <StrategyIntake open initialFile={initialStrategyFile} onClose={closeIntake} onSave={saveDefinition} onCreated={strategy => { onImported(strategy); setToast("Strategy rules saved. No research run has started."); }} onHistoryImport={() => openHistoryImport()} />}
+    {!entryOpen && !loading && (view === "portfolio" || !experimentLoading) && !importOpen && !intakeOpen && !evidence && !strategyMenu && !displayMenu && !mobileNav && <WorkspaceGuide key={`${selectedId}-${view}-${tab}-${compareReview}`} page={view === "explore" ? tab : view === "observe" ? "plans" : view === "compare" && compareReview ? "review" : view} />}
     {evidence && <EvidenceDialog evidence={evidence} onClose={() => setEvidence(null)} />}
     {toast && <Toast message={toast} onClose={dismissToast} />}
   </div></InterfaceMotion>;

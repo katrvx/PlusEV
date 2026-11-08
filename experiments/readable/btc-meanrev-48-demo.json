@@ -79,6 +79,16 @@
     "summary": "Beat the original by +27.3 pp (90% interval +15.3 to +36.2 pp). Worst drawdown 60.4% → 36.2%. Its own return was -28.9% — it still lost money.",
     "source": "experiments/frozen_look_btc-meanrev-48-demo.json"
    },
+   "timing": {
+    "vs_half_size_pp": 0.15657734770774112,
+    "vs_same_average_size_pp": 0.2080695099636397,
+    "same_average_size": 0.7440493260682535,
+    "vs_validation_size_pp": 0.17003495143929637,
+    "validation_size": 0.5665859564164648,
+    "size_note": "average size moved from 0.74x on Training to 0.57x on Validation: the condition's frequency changed, so the Training-matched constant is a loose comparison",
+    "read": "Beat constant half size and a constant of the same average size on Validation: some evidence of timing, not proof (Validation was also used to select). Its average size changed between Training and Validation, so treat the comparison with care.",
+    "source": "experiments/conditions_check/timing_btc-meanrev-48-demo.json"
+   },
    "details": [
     "validation: delta vs always-on +0.2676 (90% CI +0.0111..+0.4089), net return +0.0728 = delta vs cash",
     "vs Lane A regime filter on validation: -0.2383 (reference, not a veto)",
@@ -135,6 +145,16 @@
    "validation_own_return": 0.3875022587769823,
    "average_size_on_validation": 0.13317191283292978,
    "held_out": null,
+   "timing": {
+    "vs_half_size_pp": 0.4713141952117498,
+    "vs_same_average_size_pp": 0.4689593111926694,
+    "same_average_size": 0.48809865213650705,
+    "vs_validation_size_pp": 0.40656696569868533,
+    "validation_size": 0.13317191283292976,
+    "size_note": "average size moved from 0.49x on Training to 0.13x on Validation: the condition's frequency changed, so the Training-matched constant is a loose comparison",
+    "read": "Beat constant half size and a constant of the same average size on Validation: some evidence of timing, not proof (Validation was also used to select). Its average size changed between Training and Validation, so treat the comparison with care.",
+    "source": "experiments/conditions_check/timing_btc-meanrev-48-demo.json"
+   },
    "details": [
     "validation: delta vs always-on +0.5823 (90% CI -0.0354..+1.0169), net return +0.3875 = delta vs cash",
     "validation CI includes zero; the frozen test decides",
@@ -195,6 +215,16 @@
    "validation_own_return": 0.27585332225260073,
    "average_size_on_validation": 0.061091450921959396,
    "held_out": null,
+   "timing": {
+    "vs_half_size_pp": 0.3596652586873682,
+    "vs_same_average_size_pp": 0.32976734156314724,
+    "same_average_size": 0.3422426154287353,
+    "vs_validation_size_pp": 0.28428140612632247,
+    "validation_size": 0.06109145092195939,
+    "size_note": "average size moved from 0.34x on Training to 0.06x on Validation: the condition's frequency changed, so the Training-matched constant is a loose comparison",
+    "read": "Beat constant half size and a constant of the same average size on Validation: some evidence of timing, not proof (Validation was also used to select). Its average size changed between Training and Validation, so treat the comparison with care.",
+    "source": "experiments/conditions_check/timing_btc-meanrev-48-demo.json"
+   },
    "details": [
     "validation: delta vs always-on +0.4707 (90% CI -0.1892..+0.8592), net return +0.2759 = delta vs cash",
     "validation CI includes zero; the frozen test decides",
@@ -254,6 +284,7 @@
    "validation_own_return": -0.40716902883350636,
    "average_size_on_validation": 0.09498975600670516,
    "held_out": null,
+   "timing": null,
    "details": [
     "competitor: always carried to the frozen test for comparison",
     "validation: delta vs always-on -0.2123, net return -0.4072 = delta vs cash",
@@ -302,6 +333,7 @@
    "validation_own_return": -0.6077654884095884,
    "average_size_on_validation": 0.4846340100577389,
    "held_out": null,
+   "timing": null,
    "details": [
     "competitor: always carried to the frozen test for comparison",
     "validation: delta vs always-on -0.4129, net return -0.6078 = delta vs cash",
@@ -355,6 +387,7 @@
    "validation_own_return": 0.3111065754964606,
    "average_size_on_validation": 0.12777053455019557,
    "held_out": null,
+   "timing": null,
    "details": [
     "competitor: always carried to the frozen test for comparison",
     "validation: delta vs always-on +0.5059, net return +0.3111 = delta vs cash",
@@ -402,6 +435,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": {
     "policy_id": "agent::atr_median_0_1",
@@ -438,6 +472,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": {
     "policy_id": "agent::vol_med_mom7d_33_0_1",
@@ -479,6 +514,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": {
     "policy_id": "agent::vol_q33_0_1",
@@ -635,7 +671,7 @@
    "summary": "The rule was fixed before the run: beat the original with an interval above zero, beat cash, change something real, and not be rejected by the critic.",
    "items": [
     "Selected: Half size when 7-day volatility is low (≤ 0.006409)",
-    "champion agent::vol_median_05_1 beats always-on and cash on validation and passed the critic"
+    "champion agent::vol_median_05_1 beats always-on and cash on validation and was not rejected by the critic"
    ],
    "changed_conclusion": null,
    "evidence_ids": []
@@ -763,6 +799,10 @@
   {
    "term": "Critic",
    "meaning": "An AI agent whose job is to find reasons a filter will not hold up. It can reject a filter; it cannot approve one by itself."
+  },
+  {
+   "term": "Same average size",
+   "meaning": "A constant position equal to the filter's average Training size. If the filter can't beat it, it only won by holding less."
   },
   {
    "term": "Training folds",

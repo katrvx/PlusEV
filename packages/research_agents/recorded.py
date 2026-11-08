@@ -60,8 +60,14 @@ def present_report(report: dict, report_path: str | None = None) -> ReportPresen
         look = json.loads((ROOT / run["held_out"]).read_text()) if run["held_out"] else None
         if look and look.get("experiment_id") != report.get("experiment_id"):
             look = None                                    # never attach a look taken for another run
+        tpath = ROOT / "experiments" / "conditions_check" / f"timing_{found[0]}.json"
+        timing = json.loads(tpath.read_text()) if tpath.exists() else None
+        if timing and timing.get("experiment_id") != report.get("experiment_id"):
+            timing = None
+        if timing:
+            timing["_path"] = tpath.relative_to(ROOT).as_posix()
         return present(report, held_out=look, published=run["published"], windows=WINDOWS,
-                       report_path=report_path, held_out_path=run["held_out"] if look else None)
+                       report_path=report_path, held_out_path=run["held_out"] if look else None, timing_check=timing)
     return present(report, report_path=report_path)
 
 

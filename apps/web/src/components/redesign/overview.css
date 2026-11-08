@@ -1,37 +1,124 @@
 .ov-page { width: 100%; padding: 0 0 24px; color: var(--kk-text); }
 .ov-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .ov-heading > div:first-child { min-width: 0; }
-.ov-heading h1 { margin: 0; font-size: 22px; line-height: 1.3; }
+.ov-heading h1 { margin: 0; font:600 26px/1.2 var(--kk-sans); letter-spacing:-.035em; }
 .ov-mode { flex-shrink: 0; padding: 7px 12px; border-radius: 30px; background: var(--kk-surface-raised); color: var(--kk-secondary); font-size: 13px; }
 .ov-hero { padding: 28px 0 0; }
 .ov-hero-value strong { display: block; color: var(--kk-text); font: 650 clamp(64px, 7vw, 88px)/1.06 var(--kk-sans); letter-spacing: -.065em; font-variant-numeric: tabular-nums; }
-.ov-period { margin-top: 12px !important; color: var(--kk-secondary); font-size: 14px; line-height: 1.6; }
+.ov-period { margin-top: 12px !important; color: var(--kk-secondary); font-size: 16px; line-height: 1.5; }
 .ov-chart-wrap { margin-top: 36px; }
-.ov-health { margin-top: 22px; }
-.ov-health-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
-.ov-health-head h2 { margin: 0; font-size: 16px; }
-.ov-health-head span, .ov-health-window { color: var(--kk-secondary); font-size: 13px; }
-.ov-health p { margin: 10px 0 0; color: var(--kk-secondary); font-size: 14px; line-height: 1.5; }
-.ov-blocks { display: flex; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
-.ov-block { flex: 1; min-height: 28px; border-radius: 4px; background: var(--kk-surface-raised); }
-.ov-block-below { background: var(--kk-accent); }
-.ov-block-above { background: var(--kk-text); }
-.ov-takeaway { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 24px; padding: 24px 28px; border-radius: var(--kk-radius-panel); background: var(--kk-surface-raised); }
-.ov-takeaway h2 { margin: 0; font-size: 20px; line-height: 1.35; }
-.ov-finding { margin: 6px 0 0; color: var(--kk-secondary); font-size: 14px; line-height: 1.5; }
+.ov-takeaway { display: flex; align-items: center; justify-content: space-between; gap: 32px; margin-top: 28px; padding: 32px 0 20px; border-top:1px solid var(--kk-hairline); }
+.ov-takeaway h2 { max-width:780px; margin: 0; font:600 clamp(24px,2.6vw,34px)/1.16 var(--kk-sans); letter-spacing:-.04em; }
 .ov-primary-action svg { transition: transform 160ms ease; }
 .ov-primary-action:hover svg { transform: translateX(3px); }
 .ov-empty-chart { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 240px; color: var(--kk-secondary); font-size: 14px; }
 @media (max-width: 767px) {
   .ov-heading { align-items: flex-start; gap: 8px 12px; flex-wrap: wrap; }
   .ov-heading > div:first-child { flex: 1 1 180px; }
-  .ov-heading h1 { font-size: 18px; }
+  .ov-heading h1 { font-size: 22px; }
   .ov-mode { font-size: 14px; }
   .ov-hero { padding-top: 24px; }
   .ov-hero-value strong { font-size: 64px; }
-  .ov-period { font-size: 14px; }
-  .ov-takeaway { align-items: flex-start; flex-direction: column; gap: 20px; margin-top: 12px; padding: 24px; }
-  .ov-takeaway h2 { font-size: 18px; }
+  .ov-period { font-size: 15px; }
+  .ov-takeaway { align-items: flex-start; flex-direction: column; gap: 22px; margin-top: 16px; padding: 28px 0 0; }
+  .ov-takeaway h2 { font-size: 26px; }
   .ov-chart-wrap { margin-top: 24px; }
 }
 @media (prefers-reduced-motion: reduce) { .ov-primary-action svg { transition: none; } }
+
+/* The recorded curve gets one human-sized explanation before the next action.
+   MascotCallout keeps the meaning in HTML while the pose supplies a quiet visual cue. */
+.ov-page {
+  max-width: none;
+  padding-bottom: 88px;
+  color: var(--kk-text, #241626);
+  font-family: var(--kk-sans, Inter, Arial, sans-serif);
+}
+.ov-heading {
+  align-items: flex-start;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--kk-hairline, #e4dcd2);
+}
+.ov-heading h1 {
+  color: var(--kk-text, #241626);
+  font-size: clamp(44px, 6vw, 76px);
+  font-weight: 700;
+  letter-spacing: -.07em;
+  line-height: 1;
+}
+.ov-mode {
+  border: 1px solid var(--kk-hairline, #e4dcd2);
+  background: var(--kk-surface-raised, #fffdf8);
+  color: var(--kk-text-secondary, #665b67);
+  font-size: 14px;
+}
+.ov-mode-demo { border-color: color-mix(in srgb, var(--kk-accent, #ff681b) 32%, transparent); color: var(--kk-accent, #ff681b); }
+.ov-hero { padding-top: 42px; }
+.ov-hero-value strong {
+  color: var(--kk-text, #241626);
+  font-size: clamp(72px, 9vw, 128px);
+  font-weight: 700;
+  letter-spacing: -.08em;
+}
+.ov-period { color: var(--kk-text-secondary, #665b67); font-size: 17px; }
+.ov-chart-wrap { margin-top: 44px; padding: 30px 0 22px; border-top: 1px solid var(--kk-hairline, #e4dcd2); border-bottom: 1px solid var(--kk-hairline, #e4dcd2); }
+.ov-chart-wrap .kk-chart { --kk-chart-grid: #e8dfd6; }
+.ov-leading-note { display: flex; justify-content: flex-end; margin-top: 28px; }
+.ov-leading-note .kk-mascot-callout { max-width: min(100%, 620px); }
+.ov-takeaway { align-items: flex-start; margin-top: 26px; padding-top: 30px; border-top: 0; }
+.ov-takeaway h2 { max-width: 860px; color: var(--kk-text, #241626); font-size: clamp(30px, 4vw, 52px); font-weight: 700; letter-spacing: -.06em; }
+.ov-primary-action { min-height: 52px; border-radius: 999px; padding: 14px 22px; }
+.ov-empty-chart { min-height: 260px; border-top: 1px solid var(--kk-hairline, #e4dcd2); border-bottom: 1px solid var(--kk-hairline, #e4dcd2); }
+@media (max-width: 767px) {
+  .ov-page { padding-bottom: 64px; }
+  .ov-heading { padding-bottom: 22px; }
+  .ov-heading h1 { font-size: 42px; }
+  .ov-hero { padding-top: 30px; }
+  .ov-hero-value strong { font-size: 72px; }
+  .ov-chart-wrap { margin-top: 30px; padding-top: 20px; }
+  .ov-leading-note { justify-content: stretch; margin-top: 20px; }
+  .ov-leading-note .kk-mascot-callout { width: 100%; }
+  .ov-takeaway { gap: 20px; padding-top: 22px; }
+  .ov-takeaway h2 { font-size: 34px; }
+}
+
+/* Keep the decision surface above the curve: return, one evidence note and
+   the existing next action share the opening row. */
+.ov-heading { padding-bottom: 22px; }
+.ov-heading h1 { font-size: clamp(44px, 5vw, 60px); }
+.ov-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(700px, 760px);
+  align-items: center;
+  gap: clamp(28px, 6vw, 96px);
+  padding: 28px 0 30px;
+}
+.ov-hero-value strong { font-size: clamp(52px, 6vw, 72px); }
+.ov-hero-value strong.ov-awaiting { max-width: 240px; font-size: clamp(20px, 2.4vw, 30px); line-height: 1.2; letter-spacing: -.035em; }
+.ov-hero-action { --mascot-size: 300px; display: flex; align-items: flex-start; flex-direction: column; gap: 16px; justify-content: center; }
+.ov-hero-action .kk-mascot-callout { width: 100%; justify-content: flex-start; }
+.ov-scene-callout { --mascot-size: 300px; --mascot-mobile-size: 300px; }
+.ov-scene-callout .kk-mascot-copy { max-width: 300px; font-size: 16px; }
+.ov-hero-action .kk-mascot-copy { max-width: 340px; }
+.ov-hero-action .kk-magnetic { align-self: flex-start; margin-left: calc(var(--mascot-size, 168px) + 12px); }
+.ov-chart-wrap { margin-top: 0; padding-top: 22px; }
+.ov-leading-note, .ov-takeaway { display: none; }
+@media (max-width: 767px) {
+  .ov-hero { grid-template-columns: 1fr; gap: 22px; padding: 24px 0 26px; }
+  .ov-hero-value strong { font-size: 72px; }
+  .ov-hero-value strong.ov-awaiting { font-size: 24px; }
+  .ov-hero-action { --mascot-size: 300px; align-items: flex-start; }
+  .ov-hero-action .kk-mascot-callout { justify-content: flex-start; }
+  .ov-scene-callout { --mascot-size: 300px; --mascot-mobile-size: 300px; }
+  .ov-scene-callout .kk-mascot-copy { max-width: 220px; font-size: 15px; }
+  .ov-hero-action .kk-magnetic { align-self: flex-start; margin-left: 0; }
+}
+
+/* Keep the two-column scene fluid through tablet and compact desktop widths;
+   the full-width mobile scene takes over below 768px. */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .ov-hero { grid-template-columns: minmax(0, 1fr) minmax(0, 520px); gap: 24px; }
+  .ov-hero-action { --mascot-size: 280px; }
+  .ov-scene-callout { --mascot-size: 280px; --mascot-mobile-size: 260px; }
+  .ov-scene-callout .kk-mascot-copy { max-width: 220px; }
+}

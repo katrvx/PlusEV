@@ -7,8 +7,12 @@ const id = (value: string) => encodeURIComponent(value);
 export const API_ROUTES = {
   health: `${API_PREFIX}/health`,
   strategies: `${API_PREFIX}/strategies`,
+  nativeReportExample: `${API_PREFIX}/examples/native-report`,
+  strategyDefinitions: `${API_PREFIX}/strategies/definitions`,
+  strategyDefinition: (strategyId: string) => `${API_PREFIX}/strategies/${id(strategyId)}/definition`,
   previewImport: `${API_PREFIX}/imports/preview`,
   importStrategy: `${API_PREFIX}/strategies/import`,
+  strategyDefinitionTemplate: `${API_PREFIX}/templates/strategy-definition.json`,
   positionTemplate: `${API_PREFIX}/templates/positions.csv`,
   tradeTemplate: `${API_PREFIX}/templates/trades.csv`,
   experiments: `${API_PREFIX}/experiments`,

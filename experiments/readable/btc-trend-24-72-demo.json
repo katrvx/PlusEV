@@ -1,7 +1,7 @@
 {
  "version": 1,
  "headline": {
-  "finding": "Not proven. No filter passed, so the strategy stays unchanged.",
+  "finding": "Not proven. No filter earned the held-out test, so the strategy stays unchanged.",
   "meaning": "The held-out intervals still contain zero, and the critic rejected every proposed filter. The agents proposed 3 filters; 3 were rejected. The critic rejected all of them; the reasons are listed with each filter.",
   "next_action": "Don't add capital or change the strategy on this evidence. Re-test it on data after the held-out window. Any saved paper plan stays saved, not running.",
   "verdict": "INCONCLUSIVE",
@@ -64,6 +64,16 @@
    "validation_own_return": 1.6645107890555084,
    "average_size_on_validation": 0.9658028635664418,
    "held_out": null,
+   "timing": {
+    "vs_half_size_pp": 1.094195597153131,
+    "vs_same_average_size_pp": 0.8157285748821486,
+    "same_average_size": 0.6962242802665214,
+    "vs_validation_size_pp": 0.38014019546810784,
+    "validation_size": 0.965802863566442,
+    "size_note": "average size moved from 0.70x on Training to 0.97x on Validation: the condition's frequency changed, so the Training-matched constant is a loose comparison",
+    "read": "Beat constant half size and a constant of the same average size on Validation: some evidence of timing, not proof (Validation was also used to select). Its average size changed between Training and Validation, so treat the comparison with care.",
+    "source": "experiments/conditions_check/timing_btc-trend-24-72-demo.json"
+   },
    "details": [
     "validation: delta vs always-on +0.3205 (90% CI -0.0201..+0.8678), net return +1.6645 = delta vs cash",
     "validation CI includes zero; the frozen test decides",
@@ -127,6 +137,16 @@
    "validation_own_return": 1.5015515342632013,
    "average_size_on_validation": 0.982901431783221,
    "held_out": null,
+   "timing": {
+    "vs_half_size_pp": 0.9312363423608239,
+    "vs_same_average_size_pp": 0.41494914130128313,
+    "same_average_size": 0.8481121401332608,
+    "vs_validation_size_pp": 0.18747012410577746,
+    "validation_size": 0.982901431783221,
+    "size_note": "average size moved from 0.85x on Training to 0.98x on Validation: the condition's frequency changed, so the Training-matched constant is a loose comparison",
+    "read": "Beat constant half size and a constant of the same average size on Validation: some evidence of timing, not proof (Validation was also used to select). Its average size changed between Training and Validation, so treat the comparison with care.",
+    "source": "experiments/conditions_check/timing_btc-trend-24-72-demo.json"
+   },
    "details": [
     "validation: delta vs always-on +0.1575 (90% CI -0.0057..+0.4311), net return +1.5016 = delta vs cash",
     "validation CI includes zero; the frozen test decides",
@@ -190,6 +210,16 @@
    "validation_own_return": 1.063882946978099,
    "average_size_on_validation": 0.9389421370252041,
    "held_out": null,
+   "timing": {
+    "vs_half_size_pp": 0.4935677550757216,
+    "vs_same_average_size_pp": -0.13359186700173087,
+    "same_average_size": 0.9149520177680929,
+    "vs_validation_size_pp": -0.17431293622505661,
+    "validation_size": 0.9389421370252041,
+    "size_note": null,
+    "read": "Did not beat a constant position of the same average size: the gain came from holding less, not timing.",
+    "source": "experiments/conditions_check/timing_btc-trend-24-72-demo.json"
+   },
    "details": [
     "validation: delta vs always-on -0.2802 (90% CI -0.9376..+0.0053), net return +1.0639 = delta vs cash",
     "does not beat always-on on validation after costs",
@@ -251,6 +281,7 @@
    "validation_own_return": -0.25562024676637396,
    "average_size_on_validation": 0.559460418885339,
    "held_out": null,
+   "timing": null,
    "details": [
     "competitor: always carried to the frozen test for comparison",
     "validation: delta vs always-on -1.5997, net return -0.2556 = delta vs cash",
@@ -299,6 +330,7 @@
    "validation_own_return": -0.36781563864498046,
    "average_size_on_validation": 0.44024375813513195,
    "held_out": null,
+   "timing": null,
    "details": [
     "competitor: always carried to the frozen test for comparison",
     "validation: delta vs always-on -1.7119, net return -0.3678 = delta vs cash",
@@ -352,6 +384,7 @@
    "validation_own_return": 1.1409978509398928,
    "average_size_on_validation": 0.9886403975860845,
    "held_out": null,
+   "timing": null,
    "details": [
     "competitor: always carried to the frozen test for comparison",
     "validation: delta vs always-on -0.2030, net return +1.1410 = delta vs cash",
@@ -408,6 +441,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": {
     "policy_id": "agent::p3_rvol_q67",
@@ -429,8 +463,8 @@
   },
   {
    "policy_id": "agent::p2_volz_med",
-   "label": "Flat when trading volume vs normal is low (≤ -0.07709)",
-   "plain_rule": "When trading volume vs normal is above -0.07709: full size. Otherwise: no position. Thresholds were set on Training data.",
+   "label": "Flat when trading volume vs its 7-day normal (a volume proxy, not liquidity) is low (≤ -0.07709)",
+   "plain_rule": "When trading volume vs its 7-day normal (a volume proxy, not liquidity) is above -0.07709: full size. Otherwise: no position. Thresholds were set on Training data.",
    "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is not met.",
    "proposed_by": "Proposer agent (training trial)",
    "stages_checked": [
@@ -444,6 +478,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": {
     "policy_id": "agent::p2_volz_med",
@@ -480,6 +515,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": {
     "policy_id": "agent::p4_fg_med",
@@ -516,6 +552,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": {
     "policy_id": "agent::p1_mom7d_med",
@@ -537,8 +574,8 @@
   },
   {
    "policy_id": "agent::p8_volz_q33_half",
-   "label": "Half size when trading volume vs normal is low (≤ -0.2419)",
-   "plain_rule": "When trading volume vs normal is above -0.2419: full size. Otherwise: half size. Thresholds were set on Training data.",
+   "label": "Half size when trading volume vs its 7-day normal (a volume proxy, not liquidity) is low (≤ -0.2419)",
+   "plain_rule": "When trading volume vs its 7-day normal (a volume proxy, not liquidity) is above -0.2419: full size. Otherwise: half size. Thresholds were set on Training data.",
    "exposure_change": "Never adds risk: it only cuts the position to half size when the condition is not met.",
    "proposed_by": "Proposer agent (training trial)",
    "stages_checked": [
@@ -552,6 +589,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": {
     "policy_id": "agent::p8_volz_q33_half",
@@ -588,6 +626,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": {
     "policy_id": "agent::p7_rvol_q67_half",
@@ -624,6 +663,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": {
     "policy_id": "agent::p6_fg_med_half",
@@ -660,6 +700,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": {
     "policy_id": "agent::p5_dd_med",
@@ -696,6 +737,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": {
     "policy_id": "agent::p10_mom7d_q33_zero",
@@ -732,6 +774,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": {
     "policy_id": "agent::p11_fg_q33_half",
@@ -768,6 +811,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": {
     "policy_id": "agent::p12_fg_q33_zero",
@@ -804,6 +848,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": {
     "policy_id": "agent::p9_mom7d_q33_half",
@@ -838,6 +883,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": null,
    "evidence_ids": []
@@ -857,6 +903,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": null,
    "evidence_ids": []
@@ -876,6 +923,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": null,
    "evidence_ids": []
@@ -895,6 +943,7 @@
    "validation_own_return": null,
    "average_size_on_validation": null,
    "held_out": null,
+   "timing": null,
    "details": [],
    "spec": null,
    "evidence_ids": []
@@ -1119,6 +1168,10 @@
   {
    "term": "Critic",
    "meaning": "An AI agent whose job is to find reasons a filter will not hold up. It can reject a filter; it cannot approve one by itself."
+  },
+  {
+   "term": "Same average size",
+   "meaning": "A constant position equal to the filter's average Training size. If the filter can't beat it, it only won by holding less."
   },
   {
    "term": "Training folds",

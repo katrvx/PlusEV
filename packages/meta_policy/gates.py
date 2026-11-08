@@ -54,6 +54,8 @@ def allocation(spec: dict, context: pd.DataFrame, lgbm=None) -> pd.Series:
         return pd.Series(1.0, index=context.index)
     if family == "cash":
         return pd.Series(0.0, index=context.index)
+    if family == "constant":   # benchmark only (exposure-matched); never a candidate, need not be 0, 0.5 or 1
+        return pd.Series(min(1.0, max(0.0, float(spec["allocation"]))), index=context.index)
     if family == "threshold_gate":
         return threshold_gate_allocation(spec, context)
     if family == "lgbm_gate":
