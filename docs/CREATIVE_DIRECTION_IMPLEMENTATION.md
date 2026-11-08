@@ -145,6 +145,16 @@ The Argon reports are recorded team artifacts and should be shown with their act
 
 ## Verification before merge
 
+### Main integration and final polish — 8 November 2026
+
+- Preserved main's measured research engine, evaluator-selected chart labels, expanded verdicts and supplied paper-shadow fields while retaining the redesigned workspace and native read-only reports.
+- Existing projected native-report records read through to the canonical report without deleting saved database records. Native reports remain ineligible for paper approval; measured Kill and Inconclusive decisions are also blocked server-side.
+- Added the checked-filter browser and review-package download. Exact policy specifications, source identities, trial rows and matching frozen evidence remain available; the package makes no approval or runnable-strategy claim.
+- Fixed landing callout collisions and hero word spacing. Desktop, 390px and 320px heading checks show distinct words without clipping. Source selection and Escape dismissal remain functional.
+- Final typecheck and production build passed. The integrated Python regression run passed 271 tests; the focused native compatibility/approval suite passed 9 tests, and the export suite passed 5 tests. Python checks retain two existing FastAPI startup deprecation warnings.
+- The later A/B update on main passed 62 focused presentation/investigation checks and 24 feature/gate/regime checks (18 unrelated tests deselected).
+- Latest visual captures use the `push-*` prefix under the ignored `artifacts/positioning-redesign/` directory. Original reference images remain ignored.
+
 Motion follow-up verified locally on 8 November 2026:
 
 - Typecheck and production build pass, including static prerendering.

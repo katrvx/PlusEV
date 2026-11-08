@@ -82,7 +82,8 @@
 .se-hero-grid { display:grid; grid-template-columns:minmax(0,.91fr) minmax(0,1.09fr); align-items:center; gap:clamp(36px,6vw,110px); min-height:clamp(580px,calc(100svh - 150px),760px); padding:clamp(56px,8vh,104px) 0 34px; }
 .se-invitation { max-width:650px; padding:0; text-align:left; }
 .se-kicker { margin:0 0 22px!important; color:var(--kk-accent,#ff681b); font:650 13px/1.4 var(--kk-sans); letter-spacing:.09em; text-transform:uppercase; }
-.kk-body .kk-app .se-invitation h1 { margin:0; font:750 clamp(64px,7.2vw,118px)/.93 var(--kk-sans); letter-spacing:-.075em; text-wrap:balance; }
+.kk-body .kk-app .se-invitation h1 { margin:0; font:750 clamp(64px,7.2vw,118px)/.93 var(--kk-sans); letter-spacing:-.04em; text-wrap:balance; }
+.se-invitation h1 .kt-space { display:inline-block; width:.22em; letter-spacing:normal; }
 .se-title-accent { color:var(--kk-accent,#ff681b); }
 .se-intro { max-width:550px; margin:30px 0 0!important; color:var(--kk-text-secondary,#62525f); font:450 clamp(18px,1.6vw,23px)/1.45 var(--kk-sans); text-wrap:balance; }
 .se-actions { justify-content:flex-start; margin-top:36px; }
@@ -124,7 +125,7 @@
  .se-entry { min-height:100svh; padding:0 24px; }
  .se-topline { min-height:76px; }
  .se-hero-grid { min-height:0; padding:56px 0 24px; }
- .kk-body .kk-app .se-invitation h1 { font-size:clamp(48px,13vw,72px); line-height:.98; letter-spacing:-.07em; }
+ .kk-body .kk-app .se-invitation h1 { font-size:clamp(39px,11.8vw,68px); line-height:.98; letter-spacing:-.04em; }
  .se-kicker { font-size:11px; letter-spacing:.075em; }
  .se-intro { max-width:340px; margin-top:24px!important; font-size:18px; }
  .se-actions { gap:9px; margin-top:28px; }
