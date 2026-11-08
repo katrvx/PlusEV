@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Beaker, ChevronDown, ChevronRight, CircleCheck, CircleX, Clock3, FileSearch, FlaskConical, Info, LockKeyhole, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Beaker, ChevronDown, ChevronRight, CircleCheck, CircleX, Clock3, FileSearch, FlaskConical, Info, LockKeyhole, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
 import { teamApi, type InvestigationSummary, type InvestigationWrapper, type TeamCandidate, type TeamEvidence, type TeamHypothesis, type TeamTrial } from "@/lib/team-api";
 import "./team-research.css";
 
@@ -43,9 +43,18 @@ function CandidateCard({ candidate }: { candidate: TeamCandidate }) {
   return <article className={`tr-candidate ${eligible ? "eligible" : competitor ? "competitor" : "rejected"}`}><div className="tr-candidate-head"><span className="tr-candidate-status">{eligible ? <><CircleCheck size={14} />Ready for a new-data test</> : competitor ? <><Info size={14} />Comparison rule</> : <><CircleX size={14} />Rejected</>}</span><code>{candidate.policy_id}</code></div><p className="tr-candidate-note">{eligible ? "This trading rule passed the development-stage checks. It has not been validated on data it did not see during research." : competitor ? "This rule is included as a comparison point; it is not an agent-selected candidate." : "This trading rule will not proceed to the new-data test."}</p><ul>{candidate.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul><details className="tr-policy-spec"><summary>Trading rule details <ChevronRight size={13} /></summary><code>{json(candidate.policy_spec)}</code></details></article>;
 }
 
-export default function TeamResearch() {
+export type TeamResearchProps = {
+  /** Prefer the report that belongs to the current experiment when the native report store has it. */
+  initialExperimentId?: string;
+  /** The Part C strategy currently in focus; this is intentionally separate from the report identity. */
+  strategyId?: string;
+  /** Embedded report viewers can return to the evidence surface without adding a navigation destination. */
+  onBack?: () => void;
+};
+
+export default function TeamResearch({ initialExperimentId = "", strategyId = "", onBack }: TeamResearchProps) {
   const [summaries, setSummaries] = useState<InvestigationSummary[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState(initialExperimentId);
   const [wrapper, setWrapper] = useState<InvestigationWrapper | null>(null);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -54,7 +63,7 @@ export default function TeamResearch() {
   const [focusedEvidence, setFocusedEvidence] = useState<string | null>(null);
   const [view, setView] = useState<"findings" | "tests" | "evidence">("findings");
 
-  useEffect(() => { let cancelled = false; teamApi.investigations().then(items => { if (!cancelled) { setSummaries(items); setSelectedId(items[0]?.experiment_id || ""); } }).catch(failure => { if (!cancelled) setError(failure instanceof Error ? failure.message : "Could not load investigations."); }).finally(() => { if (!cancelled) setLoading(false); }); return () => { cancelled = true; }; }, []);
+  useEffect(() => { let cancelled = false; teamApi.investigations().then(items => { if (!cancelled) { const preferred = initialExperimentId && items.some(item => item.experiment_id === initialExperimentId) ? initialExperimentId : strategyId ? items.find(item => item.strategy_id === strategyId)?.experiment_id || items[0]?.experiment_id || "" : items[0]?.experiment_id || ""; setSummaries(items); setSelectedId(preferred); } }).catch(failure => { if (!cancelled) setError(failure instanceof Error ? failure.message : "Could not load investigations."); }).finally(() => { if (!cancelled) setLoading(false); }); return () => { cancelled = true; }; }, [initialExperimentId, strategyId]);
   useEffect(() => { if (!selectedId) { setWrapper(null); setError(""); setDetailLoading(false); return; } let cancelled = false; setDetailLoading(true); setWrapper(null); setError(""); teamApi.investigation(selectedId).then(item => { if (!cancelled) setWrapper(item); }).catch(failure => { if (!cancelled) { setWrapper(null); setError(failure instanceof Error ? failure.message : "Could not load this investigation."); } }).finally(() => { if (!cancelled) setDetailLoading(false); }); return () => { cancelled = true; }; }, [selectedId]);
 
   useEffect(() => { if (view !== "evidence" || !focusedEvidence) return; const element = document.getElementById(focusedEvidence); const details = element?.querySelector("details"); if (details) details.open = true; element?.scrollIntoView({ block: "center", behavior: "instant" }); setFocusedEvidence(null); }, [view, focusedEvidence]);
@@ -63,12 +72,13 @@ export default function TeamResearch() {
   const selectedSummary = summaries.find(item => item.experiment_id === selectedId);
   const displayedTrials = showAllTrials ? report?.trial_log || [] : (report?.trial_log || []).filter(item => item.status !== "refused");
 
-  if (loading) return <div className="tr-loading"><FlaskConical size={25} /><strong>Loading agent investigations</strong><span>Reading trusted research artifacts.</span></div>;
-  if (error && summaries.length === 0) return <div className="tr-empty"><TriangleAlert size={28} /><h2>Investigation artifacts unavailable</h2><p>{error}</p></div>;
+  const backControl = onBack && <button className="tr-back-link" type="button" onClick={onBack}><ArrowLeft size={15} />Back to evidence</button>;
+  if (loading) return <div className="tr-loading">{backControl}<FlaskConical size={25} /><strong>Loading agent investigations</strong><span>Reading trusted research artifacts.</span></div>;
+  if (error && summaries.length === 0) return <div className="tr-empty">{backControl}<TriangleAlert size={28} /><h2>Investigation artifacts unavailable</h2><p>{error}</p></div>;
   return <div className="tr-shell">
-    <div className="tr-heading page-heading">
-      <div><span className="eyebrow"><Sparkles size={13} />AGENT RESEARCH</span><h1>Inside the investigation.</h1><p>Discover the strengths. Challenge the weaknesses. Follow the evidence.</p></div>
-      <div className="tr-heading-right">{summaries.length > 0 && <label className="tr-selector-label">Research run<select className="tr-select" value={selectedId} onChange={event => setSelectedId(event.target.value)} aria-label="Choose an investigation">{summaries.map(item => <option value={item.experiment_id} key={item.experiment_id}>{item.strategy_id}</option>)}</select></label>}</div>
+      <div className="tr-heading page-heading">
+      <div><span className="eyebrow"><Sparkles size={13} />AGENT RESEARCH</span><h1>Inside the investigation.</h1><p>Discover the strengths. Challenge the weaknesses. Follow the evidence.</p>{strategyId && <p className="tr-report-context">Workspace strategy: <strong>{strategyId}</strong>{report && report.strategy_id !== strategyId ? <> · Report strategy: <strong>{report.strategy_id}</strong></> : null}</p>}</div>
+      <div className="tr-heading-right">{onBack && <button className="tr-back-link" type="button" onClick={onBack}><ArrowLeft size={15} />Back to evidence</button>}{summaries.length > 0 && <label className="tr-selector-label">Research run<select className="tr-select" value={selectedId} onChange={event => setSelectedId(event.target.value)} aria-label="Choose an investigation">{summaries.map(item => <option value={item.experiment_id} key={item.experiment_id}>{item.strategy_id}</option>)}</select></label>}</div>
     </div>
     {error && <div className="tr-inline-error" role="alert"><TriangleAlert size={16} />{error}</div>}
     {selectedSummary && <div className="tr-context-bar"><span><span className="tr-context-dot" />{selectedSummary.strategy_id}</span><ModeBadge item={selectedSummary} /><SourceBadge item={selectedSummary} /><span className="tr-context-time">{when(selectedSummary.generated_at)} UTC</span></div>}

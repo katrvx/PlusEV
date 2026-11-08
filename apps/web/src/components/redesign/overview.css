@@ -1,0 +1,28 @@
+.ov-page { width: 100%; padding: 0 0 24px; color: var(--kk-text); }
+.ov-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.ov-heading > div:first-child { min-width: 0; }
+.ov-heading h1 { margin: 0; font-size: 22px; line-height: 1.3; }
+.ov-mode { flex-shrink: 0; padding: 7px 12px; border-radius: 30px; background: var(--kk-surface-raised); color: var(--kk-secondary); font-size: 13px; }
+.ov-hero { padding: 28px 0 0; }
+.ov-hero-value strong { display: block; color: var(--kk-text); font: 650 clamp(64px, 7vw, 88px)/1.06 var(--kk-sans); letter-spacing: -.065em; font-variant-numeric: tabular-nums; }
+.ov-period { margin-top: 12px !important; color: var(--kk-secondary); font-size: 14px; line-height: 1.6; }
+.ov-chart-wrap { margin-top: 36px; }
+.ov-takeaway { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 24px; padding: 24px 28px; border-radius: var(--kk-radius-panel); background: var(--kk-surface-raised); }
+.ov-takeaway h2 { margin: 0; font-size: 20px; line-height: 1.35; }
+.ov-finding { margin: 6px 0 0; color: var(--kk-secondary); font-size: 14px; line-height: 1.5; }
+.ov-primary-action svg { transition: transform 160ms ease; }
+.ov-primary-action:hover svg { transform: translateX(3px); }
+.ov-empty-chart { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 240px; color: var(--kk-secondary); font-size: 14px; }
+@media (max-width: 767px) {
+  .ov-heading { align-items: flex-start; gap: 8px 12px; flex-wrap: wrap; }
+  .ov-heading > div:first-child { flex: 1 1 180px; }
+  .ov-heading h1 { font-size: 18px; }
+  .ov-mode { font-size: 14px; }
+  .ov-hero { padding-top: 24px; }
+  .ov-hero-value strong { font-size: 64px; }
+  .ov-period { font-size: 14px; }
+  .ov-takeaway { align-items: flex-start; flex-direction: column; gap: 20px; margin-top: 12px; padding: 24px; }
+  .ov-takeaway h2 { font-size: 18px; }
+  .ov-chart-wrap { margin-top: 24px; }
+}
+@media (prefers-reduced-motion: reduce) { .ov-primary-action svg { transition: none; } }

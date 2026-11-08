@@ -1,0 +1,81 @@
+.kk-chart{--kk-chart-height:420px;color:#eee9e1;width:100%;font-family:var(--kk-font-sans,"Segoe UI",sans-serif)}
+.kk-chart-series-toggle label:has(input:not(:checked)){opacity:.5;text-decoration:line-through}
+.kk-chart-toolbar{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:18px}.kk-chart-label{display:block;font-family:var(--kk-font-serif,Georgia,serif);font-size:22px;line-height:1.2}.kk-chart-unit{display:block;margin-top:7px;color:#969088;font-size:12px;line-height:1.5}.kk-chart-scope{color:#b4aea5;font:12px var(--kk-font-mono,ui-monospace,monospace);text-align:right;white-space:nowrap}.kk-chart-stage{position:relative;height:var(--kk-chart-height);min-height:240px;overflow:visible}.kk-chart-stage svg{display:block;width:100%;height:100%;overflow:visible}.kk-chart-grid line{stroke:#25231f;stroke-opacity:.76;stroke-width:1;vector-effect:non-scaling-stroke}.kk-chart-grid text{fill:#969088;font:12px var(--kk-font-sans,"Segoe UI",sans-serif);font-variant-numeric:tabular-nums}.kk-chart-grid .kk-chart-axis-label{fill:#b4aea5;font-family:var(--kk-font-sans,"Segoe UI",sans-serif);font-size:12px}.kk-chart-series{transition:opacity 140ms ease}.kk-chart-reveal .kk-chart-series{clip-path:inset(0 100% 0 0);animation:kk-chart-trace 650ms cubic-bezier(.22,1,.36,1) forwards}.kk-chart-end-label{font:12px var(--kk-font-sans,"Segoe UI",sans-serif);font-variant-numeric:tabular-nums;paint-order:stroke;stroke:#0b0b0a;stroke-width:4px;stroke-linejoin:round}.kk-chart-guide{stroke:#f47735;stroke-width:1;stroke-dasharray:3 5;vector-effect:non-scaling-stroke;opacity:.75;pointer-events:none}.kk-chart-hit-area{fill:transparent;cursor:crosshair;outline:none}.kk-chart-hit-area:focus-visible{outline:2px solid #ffaa73;outline-offset:5px}.kk-chart-readout{position:absolute;top:16px;transform:translateX(-50%);min-width:190px;max-width:240px;padding:12px;background:#191714;border:1px solid #7a736a;border-radius:8px;box-shadow:0 6px 16px #0008;pointer-events:none;font-size:13px;z-index:2}.kk-chart-readout strong{display:block;color:#eee9e1;font:14px var(--kk-font-mono,ui-monospace,monospace);margin-bottom:8px}.kk-chart-readout span{display:grid;grid-template-columns:8px 1fr auto;align-items:center;gap:7px;color:#b4aea5;line-height:1.6}.kk-chart-readout span i{width:7px;height:2px}.kk-chart-readout span b{color:#eee9e1;font:13px var(--kk-font-mono,ui-monospace,monospace)}.kk-chart-readout small{display:block;margin-top:8px;color:#969088;font-size:11px}.kk-chart-controls{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-top:18px}.kk-chart-series-toggle{display:flex;flex-wrap:wrap;gap:10px 18px}.kk-chart-series-toggle label{display:flex;align-items:center;gap:7px;color:#b4aea5;font-size:12px;line-height:20px;cursor:pointer}.kk-chart-series-toggle input{position:absolute;opacity:0}.kk-chart-series-toggle input:focus-visible+i{outline:2px solid #ffaa73;outline-offset:3px}.kk-chart-series-toggle i{width:16px;height:2px;display:block}.kk-chart-series-toggle label[data-series="rule"] i{background-image:linear-gradient(90deg,#a8a198 0 52%,transparent 52% 100%);background-color:transparent}.kk-chart-series-toggle label[data-series="cash"] i{background-image:radial-gradient(circle,#b4aea5 1px,transparent 1.5px);background-size:5px 2px;background-color:transparent}.kk-chart-actions{display:flex;gap:18px;white-space:nowrap}.kk-chart-link{padding:0 0 3px;border:0;border-bottom:1px solid #7a736a;background:transparent;color:#eee9e1;font-size:12px;cursor:pointer}.kk-chart-link:hover,.kk-chart-link:focus-visible{color:#ff9658;border-color:#ff9658}.kk-chart-data{margin-top:22px;max-height:300px;overflow:auto;border-top:1px solid #302c27}.kk-chart-data table{border-collapse:collapse;min-width:100%;font:12px var(--kk-font-mono,ui-monospace,monospace)}.kk-chart-data caption{text-align:left;padding:14px 0;color:#b4aea5;font:13px var(--kk-font-sans,"Segoe UI",sans-serif)}.kk-chart-data th,.kk-chart-data td{text-align:right;padding:9px 12px;border-bottom:1px solid #302c27;white-space:nowrap}.kk-chart-data th:first-child,.kk-chart-data td:first-child{text-align:left}.kk-chart-data th{color:#b4aea5;font-weight:500}.kk-chart-data td{color:#eee9e1}.kk-chart-empty{min-height:220px;display:grid;place-items:center;color:#b4aea5;border-top:1px solid #302c27;border-bottom:1px solid #302c27}.kk-chart-empty p{font-size:15px}@keyframes kk-chart-trace{to{clip-path:inset(0 0 0 0)}}
+@media(max-width:760px){.kk-chart-toolbar{display:block;margin-bottom:12px}.kk-chart-label{font-size:20px}.kk-chart-scope{margin-top:7px;text-align:left;font-size:11px}.kk-chart-stage{height:min(var(--kk-chart-height),300px);min-height:260px}.kk-chart-end-label{font-size:10px}.kk-chart-grid text{font-size:11px}.kk-chart-readout{left:50%!important;top:10px;transform:none;min-width:0;width:min(230px,calc(100% - 24px));max-width:none}.kk-chart-controls{display:block;margin-top:14px}.kk-chart-actions{margin-top:14px}.kk-chart-series-toggle{gap:9px 14px}.kk-chart-series-toggle label{min-height:34px;font-size:12px}.kk-chart-data{max-height:240px}}
+@media(prefers-reduced-motion:reduce){.kk-chart-reveal .kk-chart-series{animation:none;clip-path:none}.kk-chart-series{transition:none}}
+[data-motion="reduced"] .kk-chart-reveal .kk-chart-series{animation:none;clip-path:none}
+[data-motion="reduced"] .kk-chart-series{transition:none}
+
+/* Responsive overrides: the measured SVG viewBox and stage stay pixel matched. */
+.kk-chart-stage{min-height:0}
+.kk-chart-readout{pointer-events:auto;left:var(--kk-chart-readout-left,50%)!important}
+.kk-chart-readout small{font-size:12px}
+.kk-chart-readout--center{transform:translateX(-50%)!important}
+.kk-chart-readout--start{transform:none!important}
+.kk-chart-readout--end{transform:translateX(-100%)!important}
+.kk-chart-narrow-labels{display:none}
+.kk-chart-scrubber{display:none}
+@media(max-width:760px){
+  .kk-chart-stage{height:var(--kk-chart-height);min-height:0}
+  .kk-chart-end-label,.kk-chart-grid text{font-size:12px}
+  .kk-chart-readout{width:min(230px,calc(100% - 24px));min-width:min(190px,calc(100% - 24px));max-width:calc(100% - 24px);top:10px}
+  .kk-chart-narrow-labels{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px 16px;margin:4px 0 14px;color:#b4aea5;font:12px/18px var(--kk-font-sans,"Segoe UI",sans-serif)}
+  .kk-chart-narrow-labels span{display:grid;grid-template-columns:8px 1fr auto;align-items:center;gap:7px;min-width:0}
+  .kk-chart-narrow-labels i{display:block;width:8px;height:2px}
+  .kk-chart-narrow-labels b{color:#eee9e1;font:12px/18px var(--kk-font-mono,ui-monospace,monospace);white-space:nowrap}
+  .kk-chart-scrubber{display:flex;align-items:center;gap:10px;min-height:44px;margin-top:14px;color:#b4aea5;font:12px/18px var(--kk-font-sans,"Segoe UI",sans-serif)}
+  .kk-chart-scrubber input{flex:1;min-width:0;accent-color:#f47735}
+  .kk-chart-scrubber output{min-width:86px;color:#eee9e1;font:12px/18px var(--kk-font-mono,ui-monospace,monospace);text-align:right}
+}
+
+/* Overview uses direct chart inspection; detailed controls belong to research views. */
+.kk-chart-line{transition:opacity 180ms ease}
+@media(prefers-reduced-motion:reduce){.kk-chart-line{transition:none}}
+
+/* The overview is the first read: one quiet scale and one highlighted curve.
+   Details remain available through the disclosure below the chart. */
+.kk-chart-presentation-overview .kk-chart-grid line{stroke:var(--kk-hairline,#292b30);stroke-opacity:.55}
+.kk-chart-presentation-overview .kk-chart-grid text{fill:var(--kk-text-quiet,#91959e);font-size:11px}
+.kk-chart-presentation-overview .kk-chart-stage{padding:0}
+
+/* Light prestige palette. Keep chart geometry and interaction rules above;
+   these tokens only change the visual treatment so the chart follows the
+   warm paper canvas used by the workspace. */
+.kk-chart{color:var(--kk-text,#242623);font-family:var(--kk-sans,"Segoe UI",sans-serif)}
+.kk-chart-toolbar .kk-chart-unit,.kk-chart-scope{color:var(--kk-quiet,#70746c)}
+.kk-chart-label{color:var(--kk-text,#242623)}
+.kk-chart-grid line{stroke:var(--kk-hairline,#deded5);stroke-opacity:.9}
+.kk-chart-grid text{fill:var(--kk-quiet,#70746c)}
+.kk-chart-grid .kk-chart-axis-label{fill:var(--kk-secondary,#62665f)}
+.kk-chart-end-label{stroke:var(--kk-canvas,#f6f5f1);stroke-width:5px}
+.kk-chart-guide{stroke:var(--kk-accent,#2454f4);opacity:.68}
+.kk-chart-hit-area:focus-visible{outline-color:var(--kk-focus,#1d3fc0)}
+.kk-chart-readout{background:var(--kk-surface,#fff);border-color:var(--kk-boundary,#999c92);box-shadow:0 10px 24px rgba(45,42,35,.14)}
+.kk-chart-readout strong{color:var(--kk-text,#242623)}
+.kk-chart-readout span{color:var(--kk-secondary,#62665f)}
+.kk-chart-readout span b{color:var(--kk-text,#242623)}
+.kk-chart-readout small{color:var(--kk-quiet,#70746c)}
+.kk-chart-series-toggle label{color:var(--kk-secondary,#62665f)}
+.kk-chart-series-toggle input:focus-visible+i{outline-color:var(--kk-focus,#1d3fc0)}
+.kk-chart-series-toggle label[data-series="rule"] i{background-image:linear-gradient(90deg,var(--kk-simple,#697b8b) 0 52%,transparent 52% 100%)}
+.kk-chart-series-toggle label[data-series="cash"] i{background-image:radial-gradient(circle,var(--kk-cash,#85887e) 1px,transparent 1.5px)}
+.kk-chart-link{border-color:var(--kk-boundary,#999c92);color:var(--kk-text,#242623)}
+.kk-chart-link:hover,.kk-chart-link:focus-visible{color:var(--kk-accent-hover,#1d3fc0);border-color:var(--kk-accent-hover,#1d3fc0)}
+.kk-chart-data{border-color:var(--kk-hairline,#deded5)}
+.kk-chart-data caption{color:var(--kk-secondary,#62665f)}
+.kk-chart-data th,.kk-chart-data td{border-color:var(--kk-hairline,#deded5)}
+.kk-chart-data th{color:var(--kk-secondary,#62665f)}
+.kk-chart-data td{color:var(--kk-text,#242623)}
+.kk-chart-empty{color:var(--kk-secondary,#62665f);border-color:var(--kk-hairline,#deded5)}
+.kk-chart-narrow-labels{color:var(--kk-secondary,#62665f)}
+.kk-chart-narrow-labels b{color:var(--kk-text,#242623)}
+.kk-chart-scrubber{color:var(--kk-secondary,#62665f)}
+.kk-chart-scrubber input{accent-color:var(--kk-accent,#2454f4)}
+.kk-chart-scrubber output{color:var(--kk-text,#242623)}
+.kk-chart-presentation-overview .kk-chart-grid line{stroke:var(--kk-hairline,#deded5);stroke-opacity:.72}
+.kk-chart-presentation-overview .kk-chart-grid text{fill:var(--kk-quiet,#70746c)}
+.kk-chart-presentation-overview .kk-chart-grid line,
+.kk-chart-presentation-overview .kk-chart-y-tick{display:none}
+.kk-chart-presentation-overview .kk-chart-x-tick{fill:var(--kk-secondary,#62665f);font-size:13px}
+.kk-chart-area{pointer-events:none}
+.kk-chart-endpoint{pointer-events:none}

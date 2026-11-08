@@ -1,0 +1,80 @@
+"use client";
+
+import { ArrowRight, CircleHelp } from "lucide-react";
+import { verdictHeadline, verdictLabel } from "./decision";
+import type { SharedResearchProps } from "./types";
+import ResearchChart from "./research-chart";
+import { MagneticAction } from "./ui-motion";
+import "./overview.css";
+
+type Props = SharedResearchProps & {
+  onConditions: () => void;
+  onCompare: () => void;
+};
+
+const percent = (value: number | null | undefined) => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  return `${value < 0 ? "−" : value > 0 ? "+" : ""}${Math.abs(value * 100).toFixed(1)}%`;
+};
+
+function modeLabel(mode: SharedResearchProps["experiment"]["mode"]) {
+  if (mode === "demo") return "Example data";
+  if (mode === "measured") return "Measured research";
+  return "Research pending";
+}
+
+function plainHypothesis(hypothesis: SharedResearchProps["experiment"]["hypotheses"][number], mode: SharedResearchProps["experiment"]["mode"]) {
+  if (mode !== "demo") return hypothesis;
+  const title = hypothesis.title.toLowerCase();
+  if (hypothesis.id === "hyp_01" || title.includes("falling volatility")) {
+    return { ...hypothesis, title: "Calmer markets helped.", finding: "The example was stronger when price swings eased. A pattern to test, not proof." };
+  }
+  if (hypothesis.id === "hyp_02" || title.includes("rising volatility")) {
+    return { ...hypothesis, title: "Bigger price swings may not explain every loss", finding: "The example was weaker in these conditions, but it does not prove why the losses happened." };
+  }
+  if (hypothesis.id === "hyp_03" || title.includes("news caused")) {
+    return { ...hypothesis, title: "The news explanation lacked dated evidence", finding: "No dated news records were available in this run, so that explanation was rejected." };
+  }
+  return hypothesis;
+}
+
+function baselineReturn(experiment: SharedResearchProps["experiment"]) {
+  const baseline = experiment.baselines.find(item => item.id === "always_on") || experiment.baselines[0];
+  return baseline ? baseline.net_return : null;
+}
+
+export default function ResearchOverview({ experiment, strategy, selectedDate, onSelectDate, onConditions, onCompare }: Props) {
+  const findings = experiment.hypotheses.map(item => plainHypothesis(item, experiment.mode));
+  const mainFinding = findings.find(item => item.status === "supported") ?? findings.find(item => item.status === "inconclusive");
+  const measuredAndTested = experiment.mode === "measured" && experiment.policy.holdout_frozen && experiment.policy.test_evaluated;
+  const currentReturn = baselineReturn(experiment);
+  const primaryLabel = measuredAndTested ? "Compare" : "See why";
+  const primaryAction = measuredAndTested ? onCompare : onConditions;
+
+  return <div className="ov-page">
+    <header className="ov-heading">
+      <div>
+        <h1>{strategy.name}</h1>
+      </div>
+      <div className={`ov-mode ov-mode-${experiment.mode}`}>{experiment.mode === "demo" ? modeLabel(experiment.mode) : verdictLabel(experiment.verdict)}</div>
+    </header>
+
+    <section className="ov-hero" aria-label="Strategy at a glance">
+      <div className="ov-hero-value" aria-label={`Original strategy return ${percent(currentReturn)}`}>
+        <strong>{percent(currentReturn)}</strong>
+        <p className="ov-period">Return after costs</p>
+      </div>
+    </section>
+
+    {experiment.equity.length > 0 ? <div className="ov-chart-wrap"><ResearchChart data={experiment.equity} series={["base"]} selectedDate={selectedDate} onSelectDate={onSelectDate} label="Original strategy over time" mode={experiment.mode} height={300} presentation="overview" reveal /></div> : <div className="ov-empty-chart" role="status"><CircleHelp size={18} /><span>No measured curve is available yet.</span></div>}
+
+    <section className="ov-takeaway" aria-label="Research takeaway">
+      <div>
+        <h2>{experiment.mode === "pending" ? "Research is pending." : verdictHeadline(experiment.verdict)}</h2>
+        {mainFinding && <p className="ov-finding">{mainFinding.title}</p>}
+      </div>
+      <MagneticAction><button type="button" className="ov-primary-action kk-primary-button" onClick={primaryAction}>{primaryLabel}<ArrowRight size={17} /></button></MagneticAction>
+    </section>
+
+  </div>;
+}

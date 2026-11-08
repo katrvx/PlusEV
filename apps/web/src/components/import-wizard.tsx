@@ -30,6 +30,7 @@ import "./import-wizard.css";
 type Props = {
   onClose: () => void;
   onImported: (strategy: Strategy) => void;
+  initialFile?: File | null;
 };
 
 type FormState = {
@@ -80,12 +81,13 @@ const prettyBytes = (bytes: number) => {
 
 const fieldLabel = (field: string) => field.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 
-export default function ImportWizard({ onClose, onImported }: Props) {
+export default function ImportWizard({ onClose, onImported, initialFile = null }: Props) {
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const requestRef = useRef(0);
+  const initialFileRef = useRef<File | null>(null);
   const mountedRef = useRef(true);
   const importingRef = useRef(false);
   const onCloseRef = useRef(onClose);
@@ -214,6 +216,16 @@ export default function ImportWizard({ onClose, onImported }: Props) {
     [previewFile, resetForFile],
   );
 
+  useEffect(() => {
+    if (!initialFile || initialFileRef.current === initialFile) return;
+    const startPreview = window.setTimeout(() => {
+      if (initialFileRef.current === initialFile) return;
+      initialFileRef.current = initialFile;
+      chooseFile(initialFile);
+    }, 0);
+    return () => window.clearTimeout(startPreview);
+  }, [chooseFile, initialFile]);
+
   const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
     if (key === "kind" && preview) {
@@ -306,7 +318,7 @@ export default function ImportWizard({ onClose, onImported }: Props) {
             <div className="iw-eyebrow"><span className="iw-eyebrow-dot" /> Strategy intake</div>
             <h2 id={titleId}>{step === 3 ? "Strategy ready for research" : "Bring your strategy"}</h2>
             <p id={descriptionId}>
-              {step === 3 ? "Your original file is saved as the starting point for research." : "Upload the history your team already uses. Keep or Kill only suggests when to use it."}
+              {step === 3 ? "Your original file is saved for research." : "Upload the history your team already uses."}
             </p>
           </div>
           <button className="iw-icon-button" type="button" aria-label="Close import dialog" disabled={importing} onClick={() => onCloseRef.current()}><X size={19} /></button>
@@ -331,7 +343,7 @@ export default function ImportWizard({ onClose, onImported }: Props) {
           {step === 1 && (
             <section className="iw-upload-section" aria-labelledby={`${titleId}-upload`}>
               <div className="iw-section-heading">
-                <div><h3 id={`${titleId}-upload`}>Choose your strategy file</h3><p>Use a CSV or Parquet file. Position history lets us test when to use the strategy; trade history is for diagnosis.</p></div>
+                <div><h3 id={`${titleId}-upload`}>Choose your strategy file</h3><p>CSV or Parquet. Position history is testable; completed trades are diagnosis only.</p></div>
                 <FileSpreadsheet className="iw-heading-icon" size={23} aria-hidden="true" />
               </div>
               <div
@@ -342,16 +354,16 @@ export default function ImportWizard({ onClose, onImported }: Props) {
               >
                 <input ref={inputRef} className="iw-visually-hidden" type="file" accept=".csv,.parquet,.pq,text/csv" onChange={(event) => chooseFile(event.target.files?.[0])} />
                 <div className="iw-upload-icon"><UploadCloud size={23} /></div>
-                {loading ? <><h3>Inspecting your file…</h3><Loader2 className="iw-spin" size={18} /></> : <><h3>Drop your strategy export</h3><p><button className="iw-upload-cta" type="button" onClick={() => inputRef.current?.click()}>Choose a CSV or Parquet file</button></p></>}
-                <span className="iw-upload-note">Example: positions.csv · timestamp, symbol, capital allocation</span>
+                {loading ? <><h3>Inspecting your file…</h3><Loader2 className="iw-spin" size={18} /></> : <><h3>Drop your strategy export</h3><p><button className="iw-upload-cta kk-primary-button" type="button" onClick={() => inputRef.current?.click()}>Choose a CSV or Parquet file</button></p></>}
+                <span className="iw-upload-note">Example: positions.csv · timestamp, symbol, allocation</span>
               </div>
               {file && <div className="iw-active-file"><div className="iw-active-file-icon"><FileSpreadsheet size={16} /></div><div><span>Active file</span><strong>{file.name}</strong><small>{prettyBytes(file.size)}{loading ? " · inspecting columns…" : " · ready to configure"}</small></div></div>}
               <div className="iw-source-row">
                 <Info size={15} aria-hidden="true" />
-                <span>Not sure what the file should look like? Download a sample below, then match your column names to it.</span>
+                <span>Need a reference? Start with a sample.</span>
               </div>
               <div className="iw-template-card">
-                <div><strong>See an example file</strong><span>Open one of these small CSVs to see the format before uploading.</span></div>
+                <div><strong>Sample files</strong><span>Check the expected columns before uploading.</span></div>
                 <div className="iw-template-links"><a href={API_ROUTES.positionTemplate} download><Download size={14} /> Position history</a><a href={API_ROUTES.tradeTemplate} download><Download size={14} /> Trade history</a></div>
               </div>
             </section>
@@ -359,10 +371,10 @@ export default function ImportWizard({ onClose, onImported }: Props) {
 
           {step === 2 && preview && (
             <section aria-labelledby={`${titleId}-map`}>
-              <div className="iw-section-heading"><div><h3 id={`${titleId}-map`}>Match your columns</h3><p>We found {preview.row_count.toLocaleString()} rows and {preview.columns.length} columns in <strong>{file?.name}</strong>. Choose which column means each item below.</p></div><span className="iw-file-chip"><FileSpreadsheet size={14} /> {file ? prettyBytes(file.size) : ""}</span></div>
+              <div className="iw-section-heading"><div><h3 id={`${titleId}-map`}>Match your columns</h3><p>{preview.row_count.toLocaleString()} rows · {preview.columns.length} columns · <strong>{file?.name}</strong></p></div><span className="iw-file-chip"><FileSpreadsheet size={14} /> {file ? prettyBytes(file.size) : ""}</span></div>
               <div className="iw-kind-toggle" role="group" aria-label="Input type">
-                <button type="button" aria-pressed={form.kind === "positions"} className={form.kind === "positions" ? "iw-kind-selected" : ""} onClick={() => updateForm("kind", "positions")}><span>Position history <b className="iw-recommended">Recommended</b></span><small>Each row says how much capital the strategy allocates at that timestamp · best for testing when to use it</small></button>
-                <button type="button" aria-pressed={form.kind === "trades"} className={form.kind === "trades" ? "iw-kind-selected" : ""} onClick={() => updateForm("kind", "trades")}><span>Trade history</span><small>Diagnosis only · shows completed trades, but cannot test a new on/off policy</small></button>
+                <button type="button" aria-pressed={form.kind === "positions"} className={form.kind === "positions" ? "iw-kind-selected" : ""} onClick={() => updateForm("kind", "positions")}><span>Position history <b className="iw-recommended">Recommended</b></span><small>Allocation at each timestamp · testable</small></button>
+                <button type="button" aria-pressed={form.kind === "trades"} className={form.kind === "trades" ? "iw-kind-selected" : ""} onClick={() => updateForm("kind", "trades")}><span>Trade history</span><small>Completed trades · diagnosis only</small></button>
               </div>
               <div className="iw-map-grid">
                 <div className="iw-map-fields">
@@ -388,16 +400,16 @@ export default function ImportWizard({ onClose, onImported }: Props) {
                 <label><span>How often is it recorded?</span><select value={form.timeframe} onChange={(event) => updateForm("timeframe", event.target.value)}><option>1m</option><option>5m</option><option>15m</option><option>1h</option><option>4h</option><option>1d</option></select></label>
               </div>
               <details className="iw-assumptions" open={assumptionsOpen || assumptionErrors} onToggle={(event) => setAssumptionsOpen(event.currentTarget.open)}>
-                <summary><span><strong>Advanced settings: costs, timing &amp; version</strong><small>Optional if you already know your trading costs and timestamp details</small></span><b>{form.timezone} · fees {form.fee_bps || "—"} bps · slippage {form.slippage_bps || "—"} bps</b></summary>
+                <summary><span><strong>Assumptions: costs, timing &amp; version</strong><small>Example costs are shown up front; edit them if you know your venue details.</small></span><b>Example: {form.timezone} · fee {form.fee_bps || "—"} bps · slippage {form.slippage_bps || "—"} bps</b></summary>
                 <div className="iw-form-grid iw-assumptions-grid">
                   <label><span>Strategy version</span><input value={form.strategy_version} onChange={(event) => updateForm("strategy_version", event.target.value)} placeholder="v1.0.0 or git SHA" /><small>A label to help you find this version later.</small></label>
                   <label><span>Timestamp timezone</span><select value={form.timezone} onChange={(event) => updateForm("timezone", event.target.value)}><option>UTC</option><option>Europe/London</option><option>America/New_York</option><option>Asia/Singapore</option></select><small>Used when timestamps do not include a timezone.</small></label>
-                  <label><span>Trading fee (bps)</span><input inputMode="decimal" type="number" min="0" step="0.1" value={form.fee_bps} onChange={(event) => updateForm("fee_bps", event.target.value)} /><small>The venue fee charged when a trade happens. Leave the default if unsure.</small></label>
-                  <label><span>Slippage (bps)</span><input inputMode="decimal" type="number" min="0" step="0.1" value={form.slippage_bps} onChange={(event) => updateForm("slippage_bps", event.target.value)} /><small>The small price difference at execution. Leave the default if unsure.</small></label>
+                  <label><span>Trading fee (bps)</span><input inputMode="decimal" type="number" min="0" step="0.1" value={form.fee_bps} onChange={(event) => updateForm("fee_bps", event.target.value)} /><small>Example assumption: 5 bps. Replace it with the fee your venue charges.</small></label>
+                  <label><span>Slippage (bps)</span><input inputMode="decimal" type="number" min="0" step="0.1" value={form.slippage_bps} onChange={(event) => updateForm("slippage_bps", event.target.value)} /><small>Example assumption: 3 bps. Replace it when you have a measured estimate.</small></label>
                   <label className="iw-wide"><span>Notes <small>optional</small></span><textarea rows={2} value={form.description} onChange={(event) => updateForm("description", event.target.value)} placeholder="Venue, assumptions, or the question you want the agents to investigate" /></label>
                 </div>
               </details>
-              <div className="iw-disclosure"><Info size={15} /><span>{form.kind === "trades" ? "Trade history helps the agents find where the strategy did well and struggled. To test a different on/off policy, we also need position history." : "Your original strategy stays unchanged. Keep or Kill tests when to use it, using the costs you provide."}</span></div>
+              <div className="iw-disclosure"><Info size={15} /><span>{form.kind === "trades" ? "Trade history is for diagnosis. Use position history to test an on/off policy." : "Your original strategy stays unchanged. Research uses the costs shown above."}</span></div>
             </section>
           )}
 
@@ -413,9 +425,9 @@ export default function ImportWizard({ onClose, onImported }: Props) {
         </main>
 
         <footer className="iw-footer">
-          {step === 1 && <><span className="iw-footer-hint">Your source stays unchanged.</span><button className="iw-button iw-button-secondary" type="button" disabled={importing} onClick={() => onCloseRef.current()}>Cancel</button></>}
-          {step === 2 && <><button className="iw-button iw-button-ghost" type="button" disabled={importing} onClick={() => { setStep(1); setError(null); }}><ArrowLeft size={16} /> Replace file</button><div className="iw-footer-actions"><button className="iw-button iw-button-secondary" type="button" disabled={importing} onClick={() => onCloseRef.current()}>Cancel</button><button className="iw-button iw-button-primary" type="button" disabled={importing || !preview} onClick={() => void importStrategy()}>{importing ? <><Loader2 className="iw-spin" size={16} /> Validating…</> : <>Import strategy <ArrowRight size={16} /></>}</button></div></>}
-          {step === 3 && <><span className="iw-footer-hint">Next: ask the research agents to investigate this strategy.</span><button className="iw-button iw-button-primary" type="button" onClick={onClose}>Open research workspace <ArrowRight size={16} /></button></>}
+          {step === 1 && <><span className="iw-footer-hint">Source stays unchanged.</span><button className="iw-button iw-button-secondary" type="button" disabled={importing} onClick={() => onCloseRef.current()}>Cancel</button></>}
+          {step === 2 && <><button className="iw-button iw-button-ghost" type="button" disabled={importing} onClick={() => { setStep(1); setError(null); }}><ArrowLeft size={16} /> Replace file</button><div className="iw-footer-actions"><button className="iw-button iw-button-secondary" type="button" disabled={importing} onClick={() => onCloseRef.current()}>Cancel</button><button className="iw-button iw-button-primary kk-primary-button" type="button" disabled={importing || !preview} onClick={() => void importStrategy()}>{importing ? <><Loader2 className="iw-spin" size={16} /> Validating…</> : <>Import strategy <ArrowRight size={16} /></>}</button></div></>}
+          {step === 3 && <><span className="iw-footer-hint">Next: investigate this strategy.</span><button className="iw-button iw-button-primary kk-primary-button" type="button" onClick={onClose}>Open research workspace <ArrowRight size={16} /></button></>}
         </footer>
       </div>
     </div>
