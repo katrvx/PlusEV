@@ -90,3 +90,9 @@ will be identical (both flat) and power will be low, especially for trend.
   rule or parameter changed.
 - Lead committed this file, packages/kit_adapter/*.py and scripts/kok_challenge.py as 2327e45
   before any challenge run.
+- 2026-11-08T12:29Z: mean_reversion challenge run once (kit exit 0, 0 errors, 300/300 run).
+  Revealed seed 4041460934254655326; operator checked sha256 commitment = COMMITMENT.txt (match).
+  Raw replay + paired.json written. No rerun.
+- 2026-11-08T12:31Z: trend challenge run once (kit exit 0, 0 errors, 300/300 run).
+  Revealed seed 2983172727702243693; commitment check matched. Raw replay + paired.json
+  written. No rerun. No crashes in either run; no code or parameter changes after challenge output.
