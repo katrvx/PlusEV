@@ -277,7 +277,13 @@
   width:100% !important;
   max-width:360px !important;
   margin:20px 0 0 !important;
+  border:0;
+  border-radius:0;
+  background:transparent;
 }
+
+/* Landing-page explanations sit freely beside the characters. */
+.kk-body .kk-app .rs-story .kk-mascot-copy::after { content:none; }
 
 .kk-body .kk-app .rs-story .rs-research-stage {
   display:flex !important;
