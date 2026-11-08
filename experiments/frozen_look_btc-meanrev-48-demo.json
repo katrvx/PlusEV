@@ -1,0 +1,58 @@
+{
+  "what": "the one sealed-test look for the Lane B champion accepted by the pre-registered rule",
+  "experiment_id": "exp_a79497cf70ec",
+  "strategy_id": "btc-meanrev-48-demo",
+  "champion_policy_id": "agent::vol_median_05_1",
+  "champion_spec_hash": "spec_dbd7812c913a",
+  "selected_in_report": "experiments/investigation_argon_meanrev.json",
+  "report_committed_before_look": "ad3dff1",
+  "looked_at": "2026-11-08T11:27:16.184157+00:00",
+  "evaluation": {
+    "policy_id": "agent::vol_median_05_1",
+    "split": "test",
+    "metrics": {
+      "net_return": -0.28921116015313264,
+      "sharpe": -0.941537971767495,
+      "sortino": -0.7517419883315106,
+      "max_drawdown": 0.3615098273580968,
+      "turnover": 263.5,
+      "n_switches": 477,
+      "exposure": 0.22250949077104332,
+      "ci_net_return": [
+        -0.5114197414189143,
+        0.0465260088285728
+      ],
+      "cvar_05": -0.005092013711517377,
+      "avg_holding_bars": 26.469827586206897
+    },
+    "always_on": {
+      "net_return": -0.561943388658761,
+      "sharpe": -1.4714847308245835,
+      "sortino": -1.199621518910918,
+      "max_drawdown": 0.604354358504603,
+      "turnover": 463.0,
+      "n_switches": 463,
+      "exposure": 0.40195051708338786,
+      "ci_net_return": [
+        -0.7534485590877998,
+        -0.1852980924674709
+      ],
+      "cvar_05": -0.008397944418854627,
+      "avg_holding_bars": 26.469827586206897
+    },
+    "delta_net_return_vs_always_on": 0.2727322285056284,
+    "ci_delta": [
+      0.1528625359852689,
+      0.3616151497628489
+    ],
+    "allocation_mix": {
+      "0.0": 0.0,
+      "0.5": 0.892851327145416,
+      "1.0": 0.10714867285458395
+    },
+    "n_decisions": 15278,
+    "n_in_position": 6141,
+    "fold": null,
+    "audit_id": "audit_42e931db718d"
+  }
+}
