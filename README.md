@@ -116,6 +116,8 @@ flowchart LR
 The direction comes from each strategy's own evidence: low volatility hurts mean reversion and helps trend. Details: [experiments/conditions_check/README.md](experiments/conditions_check/README.md).
 
 ![The +EV agent trail: research, proposed rules, critic review and code verification.](docs/media/evidence.png)
+<img width="1779" height="824" alt="image" src="https://github.com/user-attachments/assets/e56bf738-f431-4033-becb-785516acef79" />
+
 
 ---
 
