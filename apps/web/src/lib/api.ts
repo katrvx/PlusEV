@@ -1,5 +1,5 @@
 import { API_ROUTES } from "../../../../packages/contracts/api";
-import type { Experiment, Health, ImportPreview, ImportRequest, ImportResult, PaperPlan, Strategy } from "../../../../packages/contracts/types";
+import type { Experiment, Health, ImportPreview, ImportRequest, ImportResult, PaperPlan, Strategy, StrategyDefinition, StrategyDefinitionResult } from "../../../../packages/contracts/types";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, { ...options, cache: "no-store" });
@@ -20,10 +20,12 @@ function json(body: unknown): RequestInit {
 }
 export const api = {
   health: () => request<Health>(API_ROUTES.health),
-  strategies: () => request<Strategy[]>(API_ROUTES.strategies),
+  strategies: () => request<Strategy[]>(`${API_ROUTES.strategies}?include_native_example=true`),
+  saveStrategyDefinition: (definition: StrategyDefinition) => request<StrategyDefinitionResult>(API_ROUTES.strategyDefinitions, json(definition)),
   preview: (file: File) => { const data = new FormData(); data.append("file", file); return request<ImportPreview>(API_ROUTES.previewImport, { method: "POST", body: data }); },
   importStrategy: (data: ImportRequest) => request<ImportResult>(API_ROUTES.importStrategy, json(data)),
   experiments: (strategyId: string) => request<Experiment[]>(API_ROUTES.strategyExperiments(strategyId)),
+  allExperiments: () => request<Experiment[]>(`${API_ROUTES.experiments}?include_native_example=true`),
   experiment: (id: string) => request<Experiment>(API_ROUTES.experiment(id)),
   investigate: (strategyId: string) => request<Experiment>(API_ROUTES.experiments, json({ strategy_id: strategyId })),
   paperPlans: () => request<PaperPlan[]>(API_ROUTES.paperPlans),

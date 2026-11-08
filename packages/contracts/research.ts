@@ -1,6 +1,37 @@
 /** Native Lane B investigation report shape consumed by Part C. */
 export type AgentMode = "llm" | "llm_with_fallback" | "deterministic_fallback";
 
+export type NativeStrategyHealth = {
+  status: string;
+  summary: string;
+  changed_assumptions: string[];
+  train_range: { low: number; high: number; horizon_bars: number; horizon_days: number; source: string };
+  validation_blocks: { start: string; net_return: number; position: "inside" | "below" | "above" }[];
+  n_blocks: number;
+  n_below: number;
+  n_above: number;
+  validation_net_return: number;
+  checks: { assumption: string; train: number | Record<string, number>; validation: number | Record<string, number>; ratio?: number; total_variation?: number; changed: boolean; note: string }[];
+  evidence_id: string;
+};
+
+export type NativeMetrics = {
+  net_return: number; sharpe: number; sortino: number; max_drawdown: number;
+  turnover: number; n_switches: number; exposure: number; ci_net_return: [number, number];
+  cvar_05?: number; avg_holding_bars?: number;
+};
+export type NativeEvaluation = {
+  policy_id: string; split: string; metrics: NativeMetrics; always_on: NativeMetrics;
+  delta_net_return_vs_always_on: number; ci_delta: [number, number];
+  allocation_mix: Record<string, number>; n_decisions: number; n_in_position: number;
+  fold: number | null; audit_id: string;
+};
+export type FrozenEvaluation = {
+  what: string; experiment_id: string; strategy_id: string;
+  champion_policy_id: string; champion_spec_hash: string; selected_in_report: string;
+  report_committed_before_look: string; looked_at: string; evaluation: NativeEvaluation;
+};
+
 export type TeamEvidence = {
   evidence_id: string;
   tool: string;
@@ -64,6 +95,11 @@ export type TeamReport = {
   agent_failures?: string[];
   verdict?: "candidate_for_frozen_test" | "INCONCLUSIVE";
   champion_policy_id?: string | null;
+  verdict_basis?: string[];
+  strategy_health?: NativeStrategyHealth;
+  validation_always_on?: Pick<NativeMetrics, "net_return" | "ci_net_return">;
+  validation_cash_net_return?: number;
+  context?: { summary: string; findings: unknown[]; limitations: string[] };
   diagnostic: {
     summary: string;
     hypotheses: TeamHypothesis[];

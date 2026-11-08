@@ -1,0 +1,67 @@
+.kk-mascot { display:block; flex:0 0 auto; width:var(--mascot-size,360px); max-width:100%; background-repeat:no-repeat; pointer-events:none; }
+.kk-mascot-duo { display:block; width:100%; height:auto; pointer-events:none; }
+
+/* Atlas cells include transparent breathing room. Each character and spoken
+   thought get a generous scene, not an icon slot. */
+.kk-body .kk-app .kk-mascot-callout {
+  position:relative; display:grid; grid-template-columns:minmax(240px,.95fr) minmax(180px,1fr);
+  align-items:center; gap:0; min-width:0; min-height:280px; max-width:780px; padding:0;
+  color:var(--kk-text); background:transparent; border:0; border-radius:0; box-shadow:none; isolation:isolate;
+}
+.kk-body .kk-app .kk-mascot-callout > .kk-mascot {
+  grid-column:1; grid-row:1; justify-self:center; width:max(340px,var(--mascot-size,380px));
+  height:auto; max-width:none; margin:-30px -38px; opacity:0;
+  transform:translateY(32px) rotate(-6deg) scale(.92); transform-origin:50% 82%;
+  transition:opacity 250ms ease, transform 650ms cubic-bezier(.2,.85,.2,1.15);
+}
+.kk-body .kk-app .kk-mascot-callout[data-peek="shown"] > .kk-mascot {
+  opacity:1; transform:none; animation:kk-character-explain 3.4s 650ms ease-in-out 2;
+}
+.kk-body .kk-app .kk-mascot-callout .kk-mascot-copy {
+  position:relative; z-index:1; grid-column:2; grid-row:1; align-self:start; min-width:0; max-width:360px;
+  margin:20px 0 0; padding:20px 23px; border:2px solid var(--kk-text);
+  border-radius:32px 34px 30px 12px; background:var(--kk-canvas,#fffaf1);
+  color:var(--kk-text); text-align:left; font:450 16px/1.5 var(--kk-sans); transform-origin:0 85%;
+}
+.kk-body .kk-app .kk-mascot-callout .kk-mascot-copy::after {
+  content:""; position:absolute; width:18px; height:18px; left:-11px; right:auto; top:auto; bottom:22px;
+  border:0; border-left:2px solid var(--kk-text); border-bottom:2px solid var(--kk-text);
+  border-radius:0 0 0 3px; background:inherit; transform:skewY(-22deg) rotate(24deg);
+}
+.kk-body .kk-app .kk-mascot-callout[data-peek="shown"] .kk-mascot-copy { animation:kk-speech-arrive 450ms 120ms both cubic-bezier(.2,.85,.2,1.15); }
+.kk-body .kk-app .kk-mascot-callout .kk-mascot-copy > strong { display:block; margin-bottom:7px; font:750 21px/1.2 var(--kk-sans); letter-spacing:-.035em; }
+.kk-mascot-copy p { margin:0; }
+.kk-mascot-copy > div { color:var(--kk-secondary); }
+@keyframes kk-character-explain {
+  0%,100% { translate:0 0; rotate:0deg; } 28% { translate:0 -7px; rotate:-2deg; }
+  58% { translate:0 -2px; rotate:1deg; } 78% { translate:0 -5px; rotate:-.5deg; }
+}
+@keyframes kk-speech-arrive { from { opacity:.35; transform:translateY(7px) scale(.96); } to { opacity:1; transform:none; } }
+
+@media(max-width:767px) {
+  .kk-body .kk-app .kk-mascot-callout {
+    grid-template-columns:minmax(0,1fr) 172px; align-items:end; width:calc(100% + 20px); max-width:none;
+    min-height:290px; margin-right:-20px; padding:8px 0 0; overflow:clip;
+  }
+  .kk-body .kk-app .kk-mascot-callout > .kk-mascot {
+    grid-column:2; grid-row:1; justify-self:start; align-self:end; width:max(280px,var(--mascot-mobile-size,300px));
+    height:auto; margin:68px 0 -28px -60px; transform:translateX(130px) rotate(-10deg); transform-origin:50% 82%;
+  }
+  .kk-body .kk-app .kk-mascot-callout[data-peek="shown"] > .kk-mascot { transform:translateX(0) rotate(-3deg); }
+  .kk-body .kk-app .kk-mascot-callout > .kk-mascot:is([data-pose$="point-right"],[data-pose$="present-up"],[data-pose$="read-sheet"],[data-pose="bull-acknowledge"],[data-pose="bull-take-note"],[data-pose="bear-question"],[data-pose="bear-compare"]) { scale:-1 1; }
+  .kk-body .kk-app .kk-mascot-callout .kk-mascot-copy {
+    grid-column:1 / -1; grid-row:1; align-self:start; width:calc(100% - 92px); max-width:290px; margin:0;
+    padding:16px 18px; border-radius:26px 28px 10px 26px; font-size:14px; line-height:1.45; transform-origin:85% 100%;
+  }
+  .kk-body .kk-app .kk-mascot-callout .kk-mascot-copy > strong { font-size:19px; line-height:1.2; }
+  .kk-body .kk-app .kk-mascot-callout .kk-mascot-copy::after {
+    left:auto; right:26px; top:auto; bottom:-11px; border-left:0; border-right:2px solid var(--kk-text);
+    border-bottom:2px solid var(--kk-text); transform:skewY(12deg) rotate(32deg);
+  }
+}
+@media(prefers-reduced-motion:reduce) {
+  .kk-body .kk-app .kk-mascot-callout > .kk-mascot,
+  .kk-body .kk-app .kk-mascot-callout .kk-mascot-copy { opacity:1; animation:none !important; transition:none; translate:none; rotate:none; }
+}
+[data-motion="reduced"] .kk-mascot-callout > .kk-mascot,
+[data-motion="reduced"] .kk-mascot-callout .kk-mascot-copy { opacity:1 !important; animation:none !important; transition:none !important; translate:none; rotate:none; }

@@ -1,6 +1,6 @@
 import type { Experiment, Strategy, PaperPlan, Health, Evidence, EquityPoint } from "../../../../../packages/contracts/types";
 export type { Experiment, Strategy, PaperPlan, Health, Evidence, EquityPoint };
-export type MainView = "strategy" | "explore" | "compare" | "observe";
+export type MainView = "portfolio" | "strategy" | "explore" | "compare" | "observe";
 export type ExploreTab = "overview" | "conditions" | "evidence";
 export type MotionPreference = "system" | "reduced" | "full";
 export type SharedResearchProps = {

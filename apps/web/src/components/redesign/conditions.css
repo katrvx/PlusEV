@@ -24,3 +24,268 @@
 .cv-kicker{display:none}
 .cv-chart-section .kk-chart-toolbar{display:none}
 .cv-about p,.cv-explainer p,.cv-small-sample{font-size:14px}
+
+/* Current light research surface: the condition view should read like a
+   calm explanation, with the supplied interval as the one visual decision. */
+.cv-page {
+  max-width: none;
+  padding: 4px 0 88px;
+  color: var(--kk-text);
+  font-family: var(--kk-sans);
+}
+.cv-header { padding: 0 0 34px; border-bottom-color: var(--kk-hairline); }
+.cv-header h1 {
+  margin: 8px 0 14px;
+  color: var(--kk-text);
+  font: 650 clamp(48px, 6vw, 72px)/1.02 var(--kk-sans);
+  letter-spacing: -.065em;
+}
+.cv-header p { color: var(--kk-text-secondary); font-size: 17px; }
+.cv-result-status {
+  margin-top: 0;
+  padding: 8px 13px;
+  border: 1px solid var(--kk-hairline);
+  border-radius: 999px;
+  background: var(--kk-surface-raised);
+  color: var(--kk-text-secondary);
+  font-size: 13px;
+}
+.cv-result-status.example { border-color: rgba(36,84,244,.22); background: var(--kk-accent-area); color: var(--kk-accent); }
+.cv-chart-section { padding: 54px 0 54px; border-bottom-color: var(--kk-hairline); }
+.cv-section-head { margin-bottom: 26px; }
+.cv-section-head h2 {
+  margin: 0;
+  color: var(--kk-text);
+  font: 620 clamp(30px, 3.8vw, 48px)/1.06 var(--kk-sans);
+  letter-spacing: -.055em;
+}
+.cv-scope { color: var(--kk-text-quiet); font-size: 14px; }
+.cv-about, .cv-explainer { border-color: var(--kk-hairline); }
+.cv-about summary, .cv-explainer summary { min-height: 52px; color: var(--kk-text-secondary); font-size: 14px; }
+.cv-about summary svg, .cv-explainer summary svg { color: var(--kk-accent); }
+.cv-about p, .cv-explainer p { color: var(--kk-text-secondary); font-size: 15px; line-height: 1.6; }
+.cv-patterns { padding-top: 54px; }
+.cv-interval-plot { border-bottom-color: var(--kk-hairline); }
+.cv-interval-axis { color: var(--kk-text-quiet); font-family: var(--kk-sans); font-size: 12px; }
+.cv-interval-row { min-height: 68px; padding: 14px 16px; border-top-color: transparent; border-radius: 14px; }
+.cv-interval-row:hover, .cv-interval-row:focus-visible, .cv-interval-row.selected { border-top-color: transparent; background: var(--kk-surface-raised); }
+.cv-interval-label strong { color: var(--kk-text); font-size: 16px; }
+.cv-interval-label small { color: var(--kk-text-secondary); font-size: 14px; }
+.cv-interval-track { border-bottom-color: var(--kk-hairline); }
+.cv-interval-line { background: var(--kk-accent); height: 3px; border-radius: 99px; }
+.cv-interval-point { border-color: var(--kk-accent); background: var(--kk-surface); }
+.cv-interval-value { color: var(--kk-text); font-family: var(--kk-sans); font-size: 16px; }
+.cv-interval-caption { padding-left: clamp(170px, 24vw, 300px); color: var(--kk-text-quiet); font-size: 13px; }
+.cv-situation-detail {
+  margin-top: 30px;
+  padding: 24px;
+  border: 1px solid var(--kk-hairline);
+  border-top: 3px solid var(--kk-accent);
+  border-radius: 18px;
+  background: var(--kk-surface-raised);
+}
+.cv-situation-detail h3 { margin: 0 0 7px; color: var(--kk-text); font: 620 24px/1.2 var(--kk-sans); letter-spacing: -.035em; }
+.cv-detail-scope { color: var(--kk-text-quiet); font-family: var(--kk-sans); font-size: 14px; }
+.cv-detail-facts > div { border-bottom-color: var(--kk-hairline); }
+.cv-detail-facts dt { color: var(--kk-text-secondary); font-size: 14px; }
+.cv-detail-facts dd { color: var(--kk-text); font-family: var(--kk-sans); font-size: 15px; }
+.cv-small-sample { color: var(--kk-text-secondary); }
+.cv-close { min-width: 40px; min-height: 40px; border-radius: 50%; }
+.cv-close:hover { background: var(--kk-surface); color: var(--kk-text); }
+.cv-evidence-action { min-height: 44px; margin-top: 20px; color: var(--kk-accent); font-size: 15px; }
+.cv-empty { color: var(--kk-text-secondary); }
+@media (max-width: 767px) {
+  .cv-page { padding-bottom: 64px; }
+  .cv-header h1 { font-size: 40px; }
+  .cv-header p { font-size: 16px; }
+  .cv-chart-section { padding: 42px 0; }
+  .cv-section-head h2 { font-size: 34px; }
+  .cv-scope { font-size: 13px; }
+  .cv-patterns { padding-top: 42px; }
+  .cv-interval-row { padding-inline: 10px; }
+  .cv-interval-caption { padding-left: 0; }
+  .cv-situation-detail { padding: 20px; }
+}
+
+/* Keep the zero label on the same coordinate system as every interval row. */
+.cv-interval-axis { display:grid; grid-template-columns:clamp(170px,24vw,300px) minmax(180px,1fr) 72px; gap:16px; padding:0 16px; }
+.cv-axis-track { position:relative; grid-column:2; display:flex; justify-content:space-between; }
+.cv-interval-axis span:first-child { visibility:visible; }
+@media(max-width:767px){ .cv-interval-axis { padding-inline:10px; } }
+@media(max-width:600px){ .cv-interval-axis { grid-template-columns:1fr; gap:0; }.cv-axis-track { grid-column:1; } }
+
+/* Keep the selected condition adjacent to the visual evidence. The mascot is
+   an annotation; the supplied values and caveat remain normal HTML text. */
+.cv-leading-note { display: flex; justify-content: flex-end; margin: -4px 0 30px; }
+.cv-leading-note .kk-mascot-callout { max-width: min(100%, 620px); }
+.cv-patterns { padding-top: 56px; }
+.cv-patterns > .cv-section-head { margin-bottom: 24px; }
+.cv-page { color: var(--kk-text, #241626); font-family: var(--kk-sans, Inter, Arial, sans-serif); }
+.cv-header { border-bottom-color: var(--kk-hairline, #e4dcd2); }
+.cv-header h1 { color: var(--kk-text, #241626); font: 700 clamp(48px, 6vw, 76px)/1 var(--kk-sans, Inter, Arial, sans-serif); letter-spacing: -.075em; }
+.cv-header p { color: var(--kk-text-secondary, #665b67); font-size: 17px; }
+.cv-result-status { border-color: var(--kk-accent, #ff681b); background: var(--kk-surface-raised, #fffdf8); color: var(--kk-text-secondary, #665b67); }
+.cv-result-status.example { color: var(--kk-accent, #ff681b); background: color-mix(in srgb, var(--kk-accent, #ff681b) 10%, var(--kk-surface, #fffaf1)); }
+.cv-section-head h2 { color: var(--kk-text, #241626); font: 700 clamp(32px, 4vw, 54px)/1.04 var(--kk-sans, Inter, Arial, sans-serif); letter-spacing: -.06em; }
+.cv-scope { color: var(--kk-text-quiet, #8a7d82); }
+.cv-interval-plot { border-bottom-color: var(--kk-hairline, #e4dcd2); }
+.cv-interval-axis { color: var(--kk-text-quiet, #8a7d82); }
+.cv-interval-row { min-height: 72px; padding: 14px 16px; border-radius: 14px; }
+.cv-interval-row:hover, .cv-interval-row:focus-visible, .cv-interval-row.selected { background: var(--kk-surface-raised, #fffdf8); }
+.cv-interval-label strong { color: var(--kk-text, #241626); font-size: 16px; }
+.cv-interval-label small { color: var(--kk-text-secondary, #665b67); font-size: 14px; }
+.cv-interval-line { height: 4px; border-radius: 999px; background: var(--kk-accent, #ff681b); }
+.cv-interval-point { border-color: var(--kk-accent, #ff681b); background: var(--kk-surface, #fffaf1); }
+.cv-interval-value { color: var(--kk-text, #241626); font-family: var(--kk-sans, Inter, Arial, sans-serif); font-size: 16px; }
+.cv-interval-value.positive, .positive { color: var(--kk-accent, #ff681b); }
+.cv-interval-caption { color: var(--kk-text-quiet, #8a7d82); font-size: 13px; }
+.cv-situation-detail { border-color: var(--kk-hairline, #e4dcd2); border-top-color: var(--kk-accent, #ff681b); border-radius: 18px; background: var(--kk-surface-raised, #fffdf8); }
+.cv-situation-detail h3 { color: var(--kk-text, #241626); font: 700 26px/1.15 var(--kk-sans, Inter, Arial, sans-serif); letter-spacing: -.04em; }
+.cv-detail-scope, .cv-detail-facts dt { color: var(--kk-text-secondary, #665b67); }
+.cv-detail-facts > div { border-color: var(--kk-hairline, #e4dcd2); }
+.cv-detail-facts dd { color: var(--kk-text, #241626); font-family: var(--kk-sans, Inter, Arial, sans-serif); }
+.cv-small-sample { color: var(--kk-text-secondary, #665b67); }
+.cv-close:hover { background: var(--kk-surface, #fffaf1); color: var(--kk-text, #241626); }
+.cv-chart-section { border-bottom-color: var(--kk-hairline, #e4dcd2); }
+.cv-about, .cv-explainer { border-color: var(--kk-hairline, #e4dcd2); }
+.cv-about summary, .cv-explainer summary { color: var(--kk-text-secondary, #665b67); }
+.cv-about p, .cv-explainer p { color: var(--kk-text-secondary, #665b67); }
+@media (max-width: 767px) {
+  .cv-leading-note { justify-content: stretch; margin: -2px 0 22px; }
+  .cv-leading-note .kk-mascot-callout { width: 100%; }
+  .cv-patterns { padding-top: 42px; }
+  .cv-header h1 { font-size: 42px; }
+  .cv-section-head h2 { font-size: 36px; }
+  .cv-interval-row { padding-inline: 10px; }
+}
+
+/* Conditions is a compact inspection surface. Keep the question and the
+   selected explanation beside the rows so the evidence action stays nearby. */
+.cv-header h1 { max-width: none; font-size: clamp(46px, 5vw, 60px); line-height: 1.02; }
+.cv-patterns { padding-top: 30px; }
+.cv-pattern-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(700px, 760px); align-items: start; gap: 28px; margin-bottom: 14px !important; }
+.cv-pattern-head h2 { font-size: clamp(26px, 2.5vw, 32px); letter-spacing: -.045em; }
+.cv-pattern-aside { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 0; }
+.cv-pattern-aside > .cv-scope { align-self: flex-end; }
+.cv-leading-note { justify-content: flex-start; margin: 0; --mascot-size: 380px; --mascot-mobile-size: 300px; }
+.cv-leading-note .kk-mascot-callout { max-width: 760px; }
+.cv-scene-callout .kk-mascot-copy { max-width: 300px; font-size: 16px; }
+.cv-interval-rows { gap: 0; }
+.cv-interval-row { min-height: 56px; padding: 8px 12px; gap: 12px; }
+.cv-interval-caption { margin-top: 12px; }
+.cv-situation-detail { margin-top: 16px; padding: 18px 20px; }
+@media (max-width: 767px) {
+  .cv-patterns { padding-top: 28px; }
+  .cv-pattern-head { display: flex; flex-direction: column; gap: 14px; }
+  .cv-pattern-aside { align-items: flex-start; width: 100%; }
+  .cv-pattern-aside > .cv-scope { align-self: flex-start; }
+  .cv-leading-note { --mascot-size: 300px; --mascot-mobile-size: 300px; }
+  .cv-leading-note .kk-mascot-callout { max-width: 100%; }
+  .cv-scene-callout .kk-mascot-copy { max-width: 220px; font-size: 15px; }
+  .cv-interval-row { min-height: 64px; padding-inline: 10px; }
+}
+
+@media (min-width: 768px) and (max-width: 1279px) {
+  .cv-pattern-head { grid-template-columns: minmax(0, 1fr) minmax(0, 540px); gap: 20px; }
+  .cv-leading-note { --mascot-size: 280px; --mascot-mobile-size: 260px; }
+  .cv-scene-callout .kk-mascot-copy { max-width: 220px; }
+}
+
+/* The workspace verdict already answers the top-level question. Conditions
+   should enter as a compact evidence chapter rather than repeating a hero. */
+.cv-header { padding-bottom: 18px; }
+.cv-page-title { margin: 0 0 8px; color: var(--kk-text, #241626); font: 700 clamp(34px, 4vw, 46px)/1.04 var(--kk-sans, Inter, Arial, sans-serif); letter-spacing: -.06em; }
+.cv-header p { margin-top: 0; }
+.cv-patterns { padding-top: 26px; }
+.cv-pattern-head { margin-bottom: 14px !important; }
+
+/* A native report can contain hypotheses without grouped regimes or an equity
+   series. Keep the supplied finding useful, while never drawing an empty chart. */
+.cv-no-conditions { padding: 6px 0 28px; border-bottom: 1px solid var(--kk-hairline, #e4dcd2); }
+.cv-no-conditions-scene { --mascot-size: 380px; --mascot-mobile-size: 300px; max-width: 780px !important; }
+.cv-no-conditions .cv-evidence-action { margin-left: 50%; margin-top: -8px; }
+.cv-no-conditions .kk-mascot-copy strong { color: var(--kk-text, #241626); }
+.cv-no-conditions-scene .kk-mascot-copy > div { display: grid; gap: 8px; }
+.cv-lead-condition { color: var(--kk-text, #241626); font-size: 15px; font-weight: 700; }
+.cv-lead-detail {
+  max-width: 520px;
+  margin: -8px 0 0 50%;
+  border-top: 1px solid var(--kk-hairline, #e4dcd2);
+  border-bottom: 1px solid var(--kk-hairline, #e4dcd2);
+}
+.cv-lead-detail summary,
+.cv-finding-detail summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--kk-text-secondary, #665b67);
+  font: 600 13px/1.25 var(--kk-sans, Inter, Arial, sans-serif);
+  cursor: pointer;
+}
+.cv-lead-detail summary:hover,
+.cv-lead-detail summary:focus-visible,
+.cv-finding-detail summary:hover,
+.cv-finding-detail summary:focus-visible { color: var(--kk-text, #241626); }
+.cv-lead-detail > div { padding: 0 0 14px; }
+.cv-lead-detail p,
+.cv-finding-detail p {
+  margin: 0 0 8px;
+  color: var(--kk-text-secondary, #665b67);
+  font: 400 13px/1.55 var(--kk-sans, Inter, Arial, sans-serif);
+}
+.cv-lead-detail p:last-child,
+.cv-finding-detail p:last-child { margin-bottom: 0; }
+.cv-lead-detail p + p,
+.cv-finding-detail p + p { color: var(--kk-text-quiet, #8a7d82); font-size: 12px; }
+.cv-finding-detail { margin-top: 8px; }
+.cv-finding-list {
+  max-width: 960px;
+  margin-top: 6px;
+  border-top: 1px solid var(--kk-hairline, #e4dcd2);
+}
+.cv-finding-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 24px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--kk-hairline, #e4dcd2);
+}
+.cv-finding-copy { min-width: 0; }
+.cv-finding-copy h3 {
+  margin: 0;
+  color: var(--kk-text, #241626);
+  font: 700 18px/1.2 var(--kk-sans, Inter, Arial, sans-serif);
+  letter-spacing: -.025em;
+}
+.cv-finding-copy p {
+  max-width: 780px;
+  margin: 7px 0 0;
+  color: var(--kk-text-secondary, #665b67);
+  font: 400 14px/1.55 var(--kk-sans, Inter, Arial, sans-serif);
+}
+.cv-finding-copy .cv-finding-conditions {
+  margin-top: 5px;
+  color: var(--kk-text-quiet, #8a7d82);
+  font-size: 12px;
+  letter-spacing: .01em;
+}
+.cv-finding-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  margin-top: -4px;
+  color: var(--kk-accent, #ff681b);
+  white-space: nowrap;
+}
+@media (max-width: 767px) {
+  .cv-header { padding-bottom: 14px; }
+  .cv-page-title { font-size: 36px; }
+  .cv-patterns { padding-top: 22px; }
+  .cv-no-conditions-scene { --mascot-size: 300px; --mascot-mobile-size: 300px; }
+  .cv-no-conditions .cv-evidence-action { margin: 0 0 0 20px; }
+  .cv-lead-detail { max-width: 100%; margin: -4px 20px 0; }
+  .cv-finding-row { grid-template-columns: 1fr; gap: 8px; padding: 16px 0; }
+  .cv-finding-link { margin-top: 0; justify-self: start; }
+}

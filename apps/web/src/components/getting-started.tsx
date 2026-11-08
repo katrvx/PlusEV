@@ -7,7 +7,7 @@ import { ArrowDownToLine, ArrowRight, Check, FileText, GitBranch, Plus, Search, 
 export default function GettingStarted({ onImport }: { onImport: () => void }) {
   return <div className="getting-started">
     <div className="page-heading"><div><span className="eyebrow">A SECOND OPINION FOR YOUR STRATEGY</span><h1>Know when your strategy works.</h1><p>Find its strengths, understand its weak spots, and decide what to test next.</p></div><button className="button primary" onClick={onImport}><Plus size={16} />Add your strategy</button></div>
-    <section className="intro-steps" aria-label="How Keep or Kill works">
+    <section className="intro-steps" aria-label="How +EV works">
       <article><span className="intro-number">01</span><FileText size={22} /><h2>Bring your track record</h2><p>Upload a file of your strategy’s positions or completed trades. We’ll help you match the columns.</p></article>
       <article><span className="intro-number">02</span><Search size={22} /><h2>See what the agents find</h2><p>Agents investigate market conditions, look for strengths and weaknesses, and challenge each other’s explanations.</p></article>
       <article><span className="intro-number">03</span><ShieldCheck size={22} /><h2>Choose a smarter next test</h2><p>Review the evidence and a suggested trading rule. Test it on fresh data before planning a simulated practice run.</p></article>

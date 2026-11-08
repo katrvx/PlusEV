@@ -79,3 +79,33 @@
 .kk-chart-presentation-overview .kk-chart-x-tick{fill:var(--kk-secondary,#62665f);font-size:13px}
 .kk-chart-area{pointer-events:none}
 .kk-chart-endpoint{pointer-events:none}
+
+/* Detail controls use the same readable type and touch targets as the workspace. */
+.kk-chart-scope { font:400 14px/1.5 var(--kk-sans); }
+.kk-chart-unit { font-size:14px; }
+.kk-chart-label { font:550 22px/1.3 var(--kk-sans); letter-spacing:-.025em; }
+.kk-chart-series-toggle label { min-height:44px; font-size:14px; }
+.kk-chart-link { min-height:44px; padding:9px 0; font:500 14px/1.5 var(--kk-sans); }
+.kk-chart-actions { gap:20px; }
+.kk-chart-readout { border-color:var(--kk-hairline); border-radius:16px; box-shadow:var(--kk-shadow); }
+.kk-chart-readout strong { font:600 14px/1.5 var(--kk-sans); }
+.kk-chart-readout span b,.kk-chart-narrow-labels b { font:550 14px/1.5 var(--kk-sans); font-variant-numeric:tabular-nums; }
+.kk-chart-data table { font:400 14px/1.5 var(--kk-sans); font-variant-numeric:tabular-nums; }
+.kk-chart-data th,.kk-chart-data td { padding:12px; }
+.kk-chart-data caption { font-size:14px; }
+.kk-chart-scrubber,.kk-chart-scrubber output { font:400 14px/1.5 var(--kk-sans); }
+@media(max-width:760px){
+ .kk-chart-controls { margin-top:16px; }
+ .kk-chart-series-toggle { gap:4px 18px; }
+ .kk-chart-actions { margin-top:8px; }
+ .kk-chart-narrow-labels { font-size:14px; line-height:1.5; }
+}
+
+/* Chart marks share the mascot palette while textual labels stay high contrast. */
+.kk-chart-guide { stroke: var(--kk-text); stroke-dasharray: 3 5; }
+.kk-chart-readout { border-radius: 12px; background: var(--kk-canvas); }
+.kk-chart-line { stroke-linecap: round; stroke-linejoin: round; }
+.kk-chart-label { font-weight: 700; }
+.kk-chart-scrubber input { accent-color: var(--kk-text); }
+.kk-chart-link { font-weight: 600; }
+.kk-chart-end-label { fill: var(--kk-text); }

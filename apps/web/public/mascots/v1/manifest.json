@@ -1,0 +1,262 @@
+{
+  "version": 1,
+  "format": "PNG RGBA",
+  "atlasSize": {
+    "width": 1536,
+    "height": 1024
+  },
+  "grid": {
+    "columns": 3,
+    "rows": 2,
+    "cellWidth": 512,
+    "cellHeight": 512
+  },
+  "notes": "24 static poses. These are pose atlases, not frame-by-frame animation sequences. Empty atlas pixels preserve the generated alpha channel.",
+  "sprites": [
+    {
+      "id": "bull-point-left",
+      "file": "bull-explain.png",
+      "x": 0,
+      "y": 0,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bull-point-right",
+      "file": "bull-explain.png",
+      "x": 512,
+      "y": 0,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "50% 0%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bull-present-up",
+      "file": "bull-explain.png",
+      "x": 1024,
+      "y": 0,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "100% 0%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bull-welcome",
+      "file": "bull-explain.png",
+      "x": 0,
+      "y": 512,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "0% 100%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bull-compare",
+      "file": "bull-explain.png",
+      "x": 512,
+      "y": 512,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "50% 100%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bull-neutral",
+      "file": "bull-explain.png",
+      "x": 1024,
+      "y": 512,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "100% 100%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bull-magnifier",
+      "file": "bull-research.png",
+      "x": 0,
+      "y": 0,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bull-read-sheet",
+      "file": "bull-research.png",
+      "x": 512,
+      "y": 0,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "50% 0%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bull-take-note",
+      "file": "bull-research.png",
+      "x": 1024,
+      "y": 0,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "100% 0%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bull-frame-region",
+      "file": "bull-research.png",
+      "x": 0,
+      "y": 512,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "0% 100%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bull-thoughtful",
+      "file": "bull-research.png",
+      "x": 512,
+      "y": 512,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "50% 100%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bull-acknowledge",
+      "file": "bull-research.png",
+      "x": 1024,
+      "y": 512,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "100% 100%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bear-point-left",
+      "file": "bear-explain.png",
+      "x": 0,
+      "y": 0,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bear-point-right",
+      "file": "bear-explain.png",
+      "x": 512,
+      "y": 0,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "50% 0%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bear-present-up",
+      "file": "bear-explain.png",
+      "x": 1024,
+      "y": 0,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "100% 0%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bear-question",
+      "file": "bear-explain.png",
+      "x": 0,
+      "y": 512,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "0% 100%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bear-compare",
+      "file": "bear-explain.png",
+      "x": 512,
+      "y": 512,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "50% 100%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bear-neutral",
+      "file": "bear-explain.png",
+      "x": 1024,
+      "y": 512,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "100% 100%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bear-magnifier",
+      "file": "bear-research.png",
+      "x": 0,
+      "y": 0,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "0% 0%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bear-read-sheet",
+      "file": "bear-research.png",
+      "x": 512,
+      "y": 0,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "50% 0%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bear-chin-rest",
+      "file": "bear-research.png",
+      "x": 1024,
+      "y": 0,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "100% 0%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bear-folded-arms",
+      "file": "bear-research.png",
+      "x": 0,
+      "y": 512,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "0% 100%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bear-pause",
+      "file": "bear-research.png",
+      "x": 512,
+      "y": 512,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "50% 100%",
+      "backgroundSize": "300% 200%"
+    },
+    {
+      "id": "bear-waiting",
+      "file": "bear-research.png",
+      "x": 1024,
+      "y": 512,
+      "width": 512,
+      "height": 512,
+      "backgroundPosition": "100% 100%",
+      "backgroundSize": "300% 200%"
+    }
+  ],
+  "hero": {
+    "file": "hero-duo.png",
+    "width": 1536,
+    "height": 1024
+  }
+}

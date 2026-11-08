@@ -10,10 +10,10 @@ type Point = { x: number; y: number; date: string; value: number };
 type SeriesDef = { id: ChartSeries; label: string; color: string; dash?: string; width: number };
 
 const SERIES: SeriesDef[] = [
-  { id: "base", label: "Original strategy", color: "var(--kk-original, #52675d)", width: 3.25 },
-  { id: "rule", label: "Simple rule", color: "var(--kk-simple, #697b8b)", dash: "7 6", width: 1.35 },
-  { id: "proposed", label: "Suggested filter", color: "var(--kk-accent, #2454f4)", width: 4 },
-  { id: "cash", label: "Cash", color: "var(--kk-cash, #85887e)", dash: "2 7", width: 1.5 },
+  { id: "base", label: "Original strategy", color: "var(--kk-original, #38253c)", width: 3.5 },
+  { id: "rule", label: "Simple rule", color: "var(--kk-simple, #9389df)", dash: "7 6", width: 2.5 },
+  { id: "proposed", label: "Suggested filter", color: "var(--kk-chart-accent, #ff681b)", width: 4.5 },
+  { id: "cash", label: "Cash", color: "var(--kk-cash, #847480)", dash: "2 7", width: 1.5 },
 ];
 const revealedDatasets = new Set<string>();
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -93,8 +93,8 @@ export default function ResearchChart({ data, series = ["base", "rule", "propose
   // recorded series the accent and extra weight in that single-series mode;
   // comparison charts retain the neutral original-vs-filter palette.
   const emphasiseBase = !visibleSeries.includes("proposed");
-  const colorFor = (item: SeriesDef) => item.id === "base" && emphasiseBase ? "var(--kk-accent, #2454f4)" : item.color;
-  const widthFor = (item: SeriesDef) => item.id === "base" && emphasiseBase ? 4 : item.width;
+  const colorFor = (item: SeriesDef) => item.id === "base" && emphasiseBase ? "var(--kk-chart-accent, #ff681b)" : item.color;
+  const widthFor = (item: SeriesDef) => item.id === "base" && emphasiseBase ? 4.5 : item.width;
 
   useEffect(() => { setVisibleSeries(allowedIds); }, [allowedIds.join(",")]);
   useEffect(() => { setLocalSelectedDate(selectedDate ?? null); }, [selectedDate]);

@@ -16,3 +16,303 @@
    section labels. Statuses and source-detail labels remain visible. */
 .ev-index{display:none}
 .ev-header>div>.ev-kicker,.ev-team-head .ev-kicker,.ev-section-head .ev-kicker{display:none}
+
+/* Evidence is the trust surface: fewer visual layers, larger hierarchy and
+   clear source actions keep the research legible for first-time users. */
+.ev-view {
+  max-width: none;
+  padding: 4px 0 88px;
+  color: var(--kk-text);
+  font-family: var(--kk-sans);
+}
+.ev-header { align-items: flex-start; margin-bottom: 64px; padding-bottom: 36px; border-bottom: 1px solid var(--kk-hairline); }
+.ev-header h1 {
+  margin: 0 0 16px;
+  color: var(--kk-text);
+  font: 650 clamp(48px, 6vw, 72px)/1.02 var(--kk-sans);
+  letter-spacing: -.065em;
+}
+.ev-header p, .ev-section-head p { color: var(--kk-text-secondary); font-size: 17px; }
+.ev-header-actions { gap: 12px; }
+.ev-action {
+  min-height: 48px;
+  padding: 12px 18px;
+  border: 1px solid var(--kk-hairline);
+  border-radius: 999px;
+  background: var(--kk-surface);
+  color: var(--kk-text);
+  font-size: 15px;
+  text-decoration: none;
+}
+.ev-action:hover { border-color: var(--kk-boundary); background: var(--kk-surface-raised); color: var(--kk-text); }
+.ev-header-actions .kk-primary-button { border-color: transparent; color: #fff; }
+.ev-header-actions .kk-primary-button:hover { color: #fff; }
+.ev-findings, .ev-library { margin-top: 0; padding: 0 0 64px; }
+.ev-section-head { margin-bottom: 30px; }
+.ev-section-head h2 {
+  margin: 0 0 12px;
+  color: var(--kk-text);
+  font: 620 clamp(32px, 4vw, 48px)/1.06 var(--kk-sans);
+  letter-spacing: -.055em;
+}
+.ev-hypothesis-list { gap: 0 48px; }
+.ev-hypothesis { padding: 26px 0 30px; border-top-color: var(--kk-hairline); }
+.ev-row-top { font-size: 14px; }
+.ev-status { color: var(--kk-text-secondary); }
+.ev-supported .ev-status { color: var(--kk-accent); }
+.ev-rejected .ev-status { color: var(--kk-danger); }
+.ev-hypothesis h3 { margin: 12px 0 10px; color: var(--kk-text); font: 600 21px/1.3 var(--kk-sans); letter-spacing: -.025em; }
+.ev-hypothesis p { color: var(--kk-text-secondary); font-size: 16px; line-height: 1.6; }
+.ev-links { gap: 10px; margin-top: 18px; }
+.ev-links button, .ev-no-source { min-height: 44px; padding: 8px 0; color: var(--kk-accent); font-size: 14px; }
+.ev-no-source { color: var(--kk-text-quiet); }
+.ev-path { margin: 0 0 64px; border-color: var(--kk-hairline); }
+.ev-path > summary { min-height: 60px; }
+.ev-path > summary strong { color: var(--kk-text); font-size: 16px; }
+.ev-path-note, .ev-path-copy p { color: var(--kk-text-secondary); font-size: 15px; }
+.ev-path-step { border-top-color: var(--kk-hairline); }
+.ev-path-meta { color: var(--kk-text-quiet); font-family: var(--kk-sans); font-size: 12px; }
+.ev-path-copy h3 { color: var(--kk-text); font-size: 18px; }
+.ev-library { border-top: 1px solid var(--kk-hairline); padding-top: 64px; }
+.ev-count { color: var(--kk-accent); font-family: var(--kk-sans); font-size: 20px; }
+.ev-source-list { border-top-color: var(--kk-hairline); }
+.ev-source-row { border-bottom-color: var(--kk-hairline); }
+.ev-source-row summary { min-height: 72px; padding: 18px 0; }
+.ev-source-row summary strong { color: var(--kk-text); font-size: 16px; }
+.ev-source-row summary small { color: var(--kk-text-quiet); font-size: 13px; }
+.ev-source-row summary svg:first-child { color: var(--kk-accent); }
+.ev-source-summary { padding: 0 0 24px 27px; color: var(--kk-text-secondary); font-size: 15px; }
+.ev-technical { margin-top: 0; border-color: var(--kk-hairline); }
+.ev-technical > button { min-height: 56px; color: var(--kk-text-secondary); font-size: 15px; }
+.ev-technical-body { border-color: var(--kk-hairline); color: var(--kk-text-secondary); font: 14px/1.6 var(--kk-sans); }
+.ev-technical code { color: var(--kk-text); font-family: var(--kk-mono); }
+.ev-dialog { border-color: var(--kk-hairline); border-radius: 20px; }
+.ev-dialog-head { padding: 18px 24px; border-bottom-color: var(--kk-hairline); }
+.ev-icon-button { border-radius: 50%; color: var(--kk-text-secondary); }
+.ev-icon-button:hover { background: var(--kk-surface-raised); color: var(--kk-text); }
+.ev-dialog-body { padding: 28px; }
+.ev-dialog-body h2 { color: var(--kk-text); font: 620 32px/1.1 var(--kk-sans); letter-spacing: -.045em; }
+.ev-dialog-body > p { color: var(--kk-text-secondary); font-size: 16px; }
+.ev-facts { border-top-color: var(--kk-hairline); }
+.ev-facts > div { border-bottom-color: var(--kk-hairline); }
+.ev-facts dt, .ev-source span { color: var(--kk-text-secondary); }
+.ev-facts dd, .ev-source strong { color: var(--kk-text); font-family: var(--kk-sans); }
+.ev-team-head { border-bottom-color: var(--kk-hairline); }
+.ev-team-head h1 { color: var(--kk-text); font: 650 clamp(42px, 5vw, 64px)/1.04 var(--kk-sans); letter-spacing: -.06em; }
+.ev-team-head p { color: var(--kk-text-secondary); font-size: 16px; }
+@media (max-width: 780px) {
+  .ev-view { padding-bottom: 64px; }
+  .ev-header { margin-bottom: 48px; padding-bottom: 28px; }
+  .ev-header h1 { font-size: 40px; }
+  .ev-header-actions { align-items: stretch; flex-direction: column; margin-top: 28px; }
+  .ev-header-actions .ev-action { justify-content: center; }
+  .ev-section-head h2 { font-size: 36px; }
+  .ev-hypothesis h3 { font-size: 20px; }
+  .ev-hypothesis p { font-size: 15px; }
+  .ev-library { padding-top: 48px; }
+  .ev-source-summary { padding-left: 0; }
+}
+
+/* Source detail stays plain-language first. Raw native tool data is available
+   on demand for judges and technical readers, without turning every click into
+   a wall of JSON. */
+.ev-raw-detail { margin-top: 28px; border-top: 1px solid var(--kk-hairline, #e4dcd2); }
+.ev-raw-detail > summary { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 56px; cursor: pointer; list-style: none; }
+.ev-raw-detail > summary::-webkit-details-marker { display: none; }
+.ev-raw-detail > summary:focus-visible { outline: 2px solid var(--kk-text, #241626); outline-offset: 5px; border-radius: 4px; }
+.ev-raw-detail > summary > span { display: flex; flex-direction: column; gap: 5px; }
+.ev-raw-detail > summary > strong { flex: 0 0 auto; }
+.ev-raw-detail > summary > svg { flex: 0 0 auto; color: var(--kk-text-secondary, #665b67); transition: transform 160ms ease; }
+.ev-raw-detail[open] > summary > svg { transform: rotate(180deg); }
+.ev-raw-kicker { color: var(--kk-accent, #ff681b); font-size: 11px; font-weight: 760; letter-spacing: .1em; }
+.ev-raw-detail summary strong { color: var(--kk-text, #241626); font-size: 15px; font-weight: 650; }
+.ev-raw-body { display: grid; gap: 18px; padding: 4px 0 2px; }
+.ev-raw-block { min-width: 0; }
+.ev-raw-block > span { display: block; color: var(--kk-text-secondary, #665b67); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.ev-raw-block pre { max-height: min(38vh, 360px); overflow: auto; margin: 8px 0 0; padding: 14px; border: 1px solid var(--kk-hairline, #e4dcd2); border-radius: 12px; background: var(--kk-surface-raised, #fffdf8); color: var(--kk-text, #241626); font: 12px/1.55 var(--kk-mono, ui-monospace, monospace); white-space: pre; }
+.ev-raw-block p { margin: 8px 0 0; color: var(--kk-text-quiet, #8a7d82); font-size: 13px; line-height: 1.45; }
+@media (prefers-reduced-motion: reduce) { .ev-raw-detail > summary > svg { transition: none; } }
+
+/* The opening evidence moment is one composed spread: the recorded agent
+   trail carries the proof on the left, while the mascot points to the finding
+   on the right. Keep both in the first reading rhythm instead of stacking a
+   tall illustration above a separate log. */
+.ev-agent-story {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(340px, .88fr);
+  align-items: center;
+  gap: clamp(28px, 5vw, 78px);
+  margin: 0 0 28px;
+}
+.ev-agent-trace .research-trace {
+  margin: 0;
+  padding: 24px 0 16px;
+}
+.ev-detail-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  margin: 0;
+  padding: 7px 0;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--kk-accent, #ff681b) 45%, transparent);
+  background: transparent;
+  color: var(--kk-accent-hover, #923207);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+}
+.ev-detail-link:hover { border-color: currentColor; color: var(--kk-accent-hover, #923207); }
+.ev-detail-link:focus-visible { outline: 2px solid var(--kk-text, #241626); outline-offset: 4px; border-radius: 4px; }
+.ev-agent-story .rt-heading { margin-bottom: 18px; }
+.ev-agent-story .rt-heading h2 { font-size: clamp(28px, 3vw, 38px); }
+.ev-agent-story .rt-heading p { max-width: 520px; }
+.ev-agent-story .rt-track { display: grid; grid-template-columns: 1fr; gap: 0; }
+.ev-agent-story .rt-step { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; padding: 0 0 14px; }
+.ev-agent-story .rt-step::before { display: none; }
+.ev-agent-story .rt-step:not(:last-child)::after { top: 27px; right: auto; bottom: 0; left: 13px; width: 1px; height: auto; background: var(--kk-hairline, #e4dcd2); }
+.ev-agent-story .rt-step:last-child::after { display: none; }
+.ev-agent-story .rt-node { margin: 0; }
+.ev-agent-story .rt-detail { padding: 0; }
+.ev-agent-story .rt-detail > summary { min-height: 44px; }
+.ev-agent-story .rt-body { padding: 9px 26px 6px 0; }
+.ev-agent-story .rt-action { margin-bottom: 10px; }
+.ev-agent-story .rt-context { margin-bottom: 10px; }
+.ev-agent-story .ev-leading-note { justify-content: center; margin: 0; }
+.ev-agent-story .ev-leading-note .kk-mascot-callout { width: 100%; max-width: 520px; --mascot-size: 340px; --mascot-mobile-size: 300px; }
+.ev-agent-story .ev-scene-callout .kk-mascot-copy { max-width: 270px; }
+
+@media (max-width: 900px) {
+  .ev-agent-story { grid-template-columns: minmax(0, 1fr) minmax(280px, .78fr); gap: 28px; }
+  .ev-agent-story .ev-leading-note .kk-mascot-callout { --mascot-size: 300px; }
+}
+@media (max-width: 700px) {
+  .ev-agent-story { display: flex; flex-direction: column; align-items: stretch; gap: 18px; margin-bottom: 22px; }
+  .ev-agent-trace { order: 1; }
+  .ev-agent-story .ev-leading-note { order: 2; margin: 0; }
+  .ev-agent-story .ev-leading-note .kk-mascot-callout { max-width: 100%; --mascot-size: 300px; --mascot-mobile-size: 300px; }
+  .ev-agent-story .ev-scene-callout .kk-mascot-copy { max-width: 220px; }
+}
+
+/* Native reports preserve a machine-facing action and a human-facing body.
+   Keep both visible in the expanded log so the concise trail can stay terse
+   without dropping what the recorded check actually said. */
+.ev-path-context { margin-top: 8px !important; color: var(--kk-text-secondary, #665b67); }
+
+/* One dominant report question, then one large editorial finding scene. */
+.ev-header h1 { font-size: clamp(44px, 5vw, 64px); }
+.ev-section-head h2 { font-size: clamp(28px, 2.7vw, 36px); letter-spacing: -.045em; }
+.ev-leading-note .kk-mascot-callout { max-width: 860px; --mascot-size: 380px; --mascot-mobile-size: 300px; }
+.ev-scene-callout .kk-mascot-copy { max-width: 300px; font-size: 16px; }
+@media (max-width: 780px) {
+  .ev-header h1 { font-size: 38px; }
+  .ev-section-head h2 { font-size: 30px; }
+  .ev-leading-note .kk-mascot-callout { width: 100%; --mascot-size: 300px; --mascot-mobile-size: 300px; }
+  .ev-scene-callout .kk-mascot-copy { max-width: 220px; font-size: 15px; }
+}
+
+/* A report heading should establish context without pushing the first finding
+   below the fold on a phone. */
+.ev-header h1 { font-size: clamp(44px, 5vw, 64px); }
+@media (max-width: 780px) {
+  .ev-header h1 { font-size: 38px; }
+  .ev-header { margin-bottom: 18px; }
+  .ev-leading-note { margin-bottom: 30px; }
+}
+
+/* The report has one dominant question; supporting section labels stay
+   editorial and readable instead of competing with it. */
+.ev-section-head h2 { font-size: clamp(28px, 2.7vw, 36px); letter-spacing: -.045em; }
+@media (max-width: 780px) {
+  .ev-section-head h2 { font-size: 30px; }
+}
+
+/* Evidence starts with one plain-language finding. Detail remains available
+   below for readers who want the source trail and technical context. */
+.ev-view {
+  max-width: none;
+  padding: 4px 0 88px;
+  color: var(--kk-text, #241626);
+  font-family: var(--kk-sans, Inter, Arial, sans-serif);
+}
+.ev-header { align-items: flex-start; margin-bottom: 28px; padding-bottom: 32px; border-bottom-color: var(--kk-hairline, #e4dcd2); }
+.ev-header h1 { margin: 0 0 14px; color: var(--kk-text, #241626); font: 700 clamp(48px, 6vw, 76px)/1 var(--kk-sans, Inter, Arial, sans-serif); letter-spacing: -.075em; }
+.ev-header p, .ev-section-head p { color: var(--kk-text-secondary, #665b67); font-size: 17px; }
+.ev-header #ev-title {
+  margin: 0 0 10px;
+  color: var(--kk-text, #241626);
+  font: 700 clamp(32px, 3.4vw, 46px)/1.04 var(--kk-sans, Inter, Arial, sans-serif);
+  letter-spacing: -.065em;
+}
+.ev-header-actions { gap: 12px; }
+.ev-action { min-height: 48px; padding: 12px 18px; border: 1px solid var(--kk-hairline, #e4dcd2); border-radius: 999px; background: var(--kk-surface, #fffaf1); color: var(--kk-text, #241626); font-size: 15px; }
+.ev-action:hover { border-color: var(--kk-boundary, #c9bdb8); background: var(--kk-surface-raised, #fffdf8); color: var(--kk-text, #241626); }
+.ev-header-actions .kk-primary-button { border-color: transparent; color: #fff; }
+.ev-leading-note { display: flex; justify-content: flex-end; margin: 0 0 42px; }
+.ev-leading-note .kk-mascot-callout { max-width: min(100%, 660px); }
+.ev-findings, .ev-library { padding-bottom: 64px; }
+.ev-section-head { margin-bottom: 30px; }
+.ev-section-head h2 { margin: 0 0 12px; color: var(--kk-text, #241626); font: 700 clamp(32px, 4vw, 54px)/1.04 var(--kk-sans, Inter, Arial, sans-serif); letter-spacing: -.06em; }
+.ev-hypothesis-list { gap: 0 48px; }
+.ev-hypothesis { padding: 26px 0 30px; border-top-color: var(--kk-hairline, #e4dcd2); }
+.ev-row-top { font-size: 14px; }
+.ev-status { color: var(--kk-text-secondary, #665b67); }
+.ev-supported .ev-status { color: var(--kk-accent, #ff681b); }
+.ev-rejected .ev-status { color: var(--kk-danger, #9b5360); }
+.ev-hypothesis h3 { margin: 12px 0 10px; color: var(--kk-text, #241626); font: 650 21px/1.3 var(--kk-sans, Inter, Arial, sans-serif); letter-spacing: -.025em; }
+.ev-hypothesis p { color: var(--kk-text-secondary, #665b67); font-size: 16px; line-height: 1.6; }
+.ev-links { gap: 10px; margin-top: 18px; }
+.ev-links button, .ev-no-source { min-height: 44px; padding: 8px 0; color: var(--kk-accent, #ff681b); font-size: 14px; }
+.ev-no-source { color: var(--kk-text-quiet, #8a7d82); }
+.ev-path { margin: 0 0 64px; border-color: var(--kk-hairline, #e4dcd2); }
+.ev-path > summary { min-height: 60px; }
+.ev-path > summary strong { color: var(--kk-text, #241626); font-size: 16px; }
+.ev-path-note, .ev-path-copy p { color: var(--kk-text-secondary, #665b67); font-size: 15px; }
+.ev-path-step { border-top-color: var(--kk-hairline, #e4dcd2); }
+.ev-path-meta { color: var(--kk-text-quiet, #8a7d82); font-family: var(--kk-sans); font-size: 12px; }
+.ev-path-copy h3 { color: var(--kk-text, #241626); font-size: 18px; }
+.ev-library { border-top: 1px solid var(--kk-hairline, #e4dcd2); padding-top: 64px; }
+.ev-count { color: var(--kk-accent, #ff681b); font-family: var(--kk-sans); font-size: 20px; }
+.ev-source-list { border-top-color: var(--kk-hairline, #e4dcd2); }
+.ev-source-row { border-bottom-color: var(--kk-hairline, #e4dcd2); }
+.ev-source-row summary { min-height: 72px; padding: 18px 0; }
+.ev-source-row summary strong { color: var(--kk-text, #241626); font-size: 16px; }
+.ev-source-row summary small { color: var(--kk-text-quiet, #8a7d82); font-size: 13px; }
+.ev-source-row summary svg:first-child { color: var(--kk-accent, #ff681b); }
+.ev-source-summary { padding: 0 0 24px 27px; color: var(--kk-text-secondary, #665b67); font-size: 15px; }
+.ev-technical { border-color: var(--kk-hairline, #e4dcd2); }
+.ev-technical > button { min-height: 56px; color: var(--kk-text-secondary, #665b67); font-size: 15px; }
+.ev-technical-body { border-color: var(--kk-hairline, #e4dcd2); color: var(--kk-text-secondary, #665b67); font: 14px/1.6 var(--kk-sans); }
+.ev-technical code { color: var(--kk-text, #241626); font-family: var(--kk-mono); }
+.ev-dialog { border-color: var(--kk-hairline, #e4dcd2); border-radius: 20px; background: var(--kk-surface, #fffaf1); color: var(--kk-text, #241626); box-shadow: 0 24px 70px rgba(36, 22, 38, .18); }
+.ev-dialog::backdrop { background: rgba(36, 22, 38, .28); }
+.ev-dialog-head { padding: 18px 24px; border-bottom-color: var(--kk-hairline, #e4dcd2); }
+.ev-icon-button { border-radius: 50%; color: var(--kk-text-secondary, #665b67); }
+.ev-icon-button:hover { background: var(--kk-surface-raised, #fffdf8); color: var(--kk-text, #241626); }
+.ev-dialog-body { padding: 28px; }
+.ev-dialog-body h2 { color: var(--kk-text, #241626); font: 700 32px/1.1 var(--kk-sans, Inter, Arial, sans-serif); letter-spacing: -.045em; }
+.ev-dialog-body > p { color: var(--kk-text-secondary, #665b67); font-size: 16px; }
+.ev-facts { border-top-color: var(--kk-hairline, #e4dcd2); }
+.ev-facts > div { border-bottom-color: var(--kk-hairline, #e4dcd2); }
+.ev-facts dt, .ev-source span { color: var(--kk-text-secondary, #665b67); }
+.ev-facts dd, .ev-source strong { color: var(--kk-text, #241626); font-family: var(--kk-sans); }
+.ev-team-head { border-bottom-color: var(--kk-hairline, #e4dcd2); }
+.ev-team-head h1 { color: var(--kk-text, #241626); font: 700 clamp(42px, 5vw, 64px)/1.04 var(--kk-sans, Inter, Arial, sans-serif); letter-spacing: -.06em; }
+.ev-team-head p { color: var(--kk-text-secondary, #665b67); font-size: 16px; }
+@media (max-width: 780px) {
+  .ev-view { padding-bottom: 64px; }
+  .ev-header { margin-bottom: 24px; padding-bottom: 26px; }
+  .ev-header h1 { font-size: 42px; }
+  .ev-header #ev-title { font-size: 30px; }
+  .ev-header-actions { align-items: stretch; flex-direction: column; margin-top: 24px; }
+  .ev-header-actions .ev-action { justify-content: center; }
+  .ev-leading-note { justify-content: stretch; margin-bottom: 44px; }
+  .ev-leading-note .kk-mascot-callout { width: 100%; }
+  .ev-section-head h2 { font-size: 36px; }
+  .ev-hypothesis h3 { font-size: 20px; }
+  .ev-hypothesis p { font-size: 15px; }
+  .ev-library { padding-top: 48px; }
+  .ev-source-summary { padding-left: 0; }
+}

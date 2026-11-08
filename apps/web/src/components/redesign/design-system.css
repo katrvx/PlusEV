@@ -1,24 +1,28 @@
 :root {
-  --kk-canvas: #ffffff;
-  --kk-surface: #ffffff;
-  --kk-surface-raised: #f3f5f9;
-  --kk-text: #121826;
-  --kk-text-secondary: #596374;
-  --kk-text-quiet: #667080;
-  --kk-accent: #2454f4;
-  --kk-accent-hover: #1740c7;
-  --kk-accent-area: rgba(36, 84, 244, 0.08);
-  --kk-hairline: #e6e9f0;
-  --kk-boundary: #929dac;
-  --kk-focus: #2454f4;
-  --kk-original: #586b87;
-  --kk-simple: #7957bb;
-  --kk-cash: #6b7481;
-  --kk-overlay: rgba(20, 28, 46, 0.2);
-  --kk-shadow: 0 16px 48px rgba(20, 35, 70, 0.1);
-  --kk-button-hover: #263044;
-  --kk-danger-soft: #fbeef1;
-  --kk-success-soft: #eaf5ef;
+  --kk-canvas: #fffaf1;
+  --kk-surface: #fffcf7;
+  --kk-surface-raised: #f3ede4;
+  --kk-text: #241626;
+  --kk-text-secondary: #625563;
+  --kk-text-quiet: #746773;
+  --kk-accent: #c04a13;
+  --kk-accent-hover: #923207;
+  --kk-accent-area: #ff681b14;
+  --kk-hairline: #ded4cc;
+  --kk-boundary: #9e8c99;
+  --kk-focus: #7251b5;
+  --kk-original: #38253c;
+  --kk-simple: #9389df;
+  --kk-cash: #847480;
+  --kk-overlay: rgba(36, 22, 38, 0.24);
+  --kk-shadow: 0 16px 48px rgba(36, 22, 38, 0.1);
+  --kk-button-hover: #443048;
+  --kk-danger-soft: #f7e6e5;
+  --kk-success-soft: #eaf1e9;
+  --kk-lavender: #9389df;
+  --kk-lavender-soft: #eee8f7;
+  --kk-peach: #ffd6bb;
+  --kk-chart-accent: #ff681b;
   --kk-secondary: var(--kk-text-secondary);
   --kk-quiet: var(--kk-text-quiet);
   --kk-border: var(--kk-hairline);
@@ -34,7 +38,7 @@
   --kk-font-mono: var(--kk-mono);
   --kk-muted: var(--kk-secondary);
   --kk-line: var(--kk-border);
-  --kk-orange: var(--kk-accent);
+  --kk-orange: #ff681b;
   --kk-orange-hover: var(--kk-accent-hover);
   --kk-essential: var(--kk-hairline);
   --kk-danger: #b33f55;
@@ -58,8 +62,8 @@
   --kk-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --kk-ease-in: cubic-bezier(0.4, 0, 1, 1);
   --kk-ease-balanced: cubic-bezier(0.4, 0, 0.2, 1);
-  --kk-radius-control: 999px;
-  --kk-radius-panel: 20px;
+  --kk-radius-control: 12px;
+  --kk-radius-panel: 18px;
 }
 
 /* Shared primary action across import, research, comparison and approval. */
@@ -72,7 +76,7 @@
   padding: 13px 24px;
   border: 0;
   border-radius: var(--kk-radius-control);
-  background: var(--kk-accent);
+  background: var(--kk-text);
   color: #fff !important;
   font: 600 15px/22px var(--kk-sans);
   text-decoration: none;
@@ -80,7 +84,7 @@
   transition: background 160ms ease, box-shadow 160ms ease;
 }
 .kk-app .kk-primary-button:hover:not(:disabled) {
-  background: var(--kk-accent-hover);
+  background: var(--kk-button-hover);
   box-shadow: 0 5px 18px var(--kk-accent-area);
 }
 .kk-magnetic { flex-shrink: 0; }
@@ -127,7 +131,7 @@ html:has(.kk-app) {
 
 .kk-body .kk-app :is(h1, h2, h3) {
   font-family: var(--kk-sans);
-  font-weight: 650;
+  font-weight: 760;
   letter-spacing: -0.035em;
 }
 

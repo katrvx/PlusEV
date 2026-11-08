@@ -25,6 +25,7 @@ import type {
   ValidationIssue,
 } from "../../../../packages/contracts/types";
 import { api } from "@/lib/api";
+import { MascotCallout } from "./redesign/mascot";
 import "./import-wizard.css";
 
 type Props = {
@@ -315,17 +316,17 @@ export default function ImportWizard({ onClose, onImported, initialFile = null }
       >
         <header className="iw-header">
           <div>
-            <div className="iw-eyebrow"><span className="iw-eyebrow-dot" /> Strategy intake</div>
-            <h2 id={titleId}>{step === 3 ? "Strategy ready for research" : "Bring your strategy"}</h2>
+            <div className="iw-eyebrow"><span className="iw-eyebrow-dot" /> Verify a strategy</div>
+            <h2 id={titleId}>{step === 3 ? "Positions saved" : "Verify your strategy"}</h2>
             <p id={descriptionId}>
-              {step === 3 ? "Your original file is saved for research." : "Upload the history your team already uses."}
+              {step === 3 ? "The positions are saved as a separate research input." : "Share its positions. Keep your code private."}
             </p>
           </div>
           <button className="iw-icon-button" type="button" aria-label="Close import dialog" disabled={importing} onClick={() => onCloseRef.current()}><X size={19} /></button>
         </header>
 
         <div className="iw-steps" aria-label="Import progress">
-          {["Upload", "Match & review", "Ready"].map((label, index) => {
+          {["Add file", "Match data", "Ready"].map((label, index) => {
             const number = index + 1;
             const completed = step > number;
             return (
@@ -343,7 +344,7 @@ export default function ImportWizard({ onClose, onImported, initialFile = null }
           {step === 1 && (
             <section className="iw-upload-section" aria-labelledby={`${titleId}-upload`}>
               <div className="iw-section-heading">
-                <div><h3 id={`${titleId}-upload`}>Choose your strategy file</h3><p>CSV or Parquet. Position history is testable; completed trades are diagnosis only.</p></div>
+                <div><h3 id={`${titleId}-upload`}>Add your position history</h3><p>CSV or Parquet with timestamp, symbol and allocation. Completed trades are for diagnosis.</p></div>
                 <FileSpreadsheet className="iw-heading-icon" size={23} aria-hidden="true" />
               </div>
               <div
@@ -354,26 +355,38 @@ export default function ImportWizard({ onClose, onImported, initialFile = null }
               >
                 <input ref={inputRef} className="iw-visually-hidden" type="file" accept=".csv,.parquet,.pq,text/csv" onChange={(event) => chooseFile(event.target.files?.[0])} />
                 <div className="iw-upload-icon"><UploadCloud size={23} /></div>
-                {loading ? <><h3>Inspecting your file…</h3><Loader2 className="iw-spin" size={18} /></> : <><h3>Drop your strategy export</h3><p><button className="iw-upload-cta kk-primary-button" type="button" onClick={() => inputRef.current?.click()}>Choose a CSV or Parquet file</button></p></>}
+                {loading ? <><h3>Checking the positions…</h3><Loader2 className="iw-spin" size={18} /></> : <><h3>Choose your positions file</h3><p><button className="iw-upload-cta kk-primary-button" type="button" onClick={() => inputRef.current?.click()}>Choose positions CSV or Parquet</button></p></>}
                 <span className="iw-upload-note">Example: positions.csv · timestamp, symbol, allocation</span>
               </div>
+              <MascotCallout pose="bull-welcome" title="Start with timestamps." className="iw-mascot-callout">
+                We check dates and positions before saving the export.
+              </MascotCallout>
               {file && <div className="iw-active-file"><div className="iw-active-file-icon"><FileSpreadsheet size={16} /></div><div><span>Active file</span><strong>{file.name}</strong><small>{prettyBytes(file.size)}{loading ? " · inspecting columns…" : " · ready to configure"}</small></div></div>}
               <div className="iw-source-row">
                 <Info size={15} aria-hidden="true" />
-                <span>Need a reference? Start with a sample.</span>
+                <span>Need a reference? Download a sample export.</span>
               </div>
               <div className="iw-template-card">
-                <div><strong>Sample files</strong><span>Check the expected columns before uploading.</span></div>
-                <div className="iw-template-links"><a href={API_ROUTES.positionTemplate} download><Download size={14} /> Position history</a><a href={API_ROUTES.tradeTemplate} download><Download size={14} /> Trade history</a></div>
+                <div><strong>Sample exports</strong><span>Check the expected columns before sharing positions.</span></div>
+                <div className="iw-template-links"><a href={API_ROUTES.positionTemplate} download><Download size={14} /> Strategy positions</a><a href={API_ROUTES.tradeTemplate} download><Download size={14} /> Trade history</a></div>
               </div>
             </section>
           )}
 
           {step === 2 && preview && (
             <section aria-labelledby={`${titleId}-map`}>
-              <div className="iw-section-heading"><div><h3 id={`${titleId}-map`}>Match your columns</h3><p>{preview.row_count.toLocaleString()} rows · {preview.columns.length} columns · <strong>{file?.name}</strong></p></div><span className="iw-file-chip"><FileSpreadsheet size={14} /> {file ? prettyBytes(file.size) : ""}</span></div>
+              <div className="iw-section-heading"><div><h3 id={`${titleId}-map`}>Check the position mapping</h3><p>{preview.row_count.toLocaleString()} rows · {preview.columns.length} columns · <strong>{file?.name}</strong></p></div><span className="iw-file-chip"><FileSpreadsheet size={14} /> {file ? prettyBytes(file.size) : ""}</span></div>
+              <MascotCallout
+                pose={hasErrors ? "bear-read-sheet" : "bull-read-sheet"}
+                title={hasErrors ? "Check the columns before importing." : "Check the mapping before importing."}
+                className="iw-mascot-callout iw-mascot-callout-compact"
+              >
+                {hasErrors
+                  ? "The preview is real, but one or more required columns still need attention."
+                  : "The preview is real data from your file; no results are estimated here."}
+              </MascotCallout>
               <div className="iw-kind-toggle" role="group" aria-label="Input type">
-                <button type="button" aria-pressed={form.kind === "positions"} className={form.kind === "positions" ? "iw-kind-selected" : ""} onClick={() => updateForm("kind", "positions")}><span>Position history <b className="iw-recommended">Recommended</b></span><small>Allocation at each timestamp · testable</small></button>
+                <button type="button" aria-pressed={form.kind === "positions"} className={form.kind === "positions" ? "iw-kind-selected" : ""} onClick={() => updateForm("kind", "positions")}><span>Strategy positions <b className="iw-recommended">Recommended</b></span><small>Allocation at each timestamp · primary verification input</small></button>
                 <button type="button" aria-pressed={form.kind === "trades"} className={form.kind === "trades" ? "iw-kind-selected" : ""} onClick={() => updateForm("kind", "trades")}><span>Trade history</span><small>Completed trades · diagnosis only</small></button>
               </div>
               <div className="iw-map-grid">
@@ -393,7 +406,7 @@ export default function ImportWizard({ onClose, onImported, initialFile = null }
                 <div className="iw-preview-card"><div className="iw-subheading"><span>Raw preview</span><span className="iw-subheading-note">first {Math.min(5, preview.rows.length)} rows</span></div><div className="iw-table-wrap"><table><thead><tr>{preview.columns.slice(0, 6).map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{preview.rows.slice(0, 5).map((row, rowIndex) => <tr key={rowIndex}>{preview.columns.slice(0, 6).map((column) => <td key={`${rowIndex}-${column}`}>{row[column] == null || row[column] === "" ? <span className="iw-null">—</span> : String(row[column])}</td>)}</tr>)}</tbody></table></div></div>
               </div>
               {renderIssues()}
-              <div className="iw-subheading iw-details-heading"><span>About this strategy</span><span className="iw-subheading-note">saved with this file</span></div>
+              <div className="iw-subheading iw-details-heading"><span>About the position export</span><span className="iw-subheading-note">saved as a separate input</span></div>
               <div className="iw-form-grid iw-core-form-grid">
                 <label><span>Strategy name <em>*</em></span><input value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder="e.g. BTC trend v1" /></label>
                 <label><span>Market / symbol <em>*</em></span><input value={form.symbol} onChange={(event) => updateForm("symbol", event.target.value)} placeholder="BTCUSDT" /></label>
@@ -409,7 +422,7 @@ export default function ImportWizard({ onClose, onImported, initialFile = null }
                   <label className="iw-wide"><span>Notes <small>optional</small></span><textarea rows={2} value={form.description} onChange={(event) => updateForm("description", event.target.value)} placeholder="Venue, assumptions, or the question you want the agents to investigate" /></label>
                 </div>
               </details>
-              <div className="iw-disclosure"><Info size={15} /><span>{form.kind === "trades" ? "Trade history is for diagnosis. Use position history to test an on/off policy." : "Your original strategy stays unchanged. Research uses the costs shown above."}</span></div>
+              <div className="iw-disclosure"><Info size={15} /><span>{form.kind === "trades" ? "Trade history is for diagnosis. It cannot describe how the strategy would behave in a new market." : "These positions are saved separately. They do not reveal or replace the strategy rules."}</span></div>
             </section>
           )}
 
@@ -417,16 +430,16 @@ export default function ImportWizard({ onClose, onImported, initialFile = null }
             <section className="iw-success" aria-labelledby={`${titleId}-success`}>
               <div className="iw-success-icon"><CheckCircle2 size={31} /></div>
               <h3 id={`${titleId}-success`}>{result.name} is ready</h3>
-              <p>We stored {result.row_count.toLocaleString()} {result.kind === "positions" ? "position rows" : "completed trades"} for <strong>{result.symbol}</strong>. The original file remains the unchanged starting point for research.</p>
-              <div className="iw-success-grid"><div><span>Input type</span><strong>{result.kind === "positions" ? "Position history" : "Trade history"}</strong></div><div><span>Date range</span><strong>{result.date_start.slice(0, 10)} → {result.date_end.slice(0, 10)}</strong></div><div><span>Version</span><strong>{result.strategy_version}</strong></div><div><span>Hash</span><strong>{result.dataset_hash.slice(0, 12)}…</strong></div></div>
-              {result.kind === "trades" && <div className="iw-disclosure"><Info size={15} /><span>This file is ready for diagnostic research. Upload position history when you want to test a new on/off policy on unseen data.</span></div>}
+               <p>We stored {result.row_count.toLocaleString()} {result.kind === "positions" ? "position rows" : "completed trades"} for <strong>{result.symbol}</strong> as a separate research input. No strategy rules were inferred from these rows.</p>
+              <div className="iw-success-grid"><div><span>Input type</span><strong>{result.kind === "positions" ? "Strategy positions" : "Trade history"}</strong></div><div><span>Date range</span><strong>{result.date_start.slice(0, 10)} → {result.date_end.slice(0, 10)}</strong></div><div><span>Version</span><strong>{result.strategy_version}</strong></div><div><span>Hash</span><strong>{result.dataset_hash.slice(0, 12)}…</strong></div></div>
+               {result.kind === "trades" && <div className="iw-disclosure"><Info size={15} /><span>This file is ready for diagnostic research. It does not define or replace a strategy rule.</span></div>}
             </section>
           )}
         </main>
 
         <footer className="iw-footer">
           {step === 1 && <><span className="iw-footer-hint">Source stays unchanged.</span><button className="iw-button iw-button-secondary" type="button" disabled={importing} onClick={() => onCloseRef.current()}>Cancel</button></>}
-          {step === 2 && <><button className="iw-button iw-button-ghost" type="button" disabled={importing} onClick={() => { setStep(1); setError(null); }}><ArrowLeft size={16} /> Replace file</button><div className="iw-footer-actions"><button className="iw-button iw-button-secondary" type="button" disabled={importing} onClick={() => onCloseRef.current()}>Cancel</button><button className="iw-button iw-button-primary kk-primary-button" type="button" disabled={importing || !preview} onClick={() => void importStrategy()}>{importing ? <><Loader2 className="iw-spin" size={16} /> Validating…</> : <>Import strategy <ArrowRight size={16} /></>}</button></div></>}
+           {step === 2 && <><button className="iw-button iw-button-ghost" type="button" disabled={importing} onClick={() => { setStep(1); setError(null); }}><ArrowLeft size={16} /> Replace file</button><div className="iw-footer-actions"><button className="iw-button iw-button-secondary" type="button" disabled={importing} onClick={() => onCloseRef.current()}>Cancel</button><button className="iw-button iw-button-primary kk-primary-button" type="button" disabled={importing || !preview} onClick={() => void importStrategy()}>{importing ? <><Loader2 className="iw-spin" size={16} /> Validating…</> : <>Save strategy positions <ArrowRight size={16} /></>}</button></div></>}
           {step === 3 && <><span className="iw-footer-hint">Next: investigate this strategy.</span><button className="iw-button iw-button-primary kk-primary-button" type="button" onClick={onClose}>Open research workspace <ArrowRight size={16} /></button></>}
         </footer>
       </div>

@@ -8,6 +8,8 @@ import type { MotionPreference } from "./types";
 
 const ReducedMotion = createContext(false);
 
+export const useInterfaceReducedMotion = () => useContext(ReducedMotion);
+
 /** One motion policy and timing scale for the entire research workspace. */
 export function InterfaceMotion({ preference, children }: { preference: MotionPreference; children: ReactNode }) {
   const systemReduced = useReducedMotion();

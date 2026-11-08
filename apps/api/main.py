@@ -21,9 +21,25 @@ from pathlib import Path
 from typing import Any, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import Response
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from .strategy_definitions import (
+    MAX_DEFINITION_BYTES,
+    StrategyDefinitionRequest,
+    definition_json_bytes,
+    definition_payload,
+    strategy_record,
+    template_definition,
+)
+from .judge_example import (
+    DEFAULT_NATIVE_STRATEGY_ID,
+    NATIVE_REPORT_STRATEGY_IDS,
+    build_virtual_bundle,
+    is_virtual_experiment,
+    is_virtual_strategy,
+    strategy_id_for_experiment,
+)
 from .team_reports import router as team_reports_router
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -466,7 +482,7 @@ class PaperTestRequest(BaseModel):
     approved: bool
 
 
-app = FastAPI(title="Keep or Kill API", version="0.1.0", description="Part C research workspace API")
+app = FastAPI(title="+EV API", version="0.1.0", description="Part C research workspace API")
 app.include_router(team_reports_router)
 
 
@@ -482,8 +498,126 @@ def health() -> dict[str, Any]:
 
 
 @app.get("/api/strategies")
-def strategies() -> list[dict[str, Any]]:
-    return db_list("strategies")
+def strategies(include_native_example: bool = False) -> list[dict[str, Any]]:
+    """List saved strategies, with real native reports opt-in.
+
+    The opt-in keeps the historical collection contract stable for existing
+    consumers while allowing the judge flow to request coherent, read-only
+    strategy/report pairs.
+    """
+    values = db_list("strategies")
+    if include_native_example:
+        existing_ids = {str(item.get("strategy_id")) for item in values}
+        for strategy_id in NATIVE_REPORT_STRATEGY_IDS:
+            if strategy_id in existing_ids:
+                continue
+            bundle = native_example_bundle(strategy_id)
+            if bundle:
+                values.append(bundle["strategy"])
+    return values
+
+
+def native_example_bundle(strategy_id: str | None = None) -> dict[str, Any] | None:
+    """Return one virtual report unless a DB record has claimed its IDs."""
+    bundle = build_virtual_bundle(strategy_id=strategy_id or DEFAULT_NATIVE_STRATEGY_ID)
+    if not bundle:
+        return None
+    if db_get("strategies", "strategy_id", bundle["strategy"]["strategy_id"]):
+        return None
+    if db_get("experiments", "experiment_id", bundle["experiment"]["experiment_id"]):
+        return None
+    return bundle
+
+
+@app.get("/api/examples/native-report")
+def native_report_example(strategy_id: str = DEFAULT_NATIVE_STRATEGY_ID) -> dict[str, Any]:
+    """Return one coherent, read-only native report bundle."""
+    bundle = native_example_bundle(strategy_id)
+    if not bundle:
+        raise HTTPException(status_code=404, detail="Native report example is unavailable")
+    return bundle
+
+
+def persist_strategy_definition(definition: StrategyDefinitionRequest) -> dict[str, Any]:
+    """Persist a validated definition as a draft, without generating signals."""
+    strategy_id = f"strat_{uuid.uuid4().hex[:12]}"
+    created_at = iso(utc_now())
+    definition_dir = DATA_DIR / "definitions"
+    definition_dir.mkdir(parents=True, exist_ok=True)
+    definition_path = definition_dir / f"{strategy_id}.json"
+    definition_path.write_bytes(definition_json_bytes(definition))
+    strategy = strategy_record(definition, strategy_id, created_at, str(definition_path))
+    db_insert("strategies", strategy_id, strategy)
+    return strategy
+
+
+def _definition_validation_detail(error: ValidationError) -> list[dict[str, Any]]:
+    return [
+        {"loc": list(item.get("loc", ())), "msg": item.get("msg", "Invalid strategy definition"), "type": item.get("type", "value_error")}
+        for item in error.errors()
+    ]
+
+
+def validate_strategy_definition_payload(payload: object) -> StrategyDefinitionRequest:
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=422, detail="Strategy definition must be a JSON object")
+    try:
+        return StrategyDefinitionRequest.model_validate(payload)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=_definition_validation_detail(exc)) from None
+
+
+@app.post("/api/strategies/definitions")
+async def create_strategy_definition(request: Request) -> dict[str, Any]:
+    """Save a bounded declarative strategy definition; never execute uploaded text."""
+    declared_length = request.headers.get("content-length")
+    if declared_length is not None:
+        try:
+            if int(declared_length) > MAX_DEFINITION_BYTES:
+                raise HTTPException(status_code=413, detail=f"Strategy definition exceeds the {MAX_DEFINITION_BYTES // 1024} KB limit")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid Content-Length header") from None
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > MAX_DEFINITION_BYTES:
+            raise HTTPException(status_code=413, detail=f"Strategy definition exceeds the {MAX_DEFINITION_BYTES // 1024} KB limit")
+        chunks.append(chunk)
+    raw = b"".join(chunks)
+    if len(raw) > MAX_DEFINITION_BYTES:
+        raise HTTPException(status_code=413, detail=f"Strategy definition exceeds the {MAX_DEFINITION_BYTES // 1024} KB limit")
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise HTTPException(status_code=400, detail="Strategy definition must be valid UTF-8 JSON") from None
+    definition = validate_strategy_definition_payload(payload)
+    strategy = persist_strategy_definition(definition)
+    return {"strategy": strategy, "definition": definition_payload(definition), "definition_hash": strategy["definition_hash"], "valid": True, "issues": []}
+
+
+@app.get("/api/templates/strategy-definition.json")
+def strategy_definition_template() -> Response:
+    definition = template_definition()
+    return Response(
+        content=definition_json_bytes(definition),
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=strategy-definition.json"},
+    )
+
+
+@app.get("/api/strategies/{strategy_id}/definition")
+def download_strategy_definition(strategy_id: str) -> Response:
+    strategy = db_get("strategies", "strategy_id", strategy_id)
+    if not strategy or strategy.get("source") != "strategy_definition" or not isinstance(strategy.get("definition"), dict):
+        raise HTTPException(status_code=404, detail="Strategy definition not found")
+    filename = re.sub(r"[^A-Za-z0-9_.-]", "_", strategy_id)
+    content = json.dumps(strategy["definition"], ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return Response(
+        content=content,
+        media_type="application/json",
+        headers={"Content-Disposition": f"attachment; filename={filename}-definition.json"},
+    )
 
 
 @app.post("/api/imports/preview")
@@ -570,8 +704,19 @@ def trades_template() -> Response:
 
 
 @app.get("/api/experiments")
-def experiments(strategy_id: str | None = Query(default=None)) -> list[dict[str, Any]]:
+def experiments(strategy_id: str | None = None, include_native_example: bool = False) -> list[dict[str, Any]]:
     values = db_list("experiments", "created_at DESC")
+    if strategy_id in NATIVE_REPORT_STRATEGY_IDS:
+        if any(item.get("strategy_id") == strategy_id for item in values):
+            return [item for item in values if item.get("strategy_id") == strategy_id]
+        bundle = native_example_bundle(strategy_id)
+        return [bundle["experiment"]] if bundle else []
+    if include_native_example:
+        existing_ids = {str(item.get("experiment_id")) for item in values}
+        for native_strategy_id in NATIVE_REPORT_STRATEGY_IDS:
+            bundle = native_example_bundle(native_strategy_id)
+            if bundle and bundle["experiment"]["experiment_id"] not in existing_ids:
+                values.append(bundle["experiment"])
     return [item for item in values if strategy_id is None or item["strategy_id"] == strategy_id]
 
 
@@ -579,6 +724,10 @@ def experiments(strategy_id: str | None = Query(default=None)) -> list[dict[str,
 def create_experiment(request: ExperimentRequest, background_tasks: BackgroundTasks) -> dict[str, Any]:
     strategy = db_get("strategies", "strategy_id", request.strategy_id)
     if not strategy:
+        if is_virtual_strategy(request.strategy_id):
+            bundle = native_example_bundle(request.strategy_id)
+            if bundle:
+                return bundle["experiment"]
         raise HTTPException(status_code=404, detail="Strategy not found")
     experiment_id = f"exp_{uuid.uuid4().hex[:14]}"
     if strategy["status"] == "demo":
@@ -611,6 +760,10 @@ def run_demo_experiment(experiment_id: str, strategy_id: str, dataset_hash: str)
 @app.get("/api/experiments/{experiment_id}")
 def get_experiment(experiment_id: str) -> dict[str, Any]:
     value = db_get("experiments", "experiment_id", experiment_id)
+    if not value and is_virtual_experiment(experiment_id):
+        bundle = native_example_bundle(strategy_id_for_experiment(experiment_id))
+        if bundle:
+            return bundle["experiment"]
     if not value:
         raise HTTPException(status_code=404, detail="Experiment not found")
     return value
@@ -619,6 +772,10 @@ def get_experiment(experiment_id: str) -> dict[str, Any]:
 @app.get("/api/experiments/{experiment_id}/report")
 def report(experiment_id: str) -> Response:
     value = db_get("experiments", "experiment_id", experiment_id)
+    if not value and is_virtual_experiment(experiment_id):
+        bundle = native_example_bundle(strategy_id_for_experiment(experiment_id))
+        if bundle:
+            value = bundle["experiment"]
     if not value:
         raise HTTPException(status_code=404, detail="Experiment not found")
     return Response(content=json.dumps(value, indent=2, ensure_ascii=False), media_type="application/json", headers={"Content-Disposition": f"attachment; filename={experiment_id}-report.json"})
@@ -629,8 +786,14 @@ def create_paper_test(request: PaperTestRequest) -> dict[str, Any]:
     if not request.approved:
         raise HTTPException(status_code=400, detail="Human approval is required before freezing a paper test")
     experiment = db_get("experiments", "experiment_id", request.experiment_id)
+    if not experiment and is_virtual_experiment(request.experiment_id):
+        bundle = native_example_bundle(strategy_id_for_experiment(request.experiment_id))
+        if bundle:
+            experiment = bundle["experiment"]
     if not experiment:
         raise HTTPException(status_code=404, detail="Experiment not found")
+    if experiment.get("paper_eligible") is False:
+        raise HTTPException(status_code=409, detail="This recorded report has no eligible paper proposal; a sealed score is not an approved candidate verdict")
     if experiment["status"] != "completed" or not experiment.get("policy", {}).get("test_evaluated") or not experiment.get("policy", {}).get("holdout_frozen"):
         raise HTTPException(status_code=409, detail="Only a completed, evaluated experiment can be frozen")
     paper_id = f"paper_{uuid.uuid4().hex[:14]}"
