@@ -668,7 +668,7 @@
    "actor_kind": "Code",
    "action": "decided",
    "title": "Selected one filter for the held-out test",
-   "summary": "The rule was fixed before the run: beat the original with an interval above zero, beat cash, change something real, and not be rejected by the critic.",
+   "summary": "The rule was fixed before the run: beat the original and cash on Validation after costs, change something real, and not be rejected by the critic. Only the best such filter goes on.",
    "items": [
     "Selected: Half size when 7-day volatility is low (≤ 0.006409)",
     "champion agent::vol_median_05_1 beats always-on and cash on validation and was not rejected by the critic"

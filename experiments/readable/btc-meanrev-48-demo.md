@@ -73,7 +73,7 @@ Source: `experiments/frozen_look_btc-meanrev-48-demo.json`.
    - Flat when 7-day volatility is low (≤ 0.00753): rejected — On validation, the gate is almost always off: allocation_mix is 93.89% at 0.0 and only 6.109% at 1.0, resulting in an exposure of just 0.02147 and only 44 position switches across 15278 decisions (53…
    - Half size when 7-day volatility is low (≤ 0.006409): approved for one held-out test — While multiple agent trials were explored on train and walk-forward fold 2 had a wide CI including zero ([-0.1346, 0.2441]), walk-forward folds 1 and 3 had positive CIs ([0.09795, 0.5821] and [0.0554…
    - *Changed the conclusion:* The filter with the best Validation number (Flat when 7-day volatility is low (≤ 0.006409), +58.2 pp) was rejected by the critic, so it could not be selected.
-7. **Code: selection rule** (Code) — Selected one filter for the held-out test. The rule was fixed before the run: beat the original with an interval above zero, beat cash, change something real, and not be rejected by the critic.
+7. **Code: selection rule** (Code) — Selected one filter for the held-out test. The rule was fixed before the run: beat the original and cash on Validation after costs, change something real, and not be rejected by the critic. Only the best such filter goes on.
    - Selected: Half size when 7-day volatility is low (≤ 0.006409)
    - champion agent::vol_median_05_1 beats always-on and cash on validation and was not rejected by the critic
 8. **Code: held-out test** (Code) — Opened the held-out test once. Beat the original by +27.3 pp (90% interval +15.3 to +36.2 pp). Worst drawdown 60.4% → 36.2%. Its own return was -28.9% — it still lost money.

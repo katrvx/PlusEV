@@ -418,9 +418,9 @@ def _filters(r, candidates, trials, evaluation, look_policy, held_out, held_out_
         elif c["status"] == "accepted_for_frozen_test":
             who = "Proposer agent"
             outcome = "selected_for_further_testing"
-            reason = ("Met every pre-registered condition on Validation (beat the original and cash, interval above "
-                      "zero for the original, critic did not reject), so it earned one held-out test. Selection is "
-                      "not approval.")
+            reason = ("Met every condition fixed before the run (beat the original and cash on Validation after costs, "
+                      "changed something real, not rejected by the critic), so it earned one held-out test. Selection "
+                      "is not approval.")
             if look_policy == pid and evaluation:
                 stages.append("Held-out test")
                 ho = _held_out_result(evaluation, held_out, held_out_path)
@@ -672,8 +672,8 @@ def _trace(r, filters, trials, published, held_out) -> list[TraceStep]:
     chosen = next((f for f in filters if f.policy_id == r.get("champion_policy_id")), None)
     add(actor="Code: selection rule", actor_kind="Code", action="decided",
         title=("Selected one filter for the held-out test" if chosen else "No filter earned the held-out test"),
-        summary=("The rule was fixed before the run: beat the original with an interval above zero, beat cash, "
-                 "change something real, and not be rejected by the critic."),
+        summary=("The rule was fixed before the run: beat the original and cash on Validation after costs, change "
+                 "something real, and not be rejected by the critic. Only the best such filter goes on."),
         items=[f"Selected: {chosen.label}" if chosen else "Selected: none"]
         + [b.replace("passed the critic", "was not rejected by the critic")
            for b in r.get("verdict_basis") or [] if b.startswith(("champion", "no agent", "none"))][:2],
