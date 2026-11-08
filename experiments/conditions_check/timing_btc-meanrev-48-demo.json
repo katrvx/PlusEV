@@ -1,0 +1,539 @@
+{
+ "what": "timing vs taking less risk, Validation only, identical costs (10 bp fee + 1 bp slippage, next-bar fills)",
+ "report": "experiments/investigation_argon_meanrev.json",
+ "experiment_id": "exp_a79497cf70ec",
+ "strategy_id": "btc-meanrev-48-demo",
+ "computed_at": "2026-11-08T13:30:41.733613+00:00",
+ "split": "validation",
+ "held_out_test_read": false,
+ "note": "Diagnostic. The selection rule fixed before the run is unchanged; a timing requirement would be a new acceptance criterion and needs fresh unseen data (after 2026-10-31). Net returns are compounded, after costs.",
+ "benchmarks": [
+  {
+   "name": "Original strategy (always on)",
+   "role": "benchmark",
+   "policy_id": "always_on",
+   "spec_hash": "spec_3ca2c047d735",
+   "spec": {
+    "policy_id": "always_on",
+    "family": "always_on"
+   },
+   "net_return": -0.19483542695663503,
+   "ci_net_return": [
+    -0.5394126359846799,
+    0.5347477844611963
+   ],
+   "max_drawdown": 0.3122038074048794,
+   "exposure": 0.35142034297682945,
+   "sharpe": -0.24776777893853164,
+   "turnover": 472.0,
+   "delta_vs_always_on": 0.0,
+   "ci_delta_vs_always_on": [
+    0.0,
+    0.0
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 0.0,
+    "1.0": 1.0
+   },
+   "audit_id": "audit_5bff2aacbd67"
+  },
+  {
+   "name": "Cash",
+   "role": "benchmark",
+   "policy_id": "cash",
+   "spec_hash": "spec_098793ea7cd6",
+   "spec": {
+    "policy_id": "cash",
+    "family": "cash"
+   },
+   "net_return": 0.0,
+   "ci_net_return": [
+    0.0,
+    0.0
+   ],
+   "max_drawdown": 0.0,
+   "exposure": 0.0,
+   "sharpe": null,
+   "turnover": 0.0,
+   "delta_vs_always_on": 0.19483542695663503,
+   "ci_delta_vs_always_on": [
+    -0.5654439600763459,
+    0.5443822747004955
+   ],
+   "allocation_mix": {
+    "0.0": 1.0,
+    "0.5": 0.0,
+    "1.0": 0.0
+   },
+   "audit_id": "audit_44d7c3da343a"
+  },
+  {
+   "name": "Constant half size",
+   "role": "benchmark",
+   "policy_id": "benchmark::half_size",
+   "spec_hash": "spec_4624fcab1d3d",
+   "spec": {
+    "policy_id": "benchmark::half_size",
+    "family": "constant",
+    "allocation": 0.5
+   },
+   "net_return": -0.08381193643476748,
+   "ci_net_return": [
+    -0.31056739835136443,
+    0.25825867051341106
+   ],
+   "max_drawdown": 0.1621013898183178,
+   "exposure": 0.17571017148841472,
+   "sharpe": -0.24776777893853164,
+   "turnover": 236.0,
+   "delta_vs_always_on": 0.11102349052186755,
+   "ci_delta_vs_always_on": [
+    -0.25656158846195964,
+    0.23486097844428622
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 1.0,
+    "1.0": 0.0
+   },
+   "audit_id": "audit_c349d0e09c12"
+  },
+  {
+   "name": "Simple rule",
+   "role": "reference",
+   "policy_id": "rule::trend_up_and_vol_below_train_median",
+   "spec_hash": "spec_2ca7c5381c93",
+   "spec": {
+    "policy_id": "rule::trend_up_and_vol_below_train_median",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "momentum_24h",
+      "op": ">",
+      "threshold": 0.0
+     },
+     {
+      "feature": "realized_vol_7d",
+      "op": "<=",
+      "threshold": 0.006409240155854531
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "net_return": -0.40716902883350636,
+   "ci_net_return": [
+    -0.4927831828242254,
+    -0.30980026997075344
+   ],
+   "max_drawdown": 0.4117769231434384,
+   "exposure": 0.03338133263516167,
+   "sharpe": -4.497684073617141,
+   "turnover": 377.0,
+   "delta_vs_always_on": -0.21233360187687134,
+   "ci_delta_vs_always_on": [
+    -0.9633986830000766,
+    0.14185180117747712
+   ],
+   "allocation_mix": {
+    "0.0": 0.9050102439932949,
+    "0.5": 0.0,
+    "1.0": 0.09498975600670516
+   },
+   "audit_id": "audit_63319f4c7cf3"
+  },
+  {
+   "name": "Lane A regime filter (current)",
+   "role": "reference",
+   "policy_id": "rule::regime_filter",
+   "spec_hash": "spec_f59b5404bfca",
+   "spec": {
+    "policy_id": "rule::regime_filter",
+    "family": "regime_gate",
+    "flat_buckets": [
+     {
+      "axis": "trend_regime",
+      "bucket": "bull"
+     },
+     {
+      "axis": "trend_7d_regime",
+      "bucket": "sideways"
+     },
+     {
+      "axis": "vol_regime",
+      "bucket": "low"
+     }
+    ],
+    "full_buckets": [],
+    "allocation_flat": 0.0,
+    "allocation_full": 1.0,
+    "allocation_else": 1.0,
+    "selected_on": "train",
+    "summary": "Train intervals only: flat in trend_regime=bull, trend_7d_regime=sideways, vol_regime=low; allocation 1 in the remaining regimes."
+   },
+   "net_return": 0.3877421855376444,
+   "ci_net_return": [
+    0.08185252621866529,
+    0.8085032641725712
+   ],
+   "max_drawdown": 0.12023602663734667,
+   "exposure": 0.032595889514334335,
+   "sharpe": 1.3531929315497502,
+   "turnover": 102.0,
+   "delta_vs_always_on": 0.5825776124942794,
+   "ci_delta_vs_always_on": [
+    -0.030118091921518174,
+    0.9758201652653931
+   ],
+   "allocation_mix": {
+    "0.0": 0.9072452970758056,
+    "0.5": 0.0,
+    "1.0": 0.09275470292419445
+   },
+   "audit_id": "audit_318761002f19"
+  }
+ ],
+ "gates": [
+  {
+   "name": "agent::vol_median_0_1",
+   "role": "agent gate",
+   "policy_id": "agent::vol_median_0_1",
+   "spec_hash": "spec_a2e686fa5d51",
+   "spec": {
+    "policy_id": "agent::vol_median_0_1",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "realized_vol_7d",
+      "op": ">",
+      "threshold": 0.00640924015585452
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "net_return": 0.3875022587769823,
+   "ci_net_return": [
+    0.03271758575137206,
+    0.9598365971405062
+   ],
+   "max_drawdown": 0.12796915578837442,
+   "exposure": 0.046799319282628614,
+   "sharpe": 1.2149191454030412,
+   "turnover": 84.0,
+   "delta_vs_always_on": 0.5823376857336173,
+   "ci_delta_vs_always_on": [
+    -0.035387515216757315,
+    1.0169497692494096
+   ],
+   "allocation_mix": {
+    "0.0": 0.8668280871670703,
+    "0.5": 0.0,
+    "1.0": 0.13317191283292978
+   },
+   "audit_id": "audit_3a2491a969ca",
+   "validation_average_size": 0.13317191283292976,
+   "vs_validation_size": 0.40656696569868533,
+   "status_in_report": "rejected",
+   "train_average_size": 0.48809865213650705,
+   "vs_half_size": 0.4713141952117498,
+   "vs_matched_exposure": 0.4689593111926694,
+   "vs_cash": 0.3875022587769823,
+   "timing_read": "beats half size and constants at both its Training and its Validation average size: evidence of timing on Validation (not proof; Validation was also used to select)",
+   "size_shift_note": "average size moved from 0.49x on Training to 0.13x on Validation: the condition's frequency changed, so the Training-matched constant is a loose comparison"
+  },
+  {
+   "name": "Constant 0.488x (same average Training size as agent::vol_median_0_1)",
+   "role": "benchmark",
+   "policy_id": "benchmark::exposure_matched::agent::vol_median_0_1",
+   "spec_hash": "spec_d728bc2ed453",
+   "spec": {
+    "policy_id": "benchmark::exposure_matched::agent::vol_median_0_1",
+    "family": "constant",
+    "allocation": 0.488099,
+    "matched_on": "train"
+   },
+   "net_return": -0.08145705241568713,
+   "ci_net_return": [
+    -0.31000810079036484,
+    0.2513575839596195
+   ],
+   "max_drawdown": 0.15841316172077957,
+   "exposure": 0.17152791798664746,
+   "sharpe": -0.2477677789385314,
+   "turnover": 230.382728,
+   "delta_vs_always_on": 0.1133783745409479,
+   "ci_delta_vs_always_on": [
+    -0.28258920457308045,
+    0.24284454673439473
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 0.0,
+    "1.0": 0.0
+   },
+   "audit_id": "audit_24b1f65ad502"
+  },
+  {
+   "name": "Constant 0.133x (the gate's actual Validation size; diagnostic, set on Validation)",
+   "role": "diagnostic",
+   "policy_id": "benchmark::validation_size::agent::vol_median_0_1",
+   "spec_hash": "spec_cf3eb698a6f6",
+   "spec": {
+    "policy_id": "benchmark::validation_size::agent::vol_median_0_1",
+    "family": "constant",
+    "allocation": 0.133172,
+    "matched_on": "validation (diagnostic)"
+   },
+   "net_return": -0.019064706921703034,
+   "ci_net_return": [
+    -0.09191082522046568,
+    0.0676016578579109
+   ],
+   "max_drawdown": 0.044549863119213384,
+   "exposure": 0.04679934991491034,
+   "sharpe": -0.2477677789385314,
+   "turnover": 62.857184000000004,
+   "delta_vs_always_on": 0.175770720034932,
+   "ci_delta_vs_always_on": [
+    -0.5020884801529126,
+    0.4660725297346466
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 0.0,
+    "1.0": 0.0
+   },
+   "audit_id": "audit_8a3d7da1aee2"
+  },
+  {
+   "name": "agent::vol_q67_0_1",
+   "role": "agent gate",
+   "policy_id": "agent::vol_q67_0_1",
+   "spec_hash": "spec_1a94a4624d52",
+   "spec": {
+    "policy_id": "agent::vol_q67_0_1",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "realized_vol_7d",
+      "op": ">",
+      "threshold": 0.00752986390446431
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "net_return": 0.27585332225260073,
+   "ci_net_return": [
+    -0.0013398534741315023,
+    0.669863419246388
+   ],
+   "max_drawdown": 0.06738438544838177,
+   "exposure": 0.021468778635947112,
+   "sharpe": 1.1296337994119208,
+   "turnover": 44.0,
+   "delta_vs_always_on": 0.47068874920923576,
+   "ci_delta_vs_always_on": [
+    -0.18923694287362147,
+    0.8592221291128743
+   ],
+   "allocation_mix": {
+    "0.0": 0.9389085490780406,
+    "0.5": 0.0,
+    "1.0": 0.061091450921959396
+   },
+   "audit_id": "audit_ebdcbcc5fb6e",
+   "validation_average_size": 0.06109145092195939,
+   "vs_validation_size": 0.28428140612632247,
+   "status_in_report": "rejected",
+   "train_average_size": 0.3422426154287353,
+   "vs_half_size": 0.3596652586873682,
+   "vs_matched_exposure": 0.32976734156314724,
+   "vs_cash": 0.27585332225260073,
+   "timing_read": "beats half size and constants at both its Training and its Validation average size: evidence of timing on Validation (not proof; Validation was also used to select)",
+   "size_shift_note": "average size moved from 0.34x on Training to 0.06x on Validation: the condition's frequency changed, so the Training-matched constant is a loose comparison"
+  },
+  {
+   "name": "Constant 0.342x (same average Training size as agent::vol_q67_0_1)",
+   "role": "benchmark",
+   "policy_id": "benchmark::exposure_matched::agent::vol_q67_0_1",
+   "spec_hash": "spec_48714a68a044",
+   "spec": {
+    "policy_id": "benchmark::exposure_matched::agent::vol_q67_0_1",
+    "family": "constant",
+    "allocation": 0.342243,
+    "matched_on": "train"
+   },
+   "net_return": -0.05391401931054651,
+   "ci_net_return": [
+    -0.2301549985421564,
+    0.16783964540315036
+   ],
+   "max_drawdown": 0.11251321350147858,
+   "exposure": 0.12027115244141903,
+   "sharpe": -0.24776777893853158,
+   "turnover": 161.53869600000002,
+   "delta_vs_always_on": 0.14092140764608851,
+   "ci_delta_vs_always_on": [
+    -0.32480619445305486,
+    0.33187073573988785
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 0.0,
+    "1.0": 0.0
+   },
+   "audit_id": "audit_748cf815bcb5"
+  },
+  {
+   "name": "Constant 0.061x (the gate's actual Validation size; diagnostic, set on Validation)",
+   "role": "diagnostic",
+   "policy_id": "benchmark::validation_size::agent::vol_q67_0_1",
+   "spec_hash": "spec_58c6d4b4d9ec",
+   "spec": {
+    "policy_id": "benchmark::validation_size::agent::vol_q67_0_1",
+    "family": "constant",
+    "allocation": 0.061091,
+    "matched_on": "validation (diagnostic)"
+   },
+   "net_return": -0.008428083873721737,
+   "ci_net_return": [
+    -0.043221900028122914,
+    0.031692688204891684
+   ],
+   "max_drawdown": 0.020553885340523825,
+   "exposure": 0.021468620172797485,
+   "sharpe": -0.24776777893853114,
+   "turnover": 28.834951999999998,
+   "delta_vs_always_on": 0.1864073430829133,
+   "ci_delta_vs_always_on": [
+    -0.5202970846537358,
+    0.5006337743334055
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 0.0,
+    "1.0": 0.0
+   },
+   "audit_id": "audit_2d98628e5c42"
+  },
+  {
+   "name": "agent::vol_median_05_1",
+   "role": "agent gate",
+   "policy_id": "agent::vol_median_05_1",
+   "spec_hash": "spec_dbd7812c913a",
+   "spec": {
+    "policy_id": "agent::vol_median_05_1",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "realized_vol_7d",
+      "op": ">",
+      "threshold": 0.00640924015585452
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.5,
+    "thresholds_selected_on": "train"
+   },
+   "net_return": 0.07276541127297365,
+   "ci_net_return": [
+    -0.2786316727189923,
+    0.6235850714239849
+   ],
+   "max_drawdown": 0.1891732332162478,
+   "exposure": 0.19910983112972902,
+   "sharpe": 0.29622608927724353,
+   "turnover": 278.0,
+   "delta_vs_always_on": 0.2676008382296087,
+   "ci_delta_vs_always_on": [
+    0.011091412158337866,
+    0.4088607111933503
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 0.8668280871670703,
+    "1.0": 0.13317191283292978
+   },
+   "audit_id": "audit_35c428112f43",
+   "validation_average_size": 0.5665859564164648,
+   "vs_validation_size": 0.17003495143929637,
+   "status_in_report": "accepted_for_frozen_test",
+   "train_average_size": 0.7440493260682535,
+   "vs_half_size": 0.15657734770774112,
+   "vs_matched_exposure": 0.2080695099636397,
+   "vs_cash": 0.07276541127297365,
+   "timing_read": "beats half size and constants at both its Training and its Validation average size: evidence of timing on Validation (not proof; Validation was also used to select)",
+   "size_shift_note": "average size moved from 0.74x on Training to 0.57x on Validation: the condition's frequency changed, so the Training-matched constant is a loose comparison"
+  },
+  {
+   "name": "Constant 0.744x (same average Training size as agent::vol_median_05_1)",
+   "role": "benchmark",
+   "policy_id": "benchmark::exposure_matched::agent::vol_median_05_1",
+   "spec_hash": "spec_7a7cd848986e",
+   "spec": {
+    "policy_id": "benchmark::exposure_matched::agent::vol_median_05_1",
+    "family": "constant",
+    "allocation": 0.744049,
+    "matched_on": "train"
+   },
+   "net_return": -0.13530409869066606,
+   "ci_net_return": [
+    -0.43781764827935427,
+    0.4013289406112009
+   ],
+   "max_drawdown": 0.23577646730404922,
+   "exposure": 0.261473954771567,
+   "sharpe": -0.2477677789385312,
+   "turnover": 351.19112799999994,
+   "delta_vs_always_on": 0.059531328265968964,
+   "ci_delta_vs_always_on": [
+    -0.1355584492737213,
+    0.11097425688741523
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 0.0,
+    "1.0": 0.0
+   },
+   "audit_id": "audit_10243b2ea499"
+  },
+  {
+   "name": "Constant 0.567x (the gate's actual Validation size; diagnostic, set on Validation)",
+   "role": "diagnostic",
+   "policy_id": "benchmark::validation_size::agent::vol_median_05_1",
+   "spec_hash": "spec_e041e1f8e0f7",
+   "spec": {
+    "policy_id": "benchmark::validation_size::agent::vol_median_05_1",
+    "family": "constant",
+    "allocation": 0.566586,
+    "matched_on": "validation (diagnostic)"
+   },
+   "net_return": -0.09726954016632272,
+   "ci_net_return": [
+    -0.35940131261261804,
+    0.3160881306083595
+   ],
+   "max_drawdown": 0.1825753872917718,
+   "exposure": 0.19910984644586988,
+   "sharpe": -0.24776777893853133,
+   "turnover": 267.428592,
+   "delta_vs_always_on": 0.0975658867903123,
+   "ci_delta_vs_always_on": [
+    -0.23141342870830522,
+    0.20057665141667727
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 0.0,
+    "1.0": 0.0
+   },
+   "audit_id": "audit_5c93beb84da0"
+  }
+ ]
+}

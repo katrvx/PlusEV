@@ -146,6 +146,22 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
             "summary": "Always half size: the exposure-only baseline."}
     ctx.arbiter_evaluate(half, "validation", source="rule_baseline")
     competitors.append(("rule_baseline", half))
+    # Same average size, no timing: for each proposal, a constant frozen at the gate's average TRAIN size (A's benchmark).
+    # If the gate cannot beat it on validation, its gain came from holding less, not from choosing when (diagnostic).
+    matched = {}
+    for p in proposals.proposals:
+        spec = p.to_policy_spec()
+        tr = ctx.arbiter_evaluate(spec, "train", source="arbiter")
+        mix = (tr.get("evaluation") or {}).get("allocation_mix") if isinstance(tr, dict) else None
+        size = sum(float(k) * float(v) for k, v in (mix or {}).items()) if mix else None
+        if size is None or not _finite(size):
+            continue
+        bench = {"policy_id": f"benchmark::exposure_matched::{p.proposal_id}", "family": "constant",
+                 "allocation": round(min(1.0, max(0.0, size)), 6), "matched_on": "train"}
+        out = ctx.arbiter_evaluate(bench, "validation", source="rule_baseline")
+        ev = (out.get("evaluation") or {}) if isinstance(out, dict) else {}
+        if _finite(ev.get("delta_net_return_vs_always_on")):
+            matched[p.proposal_id] = (bench["allocation"], ev["delta_net_return_vs_always_on"])
 
     # 3b. walk-forward: the same frozen specs on Lane A's expanding TRAIN folds (stability, not unseen data)
     # The fitted LightGBM saw all of train (fit + calibration), so scoring it on train folds is in-sample.
@@ -228,6 +244,10 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
                     reasons.append(f"vs Lane A regime filter on validation: {d - regime_delta:+.4f} (reference, not a veto)")
                 if _finite(half_delta):
                     reasons.append(f"vs constant half size on validation: {d - half_delta:+.4f} (exposure-only baseline; reference, not a veto)")
+                if p.proposal_id in matched:
+                    size, md = matched[p.proposal_id]
+                    reasons.append(f"timing check vs a constant {size:.3f}x size (this gate's average train size) on validation: "
+                                   f"{d - md:+.4f} (diagnostic, not part of the pre-registered rule)")
             if mix and max(mix.values()) >= DEGENERATE_SHARE:
                 eligible = False
                 reasons.append(f"degenerate: one multiplier on {max(mix.values()):.0%} of in-position validation decisions")
@@ -262,6 +282,9 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
             validation_delta_vs_always_on=t.delta_net_return_vs_always_on if t else None, validation_ci=t.ci_delta if t else None,
             validation_delta_vs_simple_rule=_vs_rule(t), validation_delta_vs_cash=t.net_return if t else None,
             allocation_mix=t.allocation_mix if t else {}, reasons=reasons,
+            validation_delta_vs_half_size=(t.delta_net_return_vs_always_on - half_delta) if t and _finite(half_delta, t.delta_net_return_vs_always_on) else None,
+            validation_delta_vs_matched_exposure=(t.delta_net_return_vs_always_on - matched[p.proposal_id][1]) if t and p.proposal_id in matched and _finite(t.delta_net_return_vs_always_on) else None,
+            matched_exposure=matched[p.proposal_id][0] if p.proposal_id in matched else None,
             evidence_ids=[e for e in [*p.evidence_ids, t.evidence_id if t else None, *(c.evidence_ids if c else [])] if e],
         ))
     for source, spec in competitors:

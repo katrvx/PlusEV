@@ -170,6 +170,10 @@ class PolicyCandidate(BaseModel):
     validation_delta_vs_simple_rule: float | None = None
     validation_delta_vs_cash: float | None = None
     allocation_mix: dict[str, float] = Field(default_factory=dict, description="share of IN-POSITION decisions at each multiplier")
+    # timing vs taking less risk (diagnostic, reported; not part of the pre-registered selection rule)
+    validation_delta_vs_half_size: float | None = None
+    validation_delta_vs_matched_exposure: float | None = None
+    matched_exposure: float | None = Field(default=None, description="constant size with this gate's average TRAIN size")
     reasons: list[str] = Field(description="arbiter reasons; text quoted from the critic is prefixed 'critic:'")
     evidence_ids: list[str]
 

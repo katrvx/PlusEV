@@ -31,6 +31,16 @@ A filter only changes position size (none, half or full). Checked does not mean 
 
 Also tried on Training only and not taken further (3): Flat when 14-bar average true range is low (≤ 0.008876); Flat when 7-day volatility is low (≤ 0.006409) or 7-day price momentum is low (≤ -0.02482); Flat when 7-day volatility is low (≤ 0.00535).
 
+## Timing or just less risk? (Validation, same costs)
+
+| Filter | vs constant half size | vs constant at its Training size | vs constant at its Validation size | Read |
+|---|---|---|---|---|
+| Half size when 7-day volatility is low (≤ 0.006409) | +15.7 pp | +20.8 pp (constant 0.74x) | +17.0 pp (constant 0.57x) | Beat constant half size and a constant of the same average size on Validation: some evidence of timing, not proof (Validation was also used to select). Its average size changed between Training and Validation, so treat the comparison with care. |
+| Flat when 7-day volatility is low (≤ 0.006409) | +47.1 pp | +46.9 pp (constant 0.49x) | +40.7 pp (constant 0.13x) | Beat constant half size and a constant of the same average size on Validation: some evidence of timing, not proof (Validation was also used to select). Its average size changed between Training and Validation, so treat the comparison with care. |
+| Flat when 7-day volatility is low (≤ 0.00753) | +36.0 pp | +33.0 pp (constant 0.34x) | +28.4 pp (constant 0.06x) | Beat constant half size and a constant of the same average size on Validation: some evidence of timing, not proof (Validation was also used to select). Its average size changed between Training and Validation, so treat the comparison with care. |
+
+Source: `experiments/conditions_check/timing_btc-meanrev-48-demo.json`. Diagnostic only: the selection rule fixed before the run is unchanged.
+
 ## The one held-out look
 
 Beat the original by +27.3 pp (90% interval +15.3 to +36.2 pp). Worst drawdown 60.4% → 36.2%. Its own return was -28.9% — it still lost money.
@@ -65,7 +75,7 @@ Source: `experiments/frozen_look_btc-meanrev-48-demo.json`.
    - *Changed the conclusion:* The filter with the best Validation number (Flat when 7-day volatility is low (≤ 0.006409), +58.2 pp) was rejected by the critic, so it could not be selected.
 7. **Code: selection rule** (Code) — Selected one filter for the held-out test. The rule was fixed before the run: beat the original with an interval above zero, beat cash, change something real, and not be rejected by the critic.
    - Selected: Half size when 7-day volatility is low (≤ 0.006409)
-   - champion agent::vol_median_05_1 beats always-on and cash on validation and passed the critic
+   - champion agent::vol_median_05_1 beats always-on and cash on validation and was not rejected by the critic
 8. **Code: held-out test** (Code) — Opened the held-out test once. Beat the original by +27.3 pp (90% interval +15.3 to +36.2 pp). Worst drawdown 60.4% → 36.2%. Its own return was -28.9% — it still lost money.
    - *Changed the conclusion:* Selection did not become approval: the filter still lost money.
 9. **Lane A arbiter** (Code) — Strategy verdict: KILL. held-out drawdown 60.4% is past the 40% cap and its net-return interval is entirely below zero. The agents' filter is not part of this verdict.
