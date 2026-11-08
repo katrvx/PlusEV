@@ -71,7 +71,21 @@ export type TeamTrial = {
   evidence_id: string | null;
   status: "evaluated" | "refused" | "error";
   note: string;
+  net_return?: number | null;
+  /** Walk-forward train fold (arbiter stability check); null for every policy attempt. */
+  fold?: number | null;
 };
+/** One finding of agent 4 (market sentiment around the best and worst training weeks). */
+export type TeamContextFinding = {
+  finding_id: string;
+  statement: string;
+  episode_ids?: string[];
+  evidence_ids: string[];
+  tally?: string | null;
+  strength: "none" | "weak" | "moderate";
+  caveats?: string[];
+};
+export type TeamContext = { summary: string; findings: TeamContextFinding[]; limitations?: string[] };
 export type TeamCandidate = {
   policy_id: string;
   spec_hash?: string | null;
@@ -99,7 +113,7 @@ export type TeamReport = {
   strategy_health?: NativeStrategyHealth | null;
   validation_always_on?: Pick<NativeMetrics, "net_return" | "ci_net_return">;
   validation_cash_net_return?: number;
-  context?: { summary: string; findings: unknown[]; limitations: string[] };
+  context?: TeamContext | null;
   diagnostic: {
     summary: string;
     hypotheses: TeamHypothesis[];

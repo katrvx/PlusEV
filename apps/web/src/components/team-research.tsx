@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowLeft, Beaker, ChevronDown, ChevronRight, CircleCheck, CircleX, Clock3, FileSearch, FlaskConical, Info, LockKeyhole, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
 import { teamApi, type InvestigationSummary, type InvestigationWrapper, type TeamCandidate, type TeamEvidence, type TeamHypothesis, type TeamReport, type TeamTrial } from "@/lib/team-api";
-import type { FrozenEvaluation } from "../../../../packages/contracts/research";
+import type { FrozenEvaluation, TeamContext } from "../../../../packages/contracts/research";
 import { MascotCallout } from "./redesign/mascot";
 import ResearchSourceBrowser from "./research-source-browser";
 import "./team-research.css";
 
-const pct = (value: number | null) => value === null ? "—" : `${value > 0 ? "+" : ""}${(value * 100).toFixed(2)}%`;
+/** A difference between two policies' returns, in percentage points (matches the sealed card's "p.p."). */
+const pts = (value: number | null) => value === null ? "—" : `${value > 0 ? "+" : ""}${(value * 100).toFixed(1)} p.p.`;
 const when = (value: string) => new Date(value).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 const json = (value: unknown) => JSON.stringify(value, null, 2);
 const splitLabel = (split: TeamTrial["split"]) => split === "train" ? "Training" : split === "validation" ? "Validation" : "New-data test";
@@ -103,9 +104,47 @@ function HypothesisCard({ hypothesis, evidenceById, onEvidence }: { hypothesis: 
   return <article className={`tr-hypothesis ${hypothesis.direction === "works_better" ? "better" : "worse"}`}><div className="tr-hypothesis-top"><span className="tr-hypothesis-id">{hypothesis.hypothesis_id}</span><span className={`tr-confidence ${hypothesis.confidence}`}>{hypothesis.confidence} confidence</span></div><h3>{findingSummary(hypothesis)}</h3><div className="tr-conditions">{hypothesis.conditions.map(condition => <span key={condition}>{conditionLabel(condition)}</span>)}</div><details className="tr-finding-details"><summary>Recorded details <ChevronRight size={13} /></summary><div><p><strong>Recorded statement</strong>{hypothesis.statement}</p><p><strong>Suggested test</strong>{hypothesis.suggested_test}</p>{hypothesis.caveats.length > 0 && <p className="tr-caveat"><Info size={14} />{hypothesis.caveats.join(" ")}</p>}<p className="tr-raw-conditions"><strong>Condition codes</strong>{hypothesis.conditions.map(condition => <code key={condition}>{condition}</code>)}</p></div></details><div className="tr-evidence-chips">{hypothesis.evidence_ids.map(id => <button type="button" key={id} onClick={() => onEvidence(id)} title={evidenceById.has(id) ? evidenceById.get(id)?.tool : "Missing evidence record"}><FileSearch size={12} />View evidence</button>)}</div></article>;
 }
 
-function TrialRow({ trial }: { trial: TeamTrial }) {
+function TrialRow({ trial, orphanFold = false }: { trial: TeamTrial; orphanFold?: boolean }) {
   const refusal = trial.status === "refused";
-  return <tr className={refusal ? "tr-refused" : trial.status === "error" ? "tr-error" : ""}><td><strong>{trial.policy_id}</strong><small>{sourceLabel(trial.source)}</small></td><td><span className="tr-split" title="Training develops the rule; validation checks it before a new-data test.">{splitLabel(trial.split)}</span></td><td className={trial.delta_net_return_vs_always_on !== null && trial.delta_net_return_vs_always_on > 0 ? "tr-positive" : ""}>{pct(trial.delta_net_return_vs_always_on)}</td><td>{trial.ci_delta ? `[${pct(trial.ci_delta[0])}, ${pct(trial.ci_delta[1])}]` : "—"}</td><td><span className={`tr-trial-status ${trial.status}`}>{trial.status === "evaluated" ? <CircleCheck size={13} /> : trial.status === "refused" ? <CircleX size={13} /> : <AlertTriangle size={13} />}{trial.status}</span></td><td>{trial.note || trial.evidence_id || "—"}</td></tr>;
+  const isFold = trial.fold != null;
+  const className = [isFold ? "tr-fold" : "", refusal ? "tr-refused" : trial.status === "error" ? "tr-error" : ""].filter(Boolean).join(" ");
+  const ruleCell = isFold
+    ? <td className="tr-fold-label"><span>Walk-forward fold {trial.fold}</span><small>{orphanFold ? <><code>{trial.policy_id}</code> · </> : null}stability check on one slice of training</small></td>
+    : <td><strong>{trial.policy_id}</strong><small>{sourceLabel(trial.source)}</small></td>;
+  return <tr className={className}>{ruleCell}<td><span className="tr-split" title="Training develops the rule; validation checks it before a new-data test.">{isFold ? "Training fold" : splitLabel(trial.split)}</span></td><td className={trial.delta_net_return_vs_always_on !== null && trial.delta_net_return_vs_always_on > 0 ? "tr-positive" : ""}>{pts(trial.delta_net_return_vs_always_on)}</td><td>{trial.ci_delta ? `[${pts(trial.ci_delta[0])}, ${pts(trial.ci_delta[1])}]` : "—"}</td><td><span className={`tr-trial-status ${trial.status}`}>{trial.status === "evaluated" ? <CircleCheck size={13} /> : trial.status === "refused" ? <CircleX size={13} /> : <AlertTriangle size={13} />}{trial.status}</span></td><td>{isFold ? trial.evidence_id || "—" : trial.note || trial.evidence_id || "—"}</td></tr>;
+}
+
+type TrialGroup = { trial: TeamTrial; folds: TeamTrial[]; orphan?: boolean };
+
+/** Policy attempts (fold null) in log order, each followed by its walk-forward fold checks. */
+function groupTrials(trials: TeamTrial[]): TrialGroup[] {
+  const attempts = trials.filter(trial => trial.fold == null);
+  const lastAttempt = new Map<string, number>();
+  attempts.forEach((trial, index) => lastAttempt.set(trial.policy_id, index));
+  const foldsByAttempt = new Map<number, TeamTrial[]>();
+  const orphans: TeamTrial[] = [];
+  for (const trial of trials) {
+    if (trial.fold == null) continue;
+    const parent = lastAttempt.get(trial.policy_id);
+    if (parent === undefined) orphans.push(trial);
+    else foldsByAttempt.set(parent, [...(foldsByAttempt.get(parent) || []), trial]);
+  }
+  const byFold = (a: TeamTrial, b: TeamTrial) => (a.fold ?? 0) - (b.fold ?? 0);
+  return [
+    ...attempts.map((trial, index) => ({ trial, folds: (foldsByAttempt.get(index) || []).sort(byFold) })),
+    ...orphans.sort(byFold).map(trial => ({ trial, folds: [], orphan: true })),
+  ];
+}
+
+/** Display only: shorten long floats in recorded agent text (0.323252674893775 → 0.323); the recorded statement is unchanged. */
+const tidyNumbers = (text: string) => text.replace(/\d+\.\d{4,}/g, match => { const value = Number(match); return Math.abs(value) >= 10 ? value.toFixed(1) : value.toFixed(3); });
+
+function ContextCard({ context }: { context: TeamContext }) {
+  return <section className="tr-mood panel" aria-labelledby="tr-mood-title">
+    <div className="tr-section-head"><div><span className="eyebrow">MARKET MOOD</span><h2 id="tr-mood-title">Sentiment context</h2><p>Fear &amp; Greed around the best and worst training weeks. Co-occurrence in time only, not a cause.</p></div></div>
+    <p className="tr-mood-summary">{tidyNumbers(context.summary)}</p>
+    {context.findings.length > 0 && <ul className="tr-mood-findings">{context.findings.map(finding => <li key={finding.finding_id}><span className={`tr-strength ${finding.strength}`}>{finding.strength === "none" ? "No signal" : `${finding.strength[0].toUpperCase()}${finding.strength.slice(1)} signal`}</span><p>{tidyNumbers(finding.statement)}</p></li>)}</ul>}
+  </section>;
 }
 
 function CandidateCard({ candidate, historical = false }: { candidate: TeamCandidate; historical?: boolean }) {
@@ -132,6 +171,7 @@ export default function TeamResearch({ initialExperimentId = "", strategyId = ""
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState("");
   const [showAllTrials, setShowAllTrials] = useState(true);
+  const [showFolds, setShowFolds] = useState(true);
   const [focusedEvidence, setFocusedEvidence] = useState<string | null>(null);
   const [view, setView] = useState<"findings" | "tests" | "evidence">("findings");
 
@@ -141,7 +181,10 @@ export default function TeamResearch({ initialExperimentId = "", strategyId = ""
   const report = wrapper?.report;
   const evidenceById = useMemo(() => new Map((report?.evidence || []).map(item => [item.evidence_id, item])), [report]);
   const selectedSummary = summaries.find(item => item.experiment_id === selectedId);
-  const displayedTrials = showAllTrials ? report?.trial_log || [] : (report?.trial_log || []).filter(item => item.status !== "refused");
+  const trialGroups = useMemo(() => groupTrials(report?.trial_log || []), [report]);
+  const displayedGroups = trialGroups.filter(group => (showAllTrials || group.trial.status !== "refused") && (showFolds || !group.orphan));
+  const foldCount = (report?.trial_log || []).filter(item => item.fold != null).length;
+  const runCount = (report?.trial_log.length || 0) - foldCount;
   const sealedEvaluation = frozenEvaluation?.experiment_id === report?.experiment_id && frozenEvaluation?.strategy_id === report?.strategy_id ? frozenEvaluation : frozenLook(wrapper);
   const verdict = report ? reportVerdict(report, sealedEvaluation) : null;
   useEffect(() => { if (report?.experiment_id) document.getElementById("tr-verdict-title")?.focus({ preventScroll: true }); }, [report?.experiment_id]);
@@ -180,11 +223,12 @@ export default function TeamResearch({ initialExperimentId = "", strategyId = ""
           <section className="tr-section panel" data-guide-target="evidence-finding"><div className="tr-section-head"><div><span className="eyebrow">STRENGTHS & WEAK SPOTS</span><h2>What held up?</h2><p>Each finding is a question you can inspect, not a promise.</p></div><Sparkles size={18} className="purple" /></div><div className="tr-hypotheses">{report.diagnostic.hypotheses.map(hypothesis => <HypothesisCard key={hypothesis.hypothesis_id} hypothesis={hypothesis} evidenceById={evidenceById} onEvidence={id => { setView("evidence"); setFocusedEvidence(id); }} />)}</div>
           {report.diagnostic.rejected_explanations.length > 0 && <details className="tr-rejected"><summary><CircleX size={16} />Explanations that did not hold up <span>{report.diagnostic.rejected_explanations.length}</span><ChevronDown size={16} /></summary><ul>{report.diagnostic.rejected_explanations.map(item => <li key={item}>{item}</li>)}</ul></details>}</section>
           <section className="tr-summary-panel panel"><div className="tr-panel-kicker"><span className="eyebrow">RECORDED ANALYST SUMMARY</span><ModeBadge item={report} compact /></div><p>{report.diagnostic.summary}</p><p className="tr-summary-help">This is the summary recorded by the research run. Returns include the listed costs; it is evidence for review, not a promise about future performance.</p></section>
+          {report.context && <ContextCard context={report.context} />}
         </div>
         <aside className="tr-findings-aside"><section className="tr-next-card"><span className="tr-next-symbol"><FlaskConical size={25} /></span><span className="eyebrow">SECONDARY DETAIL</span><h2>Rules under pressure.</h2><p>Accepted, refused, and failed trials stay in the Rules tested tab. Use it to inspect the historical selection and its alternatives.</p><span className="tr-next-foot"><LockKeyhole size={13} />{sealedEvaluation ? "Sealed look recorded · paper plan locked" : report.champion_policy_id ? "Candidate awaits a sealed look" : "No candidate earned a sealed look"}</span></section>
         <details className="tr-limits-card"><summary><Info size={16} />What to keep in mind<ChevronDown size={15} /></summary><ul>{[...report.diagnostic.limitations, ...report.limitations].map((limitation, index) => <li key={index}>{limitation}</li>)}</ul></details></aside>
       </div>}
-      {view === "tests" && <div className="tr-tests-view" data-guide-target="evidence-path"><section className="tr-section panel"><div className="tr-section-head"><div><span className="eyebrow">THE CHALLENGE LOG</span><h2>Rules under pressure.</h2><p>{report.n_policies_tried} distinct policies across {report.trial_log.length} recorded trial rows.</p></div><button className="tr-toggle" onClick={() => setShowAllTrials(current => !current)}>{showAllTrials ? "Hide refusals" : "Show refusals"}<ChevronDown size={14} /></button></div><div className="tr-table-wrap"><table className="tr-table"><thead><tr><th>Trading rule</th><th><span title="Training data develops the rule; validation data is the check before a new-data test.">Research stage <Info size={12} /></span></th><th><span title="The measured return change compared with leaving the original strategy on.">Change vs always-on <Info size={12} /></span></th><th><span title="A 90% uncertainty range around the measured change; it is not a guarantee.">Likely range <Info size={12} /></span></th><th>Status</th><th>Evidence / note</th></tr></thead><tbody>{displayedTrials.map((trial, index) => <TrialRow key={`${trial.policy_id}-${trial.split}-${index}`} trial={trial} />)}</tbody></table></div><p className="tr-table-help"><strong>How to read this:</strong> Training develops the rule; validation checks it before a new-data test. Change vs always-on compares with leaving the original strategy running. The likely range shows uncertainty around that measured change.</p></section>
+      {view === "tests" && <div className="tr-tests-view" data-guide-target="evidence-path"><section className="tr-section panel"><div className="tr-section-head"><div><span className="eyebrow">THE CHALLENGE LOG</span><h2>Rules under pressure.</h2><p>{report.n_policies_tried} distinct policies across {runCount} recorded runs{foldCount > 0 ? `, plus ${foldCount} walk-forward fold checks listed under their policy. Folds are stability checks, not extra attempts` : ""}.</p></div><div className="tr-toggles">{foldCount > 0 && <button className="tr-toggle" onClick={() => setShowFolds(current => !current)}>{showFolds ? "Hide folds" : "Show folds"}<ChevronDown size={14} /></button>}<button className="tr-toggle" onClick={() => setShowAllTrials(current => !current)}>{showAllTrials ? "Hide refusals" : "Show refusals"}<ChevronDown size={14} /></button></div></div><div className="tr-table-wrap"><table className="tr-table"><thead><tr><th>Trading rule</th><th><span title="Training data develops the rule; validation data is the check before a new-data test.">Research stage <Info size={12} /></span></th><th><span title="The measured return change compared with leaving the original strategy on, in percentage points.">Change vs always-on <Info size={12} /></span></th><th><span title="A 90% uncertainty range around the measured change, in percentage points; it is not a guarantee.">Likely range <Info size={12} /></span></th><th>Status</th><th>Evidence / note</th></tr></thead><tbody>{displayedGroups.flatMap((group, index) => [<TrialRow key={`${group.trial.policy_id}-${group.trial.split}-${group.trial.fold ?? "run"}-${index}`} trial={group.trial} orphanFold={group.orphan} />, ...(showFolds ? group.folds.map(fold => <TrialRow key={`${fold.policy_id}-fold-${fold.fold}-${index}`} trial={fold} />) : [])])}</tbody></table></div><p className="tr-table-help"><strong>How to read this:</strong> Training develops the rule; validation checks it before a new-data test. Change vs always-on compares with leaving the original strategy running, in percentage points. A walk-forward fold re-checks a policy on one slice of training; it is a stability check, not another attempt. The likely range shows uncertainty around that measured change.</p></section>
         <section className="tr-section panel"><div className="tr-section-head"><div><span className="eyebrow">CANDIDATES FOR FURTHER TESTING</span><h2>What can move forward?</h2><p>{sealedEvaluation ? "Historical selection is shown separately from the sealed result." : "Readiness for a new-data test does not establish profitability."}</p></div><span className="tr-count">{report.candidates.length}</span></div><div className="tr-candidates">{report.candidates.map(candidate => <CandidateCard key={candidate.policy_id} candidate={candidate} historical={Boolean(sealedEvaluation && candidate.policy_id === report.champion_policy_id)} />)}</div></section>
         <div className="tr-evidence-shortcut"><FileSearch size={18} /><p>Every result has a source. Inspect the technical tool outputs behind this comparison.</p><button className="button secondary" onClick={()=>setView("evidence")}>Open evidence <ChevronRight size={15} /></button></div>
       </div>}

@@ -1193,3 +1193,24 @@
   .kk-body .kk-app .tr-judge-report .tr-hero-mascot { min-height: 300px; margin-top: 12px; }
 }
 .kk-app .tr-judge-report .tr-evidence-view { grid-template-columns: 1fr; gap: 32px; }
+
+/* Lane B: sentiment context card (agent 4) and walk-forward fold rows */
+.tr-mood { padding: 18px 0; border-top: 1px solid var(--kk-line, #d7c9be); }
+.tr-mood-summary { margin: 4px 0 14px; max-width: 860px; color: var(--kk-text, #241626); font-size: 14px; line-height: 1.65; }
+.tr-mood-findings { list-style: none; margin: 0; padding: 0; }
+.tr-mood-findings li { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 14px; padding: 12px 0; border-top: 1px solid #e6dbd2; }
+.tr-mood-findings p { margin: 0; color: #6d5f6d; font-size: 13px; line-height: 1.6; }
+.tr-strength { align-self: start; justify-self: start; padding: 3px 7px; border-radius: 4px; background: #f4efe8; color: #6d5f6d; font-size: 11px; white-space: nowrap; }
+.tr-strength.weak { background: rgba(183, 135, 43, .12); color: #795b25; }
+.tr-strength.moderate { background: rgba(192, 74, 19, .1); color: var(--kk-accent, #c04a13); }
+.tr-toggles { display: flex; flex: none; flex-wrap: wrap; gap: 8px; }
+.tr-toggles .tr-toggle { white-space: nowrap; }
+.tr-table tr.tr-fold td { padding-top: 8px; padding-bottom: 8px; background: #faf6f0; font-size: 12px; }
+.tr-table tr.tr-fold td.tr-fold-label { position: relative; padding-left: 38px; }
+.tr-table tr.tr-fold td.tr-fold-label::before { content: ""; position: absolute; left: 22px; top: 0; bottom: 50%; width: 9px; border-left: 1px solid var(--kk-boundary, #9e8c99); border-bottom: 1px solid var(--kk-boundary, #9e8c99); }
+.tr-fold-label > span { display: block; color: #6d5f6d; }
+@media (max-width: 640px) {
+  .tr-mood-findings li { grid-template-columns: 1fr; gap: 6px; }
+  .tr-table tr.tr-fold td.tr-fold-label { padding-left: 26px; }
+  .tr-table tr.tr-fold td.tr-fold-label::before { left: 12px; }
+}
