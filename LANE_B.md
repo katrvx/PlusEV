@@ -54,7 +54,7 @@ Round 3 (7 Nov evening) started from the first full `mode=llm` runs on Lane A's 
 
 Lane A meanwhile fixed the four contract gaps Lane B reported: compounded cost rows (`switching` is 0 for the unchanged strategy), in-position `allocation_mix` with `n_decisions`/`n_in_position`, a bootstrap seeded by the spec body with 2000 draws, and LightGBM calibrated on late train with its seed and model hash in `spec()`. With the old 0.45/0.55 cut that LightGBM sat at 0.5 on 99% of in-position validation bars, and Lane B flagged it as degenerate. Lane A then switched to a band of the train-tail base rate ± 2 points. It is no longer degenerate, but it loses: −17.7% vs always-on on validation and 0/3 on Lane A's refit walk-forward.
 
-The committed artifact `experiments/investigation_argon_lane_a.json` is the final Argon run (8 Nov, morning), on the code with walk-forward folds and the strategy-health check. All three agents ran on Argon (`mode=llm`), and the holdout was not accessed. The proposer submitted three gates: `fear_greed > 53` at full/zero, the same at full/half, and low volatility at full/half. The critic rejected all three. It used both new tools on its own. From `strategy_health` it cited the sentiment shift (50.67% fear on train to 99.31% on validation, total variation 0.4864), which leaves the Fear & Greed gates off or at half size 99% of the time. From the walk-forward folds it showed that the shift had already started in the last train fold (gate off 90.69% of the time). It also found that each gate fails its own falsification test (validation Sharpe below always-on). The volatility gate switched more often than always-on (70 vs 50). No gate beats cash, so the verdict is INCONCLUSIVE. The verifier rejected three outputs. One was a correct catch (`twenty` written as a word). The other two were false positives that are now fixed: `14` in '14-day blocks', which the evidence only stated as 336 bars, and the 20-trade threshold written in a form the verifier did not recognise.
+Those morning runs used Lane A's earlier Nov 2024 – Oct 2026 window. The committed artifacts are now the reruns on the 2018–2026 book; see "Two strategies on real data" below.
 
 A third independent review (round 3) then attacked everything above: 13 findings, all reproduced. Critical: after the walk-forward change, rule (c) (no degenerate gate) only ran when fold results existed, so a degenerate gate approved by an LLM critic could reach the sealed test on a runner without folds. Fixed, with a regression test on the stand-in runner. Also fixed:
 - verifier leaks: `.9876`, a Unicode minus, numbers like `0.3` passing for 0.251, `2e2 trades`, a bare `20`, written zeros, and free numbers drawn from upload ids;
@@ -80,7 +80,7 @@ On real data, for both strategies, sentiment flips do not line up with the best 
 
 Spec section 8: a poor result alone is not proof that a strategy broke. Code, not an agent, cuts the unchanged strategy's validation period into 14-day blocks. It compares each block with Lane A's train-only 14-day range (5th to 95th percentile of block-bootstrapped train paths). About 5% of blocks should fall below that range by chance. If more do (one-sided binomial p < 0.05), the result is `outside_training_range`; otherwise it is `within_training_range`. It also checks which assumption changed between train and validation: exposure, turnover per bar, cost per bar, bar volatility (ratio outside 2/3–3/2), and how often each regime occurs (total variation ≥ 0.25). The thresholds are fixed in the module. Because the check reads validation, only the critic can call it (`strategy_health` tool) and it appears in the report (`strategy_health`, plus a line in `verdict_basis`). The fallback critic notes when the regime behind a gate's feature shifted.
 
-On real data: 10 of 10 validation blocks fall inside the train range [−9.1%, +10.1%]. The −7.1% validation loss is therefore not by itself evidence that the strategy broke. One assumption did change: sentiment went from about 51% "fear" bars on train to 99% on validation. That is exactly why the agent's Fear & Greed gate collapsed.
+On the 2018–2026 book: for trend, 43 of 45 validation blocks fall inside the range and 2 above it. For mean reversion, all 45 fall inside, but its normal range is a losing one (research net −90%). It is not unlucky and not broken: it never worked, and Lane A's sealed test says KILL. On the earlier 2-year window, the check had separated the two (10/10 inside vs 3/10 below).
 
 ## Two strategies on real data
 
@@ -95,38 +95,6 @@ Lane A's 2018-02 → 2026-10 hourly BTCUSDT book (research → 2023-05, validati
 | Sealed test (one look) | Lane A arbiter: INCONCLUSIVE | Gate vs always-on +27.3% (90% CI +15.3% … +36.2%), max drawdown 60.4% → 36.2%, but net −28.9%. Lane A arbiter: KILL |
 
 Reports: `experiments/investigation_argon_lane_a.json`, `experiments/investigation_argon_meanrev.json`. The sealed look is `experiments/frozen_look_btc-meanrev-48-demo.json`. It was taken after the report that chose the champion was committed (`ad3dff1`).
-
-## Agent 4: context (`context.py`)
-
-The spec's fourth agent is a context and news analyst. There is no news archive with first-seen timestamps, so this agent works on market sentiment (Fear & Greed), which Lane A joins point-in-time (each daily value as of its next-day availability). Code (`sentiment_episodes`, TRAIN only) picks the unchanged strategy's 4 worst and 4 best non-overlapping weeks (168 bars). For each week it records the Fear & Greed level, its 7-day change, and whether a greed-to-fear or fear-to-greed flip (across 50) happened in the 3 days before the week started. It also gives the train base rate of such flips and a one-sided binomial p-value. The agent writes findings that cite this evidence and name the weeks they use. The verifier rejects:
-- causal language ("because", "caused", "led to"…);
-- invented numbers;
-- unknown episode ids;
-- strength `moderate` unless a cited p-value is below 0.10.
-
-The findings go to the proposer as context only; gates are still based on the diagnostic hypotheses. Without a sentiment series (the stand-in), the stage is skipped and disclosed.
-
-On real data, for both strategies, sentiment flips do not line up with the best or worst weeks more often than chance (0 or 1 of 4 against base rates around 0.12). That is reported as a finding.
-
-## Bad luck vs broken (`health.py`)
-
-Spec section 8: a poor result alone is not proof that a strategy broke. Code, not an agent, cuts the unchanged strategy's validation period into 14-day blocks. It compares each block with Lane A's train-only 14-day range (5th to 95th percentile of block-bootstrapped train paths). About 5% of blocks should fall below that range by chance. If more do (one-sided binomial p < 0.05), the result is `outside_training_range`; otherwise it is `within_training_range`. It also checks which assumption changed between train and validation: exposure, turnover per bar, cost per bar, bar volatility (ratio outside 2/3–3/2), and how often each regime occurs (total variation ≥ 0.25). The thresholds are fixed in the module. Because the check reads validation, only the critic can call it (`strategy_health` tool) and it appears in the report (`strategy_health`, plus a line in `verdict_basis`). The fallback critic notes when the regime behind a gate's feature shifted.
-
-On real data: 10 of 10 validation blocks fall inside the train range [−9.1%, +10.1%]. The −7.1% validation loss is therefore not by itself evidence that the strategy broke. One assumption did change: sentiment went from about 51% "fear" bars on train to 99% on validation. That is exactly why the agent's Fear & Greed gate collapsed.
-
-## Two strategies on real data
-
-Both of Lane A's demo strategies on the same BTCUSDT 1h snapshot (validation results; the test stays sealed):
-
-| | `btc-trend-24-72-demo` | `btc-meanrev-48-demo` |
-|---|---|---|
-| Train net (gross) | +5.1% (+27.8%) | −22.0% (+10.4%): costs eat the edge |
-| Validation always-on | −7.1%, 90% CI spans zero | −40.3%, 90% CI entirely below zero |
-| Bad luck vs broken | `within_training_range`: 10/10 two-week blocks inside the train range. Sentiment shifted | `outside_training_range`: 3/10 blocks below the range, more than chance. Cost per bar and sentiment shifted |
-| Agent gates (Argon) | 3 proposed, all vetoed by the critic. The Fear & Greed gates are off or at half size 99% of validation after the sentiment shift, and each fails its own falsification test | 3 proposed, all approved by the critic. The best, high volatility plus a drawdown, is +14.8% vs always-on (CI above zero), wins 3/3 train folds and beats the regime filter by 4.3%. It still nets −25.5%, so the code rejects every gate for losing to cash |
-| Lane B verdict | INCONCLUSIVE: looks like bad luck plus a regime change | INCONCLUSIVE, with a note to Lane A's arbiter that the strategy loses to cash. A gate that loses less does not make it profitable: a kill candidate |
-
-Reports (both Gemini 4 Argon, `mode=llm`, no agent failures, holdout not accessed): `experiments/investigation_argon_lane_a.json` and `experiments/investigation_argon_meanrev.json`.
 
 ## Run on Lane A
 
