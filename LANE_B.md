@@ -78,10 +78,10 @@ Both of Lane A's demo strategies on the same BTCUSDT 1h snapshot (validation res
 | Train net (gross) | +5.1% (+27.8%) | −22.0% (+10.4%): costs eat the edge |
 | Validation always-on | −7.1%, 90% CI spans zero | −40.3%, 90% CI entirely below zero |
 | Bad luck vs broken | `within_training_range`: 10/10 two-week blocks inside the train range. Sentiment shifted | `outside_training_range`: 3/10 blocks below the range, more than chance. Cost per bar and sentiment shifted |
-| Best agent gate | `fear_greed > 53`, rejected: off 99% of validation after the sentiment shift | flat in low volatility: +14.3% vs always-on (CI above zero), 3/3 train folds, +3.8% vs the regime filter, but still −26% net, so it loses to cash and is rejected |
-| Lane B verdict | INCONCLUSIVE: looks like bad luck plus a regime change | INCONCLUSIVE for the gate, with a note to Lane A's arbiter that the strategy loses to cash: a kill candidate |
+| Agent gates (Argon) | 3 proposed, all vetoed by the critic. The Fear & Greed gates are off or at half size 99% of validation after the sentiment shift, and each fails its own falsification test | 3 proposed, all approved by the critic. The best, high volatility plus a drawdown, is +14.8% vs always-on (CI above zero), wins 3/3 train folds and beats the regime filter by 4.3%. It still nets −25.5%, so the code rejects every gate for losing to cash |
+| Lane B verdict | INCONCLUSIVE: looks like bad luck plus a regime change | INCONCLUSIVE, with a note to Lane A's arbiter that the strategy loses to cash. A gate that loses less does not make it profitable: a kill candidate |
 
-Reports: `experiments/investigation_argon_lane_a.json` (Argon) and `experiments/investigation_lane_a_btc-meanrev-48-demo_deterministic_fallback.json` (deterministic agents).
+Reports (both Gemini 4 Argon, `mode=llm`, no agent failures, holdout not accessed): `experiments/investigation_argon_lane_a.json` and `experiments/investigation_argon_meanrev.json`.
 
 ## Run on Lane A
 

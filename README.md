@@ -8,6 +8,44 @@ AgentVerse 2026 · Finance track (supported by Jane Street) · UCL · 7–8 Nove
 
 Hackathon MVP. Paper-only. Not a claim of validated alpha.
 
+## For judges: a 2-minute tour
+
+**What it does.** You give it an existing trading strategy, and it never changes the strategy's signals. AI agents work out when the strategy has an edge: which trend, volatility, liquidity and sentiment regimes it makes money in. They propose a simple on/off rule (a "gate"). Deterministic code then decides, by a rule fixed in advance, whether that gate deserves a test on data nobody has looked at.
+
+**Real result on real data.** Binance BTCUSDT 1h, Nov 2024 to Oct 2026, with Fear & Greed. Two strategies, agents on Gemini 4 Argon, and these are validation-stage results; the final test window is still sealed:
+
+| | Trend (`btc-trend-24-72-demo`) | Mean reversion (`btc-meanrev-48-demo`) |
+|---|---|---|
+| Strategy as-is, validation | −7.1%, 90% CI spans zero | −40.3%, 90% CI below zero |
+| Bad luck or broken? | 10/10 two-week blocks inside the train range, so the loss alone is not evidence it broke. Sentiment flipped from 51% to 99% "fear" | 3/10 blocks below the range (more than chance), so it does not behave like it did in training |
+| Agent gates | 3 proposed, all vetoed by the AI critic: the Fear & Greed gates were off 99% of the time after the sentiment shift, and each failed its own falsification test | 3 proposed, all approved by the critic (best: +14.8% vs as-is, 3/3 train folds). The code still rejected them: they lose money, so they lose to cash |
+| What it means | Don't kill; monitor | Kill candidate: a filter that loses less is not a fix |
+
+The agents propose and explain; **code computes every number and makes every decision.**
+
+**Where to look**
+
+| What | Where |
+|---|---|
+| The two agent reports (every claim cites an evidence id from a real tool call) | `experiments/investigation_argon_lane_a.json`, `experiments/investigation_argon_meanrev.json`, or the web app → Explore → Evidence → *Open agent report* |
+| How the agents are kept honest | [`LANE_B.md`](LANE_B.md): number verifier, sealed holdout, pre-registered rule, three adversarial reviews |
+| Data, costs, baselines, arbiter, 14-day paper plan | [`A/README.md`](A/README.md) |
+| Web app and API | [`LANE_C.md`](LANE_C.md) |
+| Where we deliberately cut scope | [`docs/LANE_B_DIVERGENCE.md`](docs/LANE_B_DIVERGENCE.md), and the `limitations` list in each report |
+
+**Run it** (Python 3.11+, Node 22+; on macOS `brew install libomp` for LightGBM):
+
+```bash
+pip install -r requirements-lane-b.txt -r requirements-lane-c.txt && npm ci
+python3 -m pytest -q tests/ A/tests                              # 196 tests: leakage, costs, holdout, verifier, API
+python3 -m uvicorn apps.api.main:app --port 8000 &                # API
+npm run dev                                                        # web app on http://127.0.0.1:3000
+python3 scripts/run_investigation.py --lane-a --fallback          # agents without an API key (deterministic)
+KOK_AGENT_MODEL=google:gemini-4-argon GEMINI_API_KEY=... python3 scripts/run_investigation.py --lane-a   # LLM agents
+```
+
+**Honest limits.** Two years of data covers roughly one market cycle, so few regime effects survive. No news archive with first-seen timestamps exists for us, so news is not used (the point-in-time news store is built and tested). The 14-day paper plan is recorded, not run. Nothing here trades real money.
+
 ---
 
 ## The problem
