@@ -85,7 +85,7 @@ function HealthCard({ health, alwaysOnNet }: { health: NonNullable<TeamReport["s
   const within = health.status === "within_training_range";
   const outsideStatus = health.status === "outside_training_range";
   const status = within ? "Behaves as in training" : outsideStatus ? "Not behaving like training" : health.status.replaceAll("_", " ");
-  const lostToo = within && typeof alwaysOnNet === "number" && alwaysOnNet < 0 ? " It lost money in training too." : "";
+  const lostToo = within && typeof alwaysOnNet === "number" && alwaysOnNet < 0 ? " It lost money on validation too." : "";
   const statusDetail = (within ? "Validation results stay inside the range this strategy produced in training." : outsideStatus ? "Validation results left the range this strategy produced in training." : "") + lostToo;
   const horizon = range?.horizon_days ?? (range ? range.horizon_bars / 24 : null);
   const counts = { inside: blocks.filter(block => block.position === "inside").length, below: blocks.filter(block => block.position === "below").length, above: blocks.filter(block => block.position === "above").length };
