@@ -14,6 +14,7 @@ FEATURE_COLUMNS = (
     "momentum_24h",
     "momentum_7d",
     "realized_vol_7d",
+    "vol_ratio_24h_7d",
     "atr_14",
     "price_drawdown",
     "volume_zscore",
@@ -21,7 +22,15 @@ FEATURE_COLUMNS = (
     "news_sentiment",
 )
 
-MARKET_FEATURES = ("momentum_24h", "momentum_7d", "realized_vol_7d", "atr_14", "price_drawdown", "volume_zscore")
+MARKET_FEATURES = (
+    "momentum_24h",
+    "momentum_7d",
+    "realized_vol_7d",
+    "vol_ratio_24h_7d",
+    "atr_14",
+    "price_drawdown",
+    "volume_zscore",
+)
 
 
 class TemporalLeakError(ValueError):
@@ -56,13 +65,18 @@ def market_features(ohlcv: pd.DataFrame) -> pd.DataFrame:
     vol_ma = volume.rolling(168, min_periods=168).mean()
     vol_sd = volume.rolling(168, min_periods=168).std()
     peak = close.rolling(168, min_periods=168).max()
+    vol_24h = ret.rolling(24, min_periods=24).std()
+    vol_7d = ret.rolling(168, min_periods=168).std()
     return pd.DataFrame(
         {
             "momentum_24h": log_close - log_close.shift(24),
             "momentum_7d": log_close - log_close.shift(168),
-            "realized_vol_7d": ret.rolling(168, min_periods=168).std(),
+            "realized_vol_7d": vol_7d,
+            # Recent volatility divided by its own 7-day baseline. Above 1 means the last day is livelier than the week.
+            "vol_ratio_24h_7d": vol_24h / vol_7d.where(vol_7d > 0),
             "atr_14": true_range.rolling(14, min_periods=14).mean() / close.where(close > 0),
             "price_drawdown": close / peak.where(peak > 0) - 1.0,
+            # Volume proxy only. The book has no spread, depth, or quoted-slippage history.
             "volume_zscore": (volume.rolling(24, min_periods=24).mean() - vol_ma) / vol_sd.where(vol_sd > 0),
         }
     )

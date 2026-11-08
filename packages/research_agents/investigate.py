@@ -34,6 +34,7 @@ from packages.meta_policy import LGBM_UNAVAILABLE, rule_gate_spec
 
 from . import fallback
 from .agents import configured_model, model_name, run_context, run_critic, run_diagnostic, run_proposer
+from .presentation import present
 from .models import CritiqueSet, InvestigationReport, PolicyCandidate, ProposalSet
 from .health import strategy_health
 from .tools import ToolContext, spec_hash
@@ -361,7 +362,7 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
         limitations.append(f"Agent mode '{mode}': some or all agent stages ran as deterministic fallback.")
 
     to_test = [c.policy_id for c in candidates if c.status in ("accepted_for_frozen_test", "competitor")]
-    return InvestigationReport(
+    report = InvestigationReport(
         experiment_id=exp.experiment_id, strategy_id=exp.strategy_id, generated_at=datetime.now(timezone.utc),
         agent_mode=mode, model_id=model_name(model), agent_failures=failures, verdict=verdict, verdict_basis=basis,
         champion_policy_id=champion[1]["policy_id"] if champion else None,
@@ -374,3 +375,8 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
         n_policies_tried=len(all_specs), holdout_accessed=ctx.holdout_accessed,
         strategy_health=ctx.health, context=context,
     )
+    try:   # presentation is optional: a failure here must never cost the report
+        report.presentation = present(report).model_dump(mode="json")
+    except Exception as exc:  # noqa: BLE001
+        report.limitations.append(f"Plain-language summary not built: {type(exc).__name__}: {exc}")
+    return report

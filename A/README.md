@@ -9,6 +9,7 @@ Quant and data for Keep or Kill. The package is [`kok_a`](kok_a/__init__.py). It
 - [Strategies and cost](#strategies-and-cost)
 - [Splits](#splits)
 - [Engine](#engine)
+- [Train gate and validation benchmarks](#train-gate-and-validation-benchmarks)
 - [Sealed results](#sealed-results)
 - [Run](#run)
 
@@ -72,16 +73,29 @@ The test is the last 20%. `GateRunner.evaluate` refuses it. `run_experiment` sco
 
 | Piece | Where | What it is |
 |---|---|---|
-| Features | [`features.py`](kok_a/features.py) | 24h and 7d momentum, 7d realised vol, 14-bar ATR, 7d drawdown, volume z-score, Fear & Greed. Row t uses bars up to t. |
-| Regimes | [`regimes.py`](kok_a/regimes.py) | Trend, volatility, liquidity, sentiment. Cutpoints fit on train only. |
+| Features | [`features.py`](kok_a/features.py) | 24h and 7d momentum, 7d realised vol, 24h vol divided by that 7d vol, 14-bar ATR, 7d drawdown, volume z-score, Fear & Greed. Row t uses bars up to t. |
+| Regimes | [`regimes.py`](kok_a/regimes.py) | 24h trend, 7d trend, vol level, vol versus its 7d baseline, volume, sentiment. Cutpoints fit on train only. The names are not a claim that bullish or calm is good. |
 | Simple rule | [`gates.py`](kok_a/gates.py) | Full size only when lagged momentum is positive and 7d vol is at or below the train median. Otherwise 0. |
-| Regime filter | [`regimes.py`](kok_a/regimes.py) | Train buckets whose return interval sits entirely above or below zero. |
+| Regime filter | [`regimes.py`](kok_a/regimes.py) | Train buckets whose bar-return interval sits entirely above zero get 1. Buckets entirely below zero get 0. A bar matching any full-size bucket is on, unless it also matches a flat bucket. |
+| Exposure benchmarks | [`gates.py`](kok_a/gates.py) | Constant half-size, and a constant frozen to the gate's average train exposure. Lower drawdown alone is not the comparison. |
 | LightGBM | [`lgbm_gate.py`](kok_a/lgbm_gate.py) | Fit on early in-market train rows. Calibrated on the last 25% of those rows. Band is that tail's base rate ± 2 points. |
 | Walk-forward | [`experiment.py`](kok_a/experiment.py) | Four expanding folds inside train, 2-bar embargo. They do not pick the sealed policy. |
 | Metrics | [`experiment.py`](kok_a/experiment.py) | Net return, Sharpe, Sortino, 5% CVaR, drawdown, exposure, turnover, average holding time. Block bootstrap, 2,000 draws. |
 | Arbiter | [`arbiter.py`](kok_a/arbiter.py) | An interval that contains zero is `INCONCLUSIVE`. Drawdown above 40% cannot become a keep or a conditional activation. |
 | Paper plan | [`paper.py`](kok_a/paper.py) | 336 hourly bars. Recorded, not started. The book ends at 2026-10-31 23:00 UTC, so the log has no fills. |
 | Control | [`market.py`](kok_a/market.py) | `synthetic-btcusdt-1h-v1`, for fill, leakage, cost, and arbiter checks. Not the demo. |
+
+## Train gate and validation benchmarks
+
+The rule below is fit on train only, with 2,000 block-bootstrap draws, seed 7. Validation is the check. The sealed test was not used to choose it. No spread, order-book depth, or quoted-slippage history is in the book. `volume_zscore` is traded volume against its own 7-day baseline. Fear & Greed is the next-UTC-day index. News is absent.
+
+A bucket is full size only when its train interval lies entirely above zero, and flat only when that interval lies entirely below zero. Every other bucket is left out of the rule.
+
+Trend `btc-trend-24-72-demo`, full size when any of these is true, otherwise flat: 24h trend bull, 7d trend bull, 7d vol low, volume deep, Fear & Greed greed. No train bucket was entirely below zero. Vol-versus-baseline did not clear zero. On validation the gate's compounded net is +114.1% (drawdown 34.7%, exposure 0.55). Always-on is +134.4% at exposure 0.55. The train-matched constant (0.95) is +125.1%. Half-size is +57.0%. The simple rule is −25.6%. The gate does not beat staying on, or staying on at the same average size.
+
+Mean reversion `btc-meanrev-48-demo`, flat when any of these is true, otherwise full size: 24h trend bull, 7d trend sideways, 7d vol low. No train bucket was entirely above zero. Volume, vol-change, and sentiment did not clear zero. On validation the gate's compounded net is +38.8% (drawdown 12.0%, exposure 0.03). Always-on is −19.5% at exposure 0.35. Half-size is −8.4%. The train-matched constant (0.36) is −5.7% at exposure 0.13. Cash is 0. The simple rule is −40.7%. The gate's validation exposure is lower than that frozen constant, because those flat conditions cover more of validation than of train.
+
+Lane B still chooses its own gate from `packages/research_agents/allowlist.py`. `vol_ratio_24h_7d` is on this frame and is not in that allowlist.
 
 ## Sealed results
 

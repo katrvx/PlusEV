@@ -200,6 +200,8 @@ class InvestigationReport(BaseModel):
     holdout_accessed: bool = False
     strategy_health: dict | None = None   # bad luck vs broken (spec section 8); code-computed, see health.py
     context: ContextReport | None = None  # agent 4: sentiment around the best/worst train weeks (context.py)
+    # optional plain-language view built by code from the fields above (presentation.py); adds no numbers or decisions
+    presentation: dict | None = None
 
 
 __all__ = [
