@@ -10,18 +10,24 @@ Hackathon MVP. Paper-only. Not a claim of validated alpha.
 
 ## For judges: a 2-minute tour
 
-**What it does.** You give it an existing trading strategy, and it never changes the strategy's signals. AI agents work out when the strategy has an edge: which trend, volatility, liquidity and sentiment regimes it makes money in. They propose a simple on/off rule (a "gate"). Deterministic code then decides, by a rule fixed in advance, whether that gate deserves a test on data nobody has looked at.
+**What it does.** You give it an existing trading strategy, and it never changes the strategy's signals. AI agents work out when the strategy has an edge: which trend, volatility, liquidity and sentiment regimes it makes money in. They propose a simple on/off rule (a "gate"). Deterministic code then decides, by a rule fixed in advance, whether that gate deserves a single test on data held back from the research.
 
-**Real result on real data.** Binance spot BTCUSDT hourly bars, 2018-02-01 to 2026-10-31, with Fear & Greed. Research period 2018-02 → 2023-05, validation 2023-05 → 2025-02, and a sealed test 2025-02 → 2026-10 opened once. Two strategies whose parameters and costs (10 bp + 1 bp) were fixed before the run. Agents on Gemini 4 Argon:
+**Real result on real data.** Binance spot BTCUSDT hourly bars, 2018-02-01 to 2026-10-31, with Fear & Greed. Research period 2018-02 → 2023-05, validation 2023-05 → 2025-02, test 2025-02 → 2026-10, scored once. The two demo strategies and their costs (10 bp + 1 bp) were fixed before the run. Agents ran on Gemini 4 Argon. Differences between a gate and the strategy as-is are in percentage points (pp):
 
 | | Trend (`btc-trend-24-72-demo`) | Mean reversion (`btc-meanrev-48-demo`) |
 |---|---|---|
 | Strategy as-is | Research +276%; validation +134% (90% CI +14% … +413%) | Research −90%; validation −19% |
-| Unlucky or broken? | 43 of 45 two-week blocks inside the normal range (2 above it) | 45 of 45 inside, but its normal range is losing money: it never worked |
-| Agent gates | 3 proposed, **all vetoed by the critic**. The best, "trade only when Fear & Greed > 28", beat as-is by 32% on validation, but sentiment had flipped to greed (fear fell from 51% to 10% of the time), so the gate was simply on 97% of the time and lost 48% on the first research fold | **Champion found**: half size when 7-day volatility is below its research median. Validation +26.8% vs as-is (CI above zero), 3/3 research folds, critic approved |
-| Sealed test, one look | Lane A arbiter: **INCONCLUSIVE** (intervals contain zero) | Gate vs as-is **+27.3%, 90% CI +15.3% … +36.2%**, drawdown 60% → 36%: the improvement held. But the gated strategy still lost 29%. Lane A arbiter: **KILL** |
+| Unlucky or broken? | 43 of 45 two-week validation blocks inside the research range, 2 above it | 45 of 45 inside the research range. That range comes from a period in which it lost 90% |
+| Agent gates | 3 proposed, **all vetoed by the critic**. The best, "trade only when Fear & Greed > 28", beat as-is by 32 pp on validation. But sentiment had flipped (fear fell from 51% to 10% of the time), so the gate was on 97% of the time, and on the first research fold it trailed as-is by 48 pp | Champion: half size when 7-day volatility is below its research median. Validation +26.8 pp vs as-is (CI above zero), +7.3 pp vs cash, 3/3 research folds, critic approved. Holding a constant half size alone gives +11.1 pp |
+| Test (one look) | Lane A arbiter: **INCONCLUSIVE** (intervals contain zero) | Gate vs as-is +27.3 pp (90% CI +15.3 … +36.2), drawdown 60% → 36%, but **net −28.9%: it still loses money**. Its average size was 0.55× as-is, so much of the gain is holding less of a losing strategy. Lane A arbiter: **KILL** for the strategy |
 
-The mean-reversion row is the point of the product: the agent found a real improvement that survived unseen data, and the system still says kill, because a filter that loses less does not make a strategy worth funding. The sealed look is recorded in `experiments/frozen_look_btc-meanrev-48-demo.json`, after the report that chose the champion was committed.
+**What this test can and cannot claim** (found by our fourth adversarial review):
+
+- **The test period was not unseen by us.** It overlaps the earlier two-year window (Nov 2024 → Oct 2026) we developed on, and there the agents had already proposed a similar idea: cut size in calm markets. So this is a pre-registered, single look at a period the team had seen. A clean test needs data after 2026-10-31.
+- **Lane A's arbiter never scored the agent's gate.** Its KILL is for the strategy, chosen among Lane A's own candidates. Our selection rule required beating cash on validation, but we had not written down how a test result maps to a verdict. By the same bar, the gate fails on test (net −28.9%).
+- **The critic acted as a selector.** It vetoed a sibling gate with the same condition (size 0 instead of 0.5), which scored higher on validation. Without that veto, the sibling would have been the champion.
+
+The honest reading: the agents found a rule that reliably loses less, mostly by trading smaller. A strategy that loses money with or without it is a kill, not a fix. The single test look is in `experiments/frozen_look_btc-meanrev-48-demo.json`, taken after the report that chose the champion was committed.
 
 The agents propose and explain; **code computes every number and makes every decision.**
 
@@ -30,7 +36,7 @@ The agents propose and explain; **code computes every number and makes every dec
 | What | Where |
 |---|---|
 | The two agent reports (every claim cites an evidence id from a real tool call) and the one sealed look | `experiments/investigation_argon_lane_a.json`, `experiments/investigation_argon_meanrev.json`, `experiments/frozen_look_btc-meanrev-48-demo.json`, or the web app → Explore → Evidence → *Open agent report* |
-| How the agents are kept honest | [`LANE_B.md`](LANE_B.md): number verifier, sealed holdout, pre-registered rule, three adversarial reviews |
+| How the agents are kept honest | [`LANE_B.md`](LANE_B.md): number verifier, sealed holdout, pre-registered rule, four adversarial reviews |
 | Data, costs, baselines, arbiter, 14-day paper plan | [`A/README.md`](A/README.md) |
 | Web app and API | [`LANE_C.md`](LANE_C.md) |
 | Where we deliberately cut scope | [`docs/LANE_B_DIVERGENCE.md`](docs/LANE_B_DIVERGENCE.md), and the `limitations` list in each report |
@@ -39,11 +45,12 @@ The agents propose and explain; **code computes every number and makes every dec
 
 ```bash
 pip install -r requirements-lane-b.txt -r requirements-lane-c.txt && npm ci
-python3 -m pytest -q tests/ A/tests                              # 207 tests: leakage, costs, holdout, verifier, API
+python3 -m pytest -q tests/ A/tests                              # 221 tests: leakage, costs, holdout, verifier, API
 python3 -m uvicorn apps.api.main:app --port 8000 &                # API
 npm run dev                                                        # web app on http://127.0.0.1:3000
 python3 scripts/run_investigation.py --lane-a --fallback          # agents without an API key (deterministic)
 KOK_AGENT_MODEL=google:gemini-4-argon GEMINI_API_KEY=... python3 scripts/run_investigation.py --lane-a   # LLM agents
+python3 scripts/frozen_look.py --report experiments/<committed report>.json   # the one sealed look, refused if already taken
 ```
 
 **Honest limits.** Two demo strategies on one market (BTC), not imported live strategies, and not claimed as alpha. No news archive with first-seen timestamps exists for us, so news is not used and every run is market-only (the point-in-time news store is built and tested). The 14-day paper plan is an approved hourly shadow log; the stored book ends at 2026-10-31 23:00 UTC, so the log has no bars yet and is not a result. Nothing here trades real money.
@@ -112,7 +119,7 @@ existing strategy (immutable) ─► import / validate / hash
 | Lane | Owns | Output interface | Status |
 |---|---|---|---|
 | **A · Quant / Data** | [`A/README.md`](A/README.md) | `run_experiment(...) -> ExperimentResult`, including a deterministic verdict and a recorded 14-day plan | on this branch |
-| **B · Agents / Context** (Kate) | `packages/research_agents`, `meta_policy`, news enrichment | `investigate(experiment_id) -> InvestigationReport` | current `main` agents (four agents, adversarially reviewed three times, 126 tests, walk-forward folds, bad-luck-vs-broken check, Argon run on real data). Default loader is the synthetic stand-in. `--lane-a` uses Lane A's development view |
+| **B · Agents / Context** (Kate) | `packages/research_agents`, `meta_policy`, news enrichment | `investigate(experiment_id) -> InvestigationReport` | current `main` agents (four agents, adversarially reviewed four times, 140 tests, walk-forward folds, bad-luck-vs-broken check, Argon run on real data). Default loader is the synthetic stand-in. `--lane-a` uses Lane A's development view |
 | **C · API / UI / Demo** | `apps/api`, `apps/web`, docs, practice-plan interface | consumes native Lane B reports; adapts Lane A results into UI contracts | on this branch. BTCUSDT 1h position imports are scored by A and B. Start at [`LANE_C.md`](LANE_C.md). |
 
 Work on branches per lane; don't edit another lane's directories without coordinating. Freeze shared Pydantic contracts before integrating.

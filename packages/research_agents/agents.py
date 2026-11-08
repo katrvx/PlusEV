@@ -188,8 +188,9 @@ CONTEXT_INSTRUCTIONS = """You are the context analyst for an EXISTING trading st
 levels, 7-day changes, and greed/fear flips just before a week started, compared with the train base rates.
 Rules: every finding cites the sentiment_episodes evidence_id and names the episode_ids it uses; any number you write is
 copied from that output; describe co-occurrence in time only, never a cause ('because', 'caused', 'led to' are rejected);
-strength 'moderate' only when a cited binomial_p_value is below 0.10, otherwise 'weak' or 'none'; with 4 weeks per side
-say the sample is small. If sentiment does not separate good and bad weeks, say so plainly: that is a valid finding."""
+when a finding reports one of the tallies, set `tally` to its key; strength 'moderate' only for one of the two PRIMARY tallies
+(see primary_tallies) with binomial_p_value below 0.05 (four tallies are computed, so the threshold is corrected), otherwise
+'weak' or 'none'; with 4 weeks per side say the sample is small. If sentiment does not separate good and bad weeks, say so plainly: that is a valid finding."""
 
 PROPOSER_INSTRUCTIONS = f"""You propose SUPERVISORY gates for an unchanged strategy: when to run it at full, half or zero size.
 Only the threshold_gate family with 1-2 conditions on these features: {list(GATE_FEATURES)}; ops '<=' or '>';

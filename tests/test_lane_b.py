@@ -838,7 +838,7 @@ def test_quantile_levels_from_the_feature_grid_are_citable():
     assert unsupported_numbers("threshold at the 0.35 quantile", [g])
 
 
-@pytest.mark.parametrize("text", ["below the 20-trade threshold", "a minimum of 20 trades", "under the threshold of 20",
+@pytest.mark.parametrize("text", ["below the 20-trade threshold", "a minimum of 20 trades", "under the threshold of 20 trades",
                                   "the 20 trade minimum"])
 def test_min_trades_threshold_phrasings_from_argon_are_allowed(text):
     assert not unsupported_numbers(text, R3_EV)
@@ -936,7 +936,7 @@ def test_llm_context_agent_is_made_to_retry_a_causal_claim():
         stmt = "Worst weeks were caused by greed-to-fear flips." if cheat else "Worst weeks started right after greed-to-fear flips."
         return {"summary": "Flips line up with the worst weeks on train.",
                 "findings": [{"finding_id": "C1", "statement": stmt, "strength": "moderate", "evidence_ids": [eid],
-                              "episode_ids": ["worst_week_1"]}]}
+                              "episode_ids": ["worst_week_1"], "tally": "worst_weeks_after_greed_to_fear_flip"}]}
 
     model, state = _script(build_output, first_call=("sentiment_episodes", {}), cheat_first=True)
     out = agents.run_context(_context_ctx(planted=True), model)
@@ -951,3 +951,85 @@ def test_context_agent_has_one_train_only_tool_and_feeds_the_proposer():
 def test_context_is_skipped_and_disclosed_without_a_sentiment_series():
     rep = investigate("x", model=None, loader=fixture_loader)
     assert rep.context is None and any(l.startswith("Context agent skipped") for l in rep.limitations)
+
+
+# ------------------------------------------------------------------ adversarial review round 4 regressions
+
+@pytest.mark.parametrize("text", ["max drawdown was held to a floor of 20%", "costs ran at a minimum of 20 bps",
+                                  "only 20 trades in high vol"])
+def test_r4_threshold_phrases_do_not_hide_other_numbers(text):
+    """R4-F7: '... of 20' is free only when it is the trade-count threshold."""
+    assert unsupported_numbers(text, R3_EV)
+
+
+def test_r4_quantile_levels_are_free_only_when_named_as_such():
+    """R4-F8: '0.33' from feature_grid's keys is citable as a quantile, not as a Sharpe or a turnover."""
+    g = {"train_quantiles": {"realized_vol_7d": {"0.33": 0.0074, "0.67": 0.0114}}}
+    assert not unsupported_numbers("the 0.33 quantile of realized_vol_7d", [g])
+    assert unsupported_numbers("a 0.33 Sharpe", [g]) and unsupported_numbers("turnover fell by 0.67", [g])
+
+
+def test_r4_moderate_needs_a_primary_tally_below_the_corrected_threshold_and_real_flagged_weeks():
+    """R4-F5/F6: 'moderate' only for a primary tally at p < 0.05; named weeks must actually have the flip."""
+    from packages.research_agents.models import ContextFinding, ContextReport
+    from packages.research_agents.verify import verify_context
+    ctx = _context_ctx(planted=True)
+    eid = ctx.sentiment_context()["evidence_id"]
+    mk = lambda **kw: ContextReport(summary="Context.", findings=[ContextFinding(  # noqa: E731
+        finding_id="C1", statement="Worst weeks started right after flips.", evidence_ids=[eid], **kw)])
+    assert not verify_context(ctx, mk(strength="moderate", tally="worst_weeks_after_greed_to_fear_flip", episode_ids=["worst_week_1"]))
+    assert verify_context(ctx, mk(strength="moderate"))                                            # no tally named
+    assert verify_context(ctx, mk(strength="moderate", tally="best_weeks_after_greed_to_fear_flip"))  # not primary
+    assert verify_context(ctx, mk(strength="weak", tally="best_weeks_after_fear_to_greed_flip", episode_ids=["best_week_1"]))
+
+
+@pytest.mark.parametrize("text,bad", [("Flips sparked the losing weeks.", True), ("Flips were responsible for losses.", True),
+                                      ("Losses were a consequence of flips.", True),
+                                      ("This is co-occurrence, not evidence of causation.", False),
+                                      ("No causal link is claimed.", False)])
+def test_r4_causal_filter_catches_synonyms_and_allows_negated_caveats(text, bad):
+    from packages.research_agents.verify import _causal
+    assert bool(_causal(text)) is bad
+
+
+def test_r4_bad_loader_data_does_not_crash_the_context_stage():
+    """R4-F12: naive timestamps, None returns or a raising series are disclosed, not fatal."""
+    from types import SimpleNamespace as NS
+    from packages.research_agents.context import sentiment_episodes
+    t0 = datetime(2024, 1, 9, 8)                                   # naive on purpose
+    eq = [NS(split="train", decision_time=t0 + timedelta(hours=i), net_return=0.001, exposure=1.0) for i in range(400)]
+    runner = NS(feature_series=lambda n, s: [(t0 + timedelta(hours=i), 60.0) for i in range(400)])
+    assert "error" not in sentiment_episodes(NS(equity=eq), runner, train_end=datetime(2024, 6, 1, tzinfo=timezone.utc))
+    eq[5] = NS(split="train", decision_time=t0, net_return=float("nan"), exposure=1.0)
+    assert "error" in sentiment_episodes(NS(equity=eq), runner)
+    assert "error" in sentiment_episodes(NS(equity=eq), NS(feature_series=lambda n, s: None))
+
+
+def test_r4_best_and_worst_weeks_never_overlap():
+    """R4-F13."""
+    from types import SimpleNamespace as NS
+    from packages.research_agents.context import WEEK, sentiment_episodes
+    t0 = datetime(2024, 1, 9, 8, tzinfo=timezone.utc)
+    rets = [0.002 * ((-1) ** (i // 37)) for i in range(600)]
+    eq = [NS(split="train", decision_time=t0 + timedelta(hours=i), net_return=r, exposure=1.0) for i, r in enumerate(rets)]
+    out = sentiment_episodes(NS(equity=eq), NS(feature_series=lambda n, s: [(p.decision_time, 55.0) for p in eq]))
+    starts = lambda key: [datetime.fromisoformat(e["start"]) for e in out[key]]  # noqa: E731
+    assert all(abs((a - b).total_seconds()) >= WEEK * 3600 for a in starts("worst_weeks") for b in starts("best_weeks"))
+
+
+def test_r4_ledger_refuses_a_second_look_by_spec_hash(tmp_path):
+    """R4-F4: one sealed look per policy body, whatever its name or process."""
+    from packages.research_agents import frozen
+    led = tmp_path / "ledger.json"
+    frozen.record({"spec_hash": "abc", "experiment_id": "e", "policy_id": "agent::x", "looked_at": "t", "artifact": "a"}, led)
+    with pytest.raises(frozen.AlreadyLooked):
+        frozen.record({"spec_hash": "abc", "experiment_id": "e", "policy_id": "agent::x_v2", "looked_at": "t2", "artifact": "b"}, led)
+    frozen.check("def", led)
+
+
+def test_r4_the_committed_sealed_look_is_in_the_ledger():
+    import json
+    from packages.research_agents import frozen
+    look = json.load(open("experiments/frozen_look_btc-meanrev-48-demo.json"))
+    with pytest.raises(frozen.AlreadyLooked):
+        frozen.check(look["champion_spec_hash"])

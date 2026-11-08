@@ -87,8 +87,12 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
 
     # 1b. context (agent 4): sentiment around the best/worst train weeks; skipped (and disclosed) without a series
     context = None
-    if "error" in ctx.sentiment_context():
-        limitations.append("Context agent skipped: the loader has no train Fear & Greed series or per-bar equity.")
+    try:
+        pre = ctx.sentiment_context()
+    except Exception as exc:  # noqa: BLE001 - bad loader data must not crash the investigation
+        pre = {"error": f"{type(exc).__name__}: {exc}"}
+    if "error" in pre:
+        limitations.append(f"Context agent skipped: {pre['error']}.")
     else:
         context, ok = _stage("context", lambda: run_context(ctx, model), lambda: fallback.context(ctx), model, failures, ctx)
         used_llm.append(ok)
@@ -134,6 +138,13 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
     if regime:
         ctx.arbiter_evaluate(regime, "validation", source="rule_baseline")
         competitors.append(("rule_baseline", regime))
+    # Constant half size: a gate that mostly halves exposure must beat simply holding half (R4-F3). Reference, not a veto.
+    half = {"policy_id": "rule::half_size_constant", "family": "threshold_gate",
+            "conditions": [{"feature": "realized_vol_7d", "op": ">", "threshold": -1.0}],   # always true: vol >= 0
+            "allocation_when_true": 0.5, "allocation_when_false": 0.5, "thresholds_selected_on": "none (constant)",
+            "summary": "Always half size: the exposure-only baseline."}
+    ctx.arbiter_evaluate(half, "validation", source="rule_baseline")
+    competitors.append(("rule_baseline", half))
 
     # 3b. walk-forward: the same frozen specs on Lane A's expanding TRAIN folds (stability, not unseen data)
     # The fitted LightGBM saw all of train (fit + calibration), so scoring it on train folds is in-sample.
@@ -165,6 +176,8 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
     rule_delta = rule_t.delta_net_return_vs_always_on if rule_t else None
     regime_t = val_trial(regime) if regime else None
     regime_delta = regime_t.delta_net_return_vs_always_on if regime_t else None
+    half_t = val_trial(half)
+    half_delta = half_t.delta_net_return_vs_always_on if half_t else None
     always_on = rule_out.get("evaluation", {}).get("always_on", {}) if isinstance(rule_out, dict) else {}
 
     # 3c. bad luck vs broken (code; reads validation of the unchanged strategy, so the critic sees it, agents 1-2 do not)
@@ -212,6 +225,8 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
                     reasons.append("validation CI includes zero; the frozen test decides")
                 if _finite(regime_delta):
                     reasons.append(f"vs Lane A regime filter on validation: {d - regime_delta:+.4f} (reference, not a veto)")
+                if _finite(half_delta):
+                    reasons.append(f"vs constant half size on validation: {d - half_delta:+.4f} (exposure-only baseline; reference, not a veto)")
             if mix and max(mix.values()) >= DEGENERATE_SHARE:
                 eligible = False
                 reasons.append(f"degenerate: one multiplier on {max(mix.values()):.0%} of in-position validation decisions")
@@ -274,6 +289,9 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
     ao_net, ao_ci = always_on.get("net_return"), always_on.get("ci_net_return")
     basis = [f"always-on on validation: net {ao_net:+.4f}, 90% CI {ao_ci}" if _finite(ao_net) else "always-on validation metrics unavailable",
              "cash on validation: net 0.0000"]
+    if half_t and _finite(half_delta, half_t.net_return):
+        basis.append(f"constant half size on validation: delta vs always-on {half_delta:+.4f}, net {half_t.net_return:+.4f} "
+                     "(a gate that mostly halves exposure should beat this)")
     if regime_note:
         basis.append(regime_note)
     if regime_t and _finite(regime_delta, regime_t.net_return):

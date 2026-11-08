@@ -146,10 +146,16 @@ def context(ctx: ToolContext) -> ContextReport:
     for fid, key, eps_key, word, flip in specs:
         t = out[key]
         p = t["binomial_p_value"]
-        strength = "moderate" if p is not None and p < 0.10 else ("weak" if t["n_with_flip"] else "none")
+        if not t["n_weeks"]:
+            findings.append(ContextFinding(
+                finding_id=fid, evidence_ids=[eid], strength="none", tally=key,
+                statement=f"No non-overlapping {word} train weeks could be chosen, so this tally is empty.",
+                caveats=["train period too short for separate best and worst weeks"]))
+            continue
+        strength = "moderate" if p is not None and p < out["moderate_p_threshold"] else ("weak" if t["n_with_flip"] else "none")
         flag = "greed_to_fear_flip_in_prior_3_days" if word == "worst" else "fear_to_greed_flip_in_prior_3_days"
         findings.append(ContextFinding(
-            finding_id=fid, evidence_ids=[eid], strength=strength,
+            finding_id=fid, evidence_ids=[eid], strength=strength, tally=key,
             episode_ids=[e["episode_id"] for e in out[eps_key] if e[flag]],
             statement=(f"{t['n_with_flip']} of {t['n_weeks']} {word} train weeks started within 3 days after {flip}; "
                        f"the train base rate is {t['base_rate']:.3g} (binomial p {p:.3g})."),
