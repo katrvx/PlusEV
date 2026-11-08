@@ -29,7 +29,7 @@ from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.usage import UsageLimits
 
 from .allowlist import ALLOCATIONS, GATE_FEATURES, check_gate
-from .models import CritiqueSet, DiagnosticReport, ProposalSet, ThresholdCondition
+from .models import ContextReport, CritiqueSet, DiagnosticReport, ProposalSet, ThresholdCondition
 from .tools import HoldoutAccessError, ToolContext, spec_hash
 
 MODEL_ENV = "KOK_AGENT_MODEL"
@@ -73,7 +73,7 @@ def model_name(model) -> str | None:
 
 # ------------------------------------------------------------------ claim verification lives in verify.py
 
-from .verify import MIN_TRADES, unsupported_numbers, verify_critiques, verify_diagnostic, verify_proposals  # noqa: E402,F401
+from .verify import MIN_TRADES, unsupported_numbers, verify_context, verify_critiques, verify_diagnostic, verify_proposals  # noqa: E402,F401
 
 
 # ------------------------------------------------------------------ tool wrappers (what the LLM sees)
@@ -122,6 +122,13 @@ def news_context(ctx: RunContext[ToolContext], start: str, end: str, decision_cu
     except HoldoutAccessError as exc:
         ctx.deps.attempt_holdout("news_context")
         return {"error": str(exc)}
+
+
+def sentiment_episodes(ctx: RunContext[ToolContext]) -> dict:
+    """Fear & Greed around the unchanged strategy's 4 worst and 4 best TRAIN weeks: level, 7-day change and
+    greed/fear flips in the 3 days before each week, plus train base rates and binomial p-values. Cite its evidence_id."""
+    _log("  tool call: sentiment_episodes")
+    return ctx.deps.sentiment_context()
 
 
 def feature_grid(ctx: RunContext[ToolContext]) -> dict:
@@ -176,6 +183,14 @@ co-occurrence is not causation. Validation and test periods are not available to
 Numbers: copy them from the cited tool output and round to 3-4 significant digits (0.3043, -3.54e-05, 5.15%);
 rounding is fine, changing digits or computing new numbers is not."""
 
+CONTEXT_INSTRUCTIONS = """You are the context analyst for an EXISTING trading strategy that must not be changed. Call sentiment_episodes
+(TRAIN only) and report what market sentiment (Fear & Greed) was doing around the strategy's worst and best weeks:
+levels, 7-day changes, and greed/fear flips just before a week started, compared with the train base rates.
+Rules: every finding cites the sentiment_episodes evidence_id and names the episode_ids it uses; any number you write is
+copied from that output; describe co-occurrence in time only, never a cause ('because', 'caused', 'led to' are rejected);
+strength 'moderate' only when a cited binomial_p_value is below 0.10, otherwise 'weak' or 'none'; with 4 weeks per side
+say the sample is small. If sentiment does not separate good and bad weeks, say so plainly: that is a valid finding."""
+
 PROPOSER_INSTRUCTIONS = f"""You propose SUPERVISORY gates for an unchanged strategy: when to run it at full, half or zero size.
 Only the threshold_gate family with 1-2 conditions on these features: {list(GATE_FEATURES)}; ops '<=' or '>';
 allocations in {list(ALLOCATIONS)}; thresholds MUST be values returned by feature_grid. You may evaluate candidates with
@@ -218,6 +233,18 @@ def _diagnostic_agent(model) -> Agent:
     return agent
 
 
+def _context_agent(model) -> Agent:
+    agent = Agent(model, output_type=ContextReport, deps_type=ToolContext, instructions=CONTEXT_INSTRUCTIONS,
+                  tools=[sentiment_episodes], retries=3, defer_model_check=True)
+
+    @agent.output_validator
+    def _v(ctx: RunContext[ToolContext], out: ContextReport) -> ContextReport:
+        _check(verify_context(ctx.deps, out))
+        return out
+
+    return agent
+
+
 def _proposer_agent(model, hypothesis_ids: set[str]) -> Agent:
     agent = Agent(model, output_type=ProposalSet, deps_type=ToolContext, instructions=PROPOSER_INSTRUCTIONS,
                   tools=[feature_grid, regime_performance, test_gate_train], retries=3, defer_model_check=True)
@@ -247,9 +274,17 @@ def run_diagnostic(ctx: ToolContext, model) -> DiagnosticReport:
     return _run(_diagnostic_agent(model), prompt, ctx, "diagnostic")
 
 
-def run_proposer(ctx: ToolContext, model, diagnostic: DiagnosticReport) -> ProposalSet:
+def run_context(ctx: ToolContext, model) -> ContextReport:
+    prompt = f"Strategy {ctx.experiment.strategy_id}. What was market sentiment doing around its best and worst train weeks?"
+    return _run(_context_agent(model), prompt, ctx, "context")
+
+
+def run_proposer(ctx: ToolContext, model, diagnostic: DiagnosticReport, context: ContextReport | None = None) -> ProposalSet:
     ids = {h.hypothesis_id for h in diagnostic.hypotheses}
     prompt = "Hypotheses:\n" + json.dumps([h.model_dump() for h in diagnostic.hypotheses], indent=1)
+    if context and context.findings:
+        prompt += ("\n\nSentiment context (co-occurrence only, not causes; base proposals on the hypotheses above):\n"
+                   + json.dumps([{"statement": f.statement, "strength": f.strength} for f in context.findings], indent=1))
     return _run(_proposer_agent(model, ids), prompt, ctx, "proposer")
 
 

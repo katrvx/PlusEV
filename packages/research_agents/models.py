@@ -49,6 +49,30 @@ class DiagnosticReport(BaseModel):
         return self
 
 
+class ContextFinding(BaseModel):
+    finding_id: str
+    statement: str = Field(description="what co-occurred in time; never a causal claim")
+    episode_ids: list[str] = Field(default_factory=list, description="worst_week_n / best_week_n from sentiment_episodes")
+    evidence_ids: list[str] = Field(min_length=1)
+    strength: Literal["none", "weak", "moderate"] = Field(
+        description="'moderate' only when a cited binomial_p_value is below 0.10; with 4 weeks per side, usually 'weak' or 'none'")
+    caveats: list[str] = Field(default_factory=list)
+
+
+class ContextReport(BaseModel):
+    """Agent 4 (context): market sentiment around the strategy's best and worst TRAIN weeks. Co-occurrence only."""
+    summary: str = Field(max_length=800)
+    findings: list[ContextFinding] = Field(default_factory=list, max_length=6)
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique(self):
+        ids = [f.finding_id for f in self.findings]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"duplicate finding_id in {ids}")
+        return self
+
+
 class ThresholdCondition(BaseModel):
     feature: str
     op: Literal["<=", ">"]
@@ -172,10 +196,11 @@ class InvestigationReport(BaseModel):
     n_policies_tried: int
     holdout_accessed: bool = False
     strategy_health: dict | None = None   # bad luck vs broken (spec section 8); code-computed, see health.py
+    context: ContextReport | None = None  # agent 4: sentiment around the best/worst train weeks (context.py)
 
 
 __all__ = [
     "ALLOCATIONS", "GATE_FAMILIES", "GATE_FEATURES",
-    "Evidence", "Hypothesis", "DiagnosticReport", "ThresholdCondition", "GateProposal", "ProposalSet",
+    "Evidence", "Hypothesis", "DiagnosticReport", "ContextFinding", "ContextReport", "ThresholdCondition", "GateProposal", "ProposalSet",
     "Critique", "CritiqueSet", "TrialRecord", "PolicyCandidate", "InvestigationReport",
 ]

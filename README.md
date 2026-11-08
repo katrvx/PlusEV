@@ -37,7 +37,7 @@ The agents propose and explain; **code computes every number and makes every dec
 
 ```bash
 pip install -r requirements-lane-b.txt -r requirements-lane-c.txt && npm ci
-python3 -m pytest -q tests/ A/tests                              # 196 tests: leakage, costs, holdout, verifier, API
+python3 -m pytest -q tests/ A/tests                              # 206 tests: leakage, costs, holdout, verifier, API
 python3 -m uvicorn apps.api.main:app --port 8000 &                # API
 npm run dev                                                        # web app on http://127.0.0.1:3000
 python3 scripts/run_investigation.py --lane-a --fallback          # agents without an API key (deterministic)
@@ -109,7 +109,7 @@ existing strategy (immutable) ─► import / validate / hash
 | Lane | Owns | Output interface | Status |
 |---|---|---|---|
 | **A · Quant / Data** | `A/` (target layout was `packages/ingestion`, `feature_store`, `strategies`, `quant`, `evaluation`) | `run_experiment(...) -> ExperimentResult`, including a deterministic verdict and a recorded 14-day plan | on this branch |
-| **B · Agents / Context** (Kate) | `packages/research_agents`, `meta_policy`, news enrichment | `investigate(experiment_id) -> InvestigationReport` | current `main` agents (adversarially reviewed three times, 111 tests, walk-forward folds, bad-luck-vs-broken check, Argon run on real data). Default loader is the synthetic stand-in. `--lane-a` uses Lane A's development view |
+| **B · Agents / Context** (Kate) | `packages/research_agents`, `meta_policy`, news enrichment | `investigate(experiment_id) -> InvestigationReport` | current `main` agents (four agents, adversarially reviewed three times, 126 tests, walk-forward folds, bad-luck-vs-broken check, Argon run on real data). Default loader is the synthetic stand-in. `--lane-a` uses Lane A's development view |
 | **C · API / UI / Demo** | `apps/api`, `apps/web`, docs, practice-plan interface | consumes native Lane B reports; adapts Lane A results into UI contracts | on this branch. BTCUSDT 1h position imports are scored by A and B. Start at [`LANE_C.md`](LANE_C.md). |
 
 Work on branches per lane; don't edit another lane's directories without coordinating. Freeze shared Pydantic contracts before integrating.

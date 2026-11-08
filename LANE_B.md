@@ -20,6 +20,7 @@ report = investigate(experiment_id)        # -> InvestigationReport (pydantic), 
 | 3 Diagnostic agent | `packages/research_agents/agents.py` | done (PydanticAI) + deterministic fallback |
 | 4 Critic agent | same | done + fallback |
 | 5 Gate proposer with whitelist | same + `allowlist.py` | done + fallback |
+| Agent 4: context (sentiment) | `context.py` (tool, code), `agents.py` (agent), `fallback.context` | done: Fear & Greed around the 4 best and 4 worst train weeks, with base rates and binomial p-values; no news archive, so no news agent |
 | 6 Semantic news labelling with first-seen timestamps | `news.py`, `labeller.py` | models, point-in-time store, LLM + lexicon labellers; no news data yet |
 | meta_policy: rule gate + LightGBM gate | `packages/meta_policy/` | done |
 
@@ -63,6 +64,18 @@ A third independent review (round 3) then attacked everything above: 13 findings
 - trial records now carry a structured `fold`;
 - Lane A's notes, which quote the sealed-test verdict, are dropped from what agents can see.
 
+## Agent 4: context (`context.py`)
+
+The spec's fourth agent is a context and news analyst. There is no news archive with first-seen timestamps, so this agent works on market sentiment (Fear & Greed), which Lane A joins point-in-time (each daily value as of its next-day availability). Code (`sentiment_episodes`, TRAIN only) picks the unchanged strategy's 4 worst and 4 best non-overlapping weeks (168 bars). For each week it records the Fear & Greed level, its 7-day change, and whether a greed-to-fear or fear-to-greed flip (across 50) happened in the 3 days before the week started. It also gives the train base rate of such flips and a one-sided binomial p-value. The agent writes findings that cite this evidence and name the weeks they use. The verifier rejects:
+- causal language ("because", "caused", "led to"…);
+- invented numbers;
+- unknown episode ids;
+- strength `moderate` unless a cited p-value is below 0.10.
+
+The findings go to the proposer as context only; gates are still based on the diagnostic hypotheses. Without a sentiment series (the stand-in), the stage is skipped and disclosed.
+
+On real data, for both strategies, sentiment flips do not line up with the best or worst weeks more often than chance (0 or 1 of 4 against base rates around 0.12). That is reported as a finding.
+
 ## Bad luck vs broken (`health.py`)
 
 Spec section 8: a poor result alone is not proof that a strategy broke. Code, not an agent, cuts the unchanged strategy's validation period into 14-day blocks. It compares each block with Lane A's train-only 14-day range (5th to 95th percentile of block-bootstrapped train paths). About 5% of blocks should fall below that range by chance. If more do (one-sided binomial p < 0.05), the result is `outside_training_range`; otherwise it is `within_training_range`. It also checks which assumption changed between train and validation: exposure, turnover per bar, cost per bar, bar volatility (ratio outside 2/3–3/2), and how often each regime occurs (total variation ≥ 0.25). The thresholds are fixed in the module. Because the check reads validation, only the critic can call it (`strategy_health` tool) and it appears in the report (`strategy_health`, plus a line in `verdict_basis`). The fallback critic notes when the regime behind a gate's feature shifted.
@@ -103,7 +116,7 @@ Walk-forward: every agent gate and competitor is also scored with Lane A's `Gate
 
 ```bash
 pip install "pydantic-ai-slim[google]" lightgbm scikit-learn pandas numpy pytest
-python3 -m pytest -q tests/test_lane_b.py          # 111 guardrail + regression tests
+python3 -m pytest -q tests/test_lane_b.py          # 126 guardrail + regression tests
 python3 scripts/run_investigation.py --fallback     # deterministic agents
 KOK_AGENT_MODEL=google:gemini-3.8-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
 ```
