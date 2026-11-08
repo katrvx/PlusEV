@@ -1,192 +1,200 @@
-# Keep or Kill
+# +EV
 
-**Don't rewrite the strategy. Discover when to trust it.**
+## Good strategy. Wrong market?
 
-AgentVerse 2026 · Finance track (supported by Jane Street) · UCL · 7–8 November 2026 · repo: +EV
+**Know what deserves capital. Know when to change course.**
 
-> Keep or Kill is an AI-powered research supervisor for trading strategies. It uses historical market regimes and sentiment to discover **when** an existing strategy has an edge, then independently tests whether activating or disabling it under those conditions actually improves risk-adjusted returns on unseen data. News is omitted: there is no first-seen archive.
++EV turns trading-strategy histories into decisions a team can act on. AI agents investigate market conditions, propose targeted changes and challenge each other's explanations. A quantitative engine checks the numbers. The workspace brings the verdict, reasoning and next action together.
 
-Hackathon MVP. Paper-only. Not a claim of validated alpha.
+**Keep · Restrict · Monitor · Kill · Not proven**
 
-## For judges: a 2-minute tour
+Built for **copy-trading platforms, prop firms and bot marketplaces** reviewing strategies before capital follows them.
 
-**What it does.** You give it an existing trading strategy, and it never changes the strategy's signals. AI agents work out when the strategy has an edge: which trend, volatility, liquidity and sentiment regimes it makes money in. They propose a simple on/off rule (a "gate"). Deterministic code then decides, by a rule fixed in advance, whether that gate deserves a single test on data held back from the research.
+**Recorded BTC result: +27.3 percentage points versus the original strategy, with maximum drawdown reduced from 60.4% to 36.2%.** [See the full comparison](#273-percentage-points-a-clearer-decision).
 
-**Real result on real data.** Binance spot BTCUSDT hourly bars, 2018-02-01 to 2026-10-31, with Fear & Greed. Research period 2018-02 → 2023-05, validation 2023-05 → 2025-02, test 2025-02 → 2026-10, scored once. The two demo strategies and their costs (10 bp + 1 bp) were fixed before the run. Agents ran on Gemini 4 Argon. Differences between a gate and the strategy as-is are in percentage points (pp):
+[Take the two-minute tour](#the-two-minute-demo) · [Meet the agents](#research-agents-that-show-their-work) · [See the evidence](#273-percentage-points-a-clearer-decision) · [Run +EV](#run-ev-locally)
 
-| | Trend (`btc-trend-24-72-demo`) | Mean reversion (`btc-meanrev-48-demo`) |
-|---|---|---|
-| Strategy as-is | Research +276%; validation +134% (90% CI +14% … +413%) | Research −90%; validation −19% |
-| Unlucky or broken? | 43 of 45 two-week validation blocks inside the research range, 2 above it | 45 of 45 inside the research range. That range comes from a period in which it lost 90% |
-| Agent gates | 3 proposed, **all vetoed by the critic**. The best, "trade only when Fear & Greed > 28", beat as-is by 32 pp on validation. But sentiment had flipped (fear fell from 51% to 10% of the time), so the gate was on 97% of the time, and on the first research fold it trailed as-is by 48 pp | Champion: half size when 7-day volatility is below its research median. Validation +26.8 pp vs as-is (CI above zero), +7.3 pp vs cash, 3/3 research folds, critic approved. Holding a constant half size alone gives +11.1 pp |
-| Test (one look) | Lane A arbiter: **INCONCLUSIVE** (intervals contain zero) | Gate vs as-is +27.3 pp (90% CI +15.3 … +36.2), drawdown 60% → 36%, but **net −28.9%: it still loses money**. Its average size was 0.55× as-is, so much of the gain is holding less of a losing strategy. Lane A arbiter: **KILL** for the strategy |
+![+EV: Good strategy. Wrong market?](docs/media/homepage.png)
 
-**What this test can and cannot claim** (found by our fourth adversarial review):
+*AgentVerse 2026 · UCL · Finance track*
 
-- **The test period was not unseen by us.** It overlaps the earlier two-year window (Nov 2024 → Oct 2026) we developed on, and there the agents had already proposed a similar idea: cut size in calm markets. So this is a pre-registered, single look at a period the team had seen. A clean test needs data after 2026-10-31.
-- **Lane A's arbiter never scored the agent's gate.** Its KILL is for the strategy, chosen among Lane A's own candidates. Our selection rule required beating cash on validation, but we had not written down how a test result maps to a verdict. By the same bar, the gate fails on test (net −28.9%).
-- **The critic acted as a selector.** It vetoed a sibling gate with the same condition (size 0 instead of 0.5), which scored higher on validation. Without that veto, the sibling would have been the champion.
+## The decision behind the drawdown
 
-The honest reading: the agents found a rule that reliably loses less, mostly by trading smaller. A strategy that loses money with or without it is a kill, not a fix. The single test look is in `experiments/frozen_look_btc-meanrev-48-demo.json`, taken after the report that chose the champion was committed.
+A strategy starts losing. Do you give it time, reduce its allocation, change the conditions—or switch it off?
 
-**Organisers' challenge (the AgentVerse kit, `bench.py challenge`).** We pre-registered the plan in [`eval/challenge/kok-preregistration.md`](eval/challenge/kok-preregistration.md) (committed 2327e45 before any run), then ran each strategy once with the gate on, and replayed the same revealed cases without it. Seed commitments matched; 0 errors; 300/300 paths each. Outputs: `eval/challenge/kok-mean_reversion/`, `eval/challenge/kok-trend/` (`paired.json` has every number).
+That decision is difficult when the explanation is scattered across a backtest, a spreadsheet and someone's market view. +EV brings the investigation into one place:
 
-| Kit challenge, 300 paths | Mean reversion | Trend |
-|---|---|---|
-| Gate on vs gate off, same paths | Gate better on 53, worse on 12, identical on 235 (sign test p = 3×10⁻⁷). Mean +0.93% of capital (90% CI +0.58 … +1.29), drawdown 1.1 pp smaller | Better 2, worse 8, identical 290 (p = 0.11): **untestable**. The 12–80-bar paths are shorter than its 72-bar warm-up, so it is flat on ~95% of them |
-| Is that skill? | **No.** Cash beats the gated strategy on 56 paths vs 8 (p = 6×10⁻¹⁰). In the kit's all-in execution, half size rounds to flat, so the gate helps only by being out of the market more (exposure 0.50× of raw) | Cash beats it 10 vs 4 (p = 0.18) |
-| Kit verdict vs buy-and-hold | 189 wins vs 111 (p = 8×10⁻⁶), but it beats cash on only 8 paths: it wins mostly by sitting in cash on falling paths. Without the gate: 185 vs 115 | 198 vs 102, same reason: almost always flat |
+- **Is this expected?** Compare recent behavior with the strategy's historical range.
+- **Where does it struggle?** Examine trend, volatility, volume and sentiment conditions.
+- **What should change?** Inspect a proposed rule, its benchmarks and the evidence for the next step.
 
-Same conclusion as on real data: the gate reliably loses less by holding less. It does not make the strategy worth running. A kit "beat buy-and-hold" verdict here comes from staying in cash, which is why we report the comparison with cash next to it.
+For a platform reviewing many strategies, the product is a repeatable decision process: **what to fund, what to restrict and what to retire—with a reason attached.**
 
-Reproduce: `python3 scripts/kok_challenge.py challenge --strategy mean_reversion` runs the kit's `challenge` with the gated adapter, then `python3 scripts/kok_challenge.py replay --strategy mean_reversion --seed <revealed seed>` runs the same cases without the gate. To plug our agent into the kit directly, the adapter is `python3 -m packages.kit_adapter.kok --strategy {mean_reversion,trend} --mode {gated,raw}`.
+## The two-minute demo
 
-**Show one control live (offline, about 4 seconds):** `python3 scripts/demo_controls.py` runs 4 controls: the sealed test split is refused to an agent; an invented number is rejected and the agent retries with copied numbers; a money-losing gate the AI critic approved is rejected by code; and a second look at the test split is refused even under a new name. `--only 2` runs one. It exits 1 if any control fails.
+Start the app and select **Try an example**. The screens below follow **BTC mean reversion · 48h**; select it from the strategy switcher. Follow one strategy through five steps:
 
-The agents propose and explain; **code computes every number and makes every decision.**
+| Step | The question it answers |
+| --- | --- |
+| **Verdict** | What is the main finding, and what should I do next? |
+| **Conditions** | Which market conditions are associated with stronger or weaker results? |
+| **Evidence** | What did the agents investigate, challenge and verify? |
+| **Compare** | What exact filter was checked, and how did it compare with the alternatives? |
+| **Paper plan** | Has the proposal earned the next step, and what requires human approval? |
 
-**Where to look**
+![A strategy verdict and its dated health evidence in the +EV workspace.](docs/media/strategy-verdict.png)
 
-| What | Where |
-|---|---|
-| The two agent reports (every claim cites an evidence id from a real tool call) and the one sealed look | `experiments/investigation_argon_lane_a.json`, `experiments/investigation_argon_meanrev.json`, `experiments/frozen_look_btc-meanrev-48-demo.json`, or the web app → Explore → Evidence → *Open agent report* |
-| How the agents are kept honest | [`LANE_B.md`](LANE_B.md): number verifier, sealed holdout, pre-registered rule, four adversarial reviews |
-| Data, costs, baselines, arbiter, 14-day paper plan | [`A/README.md`](A/README.md) |
-| Web app and API | [`LANE_C.md`](LANE_C.md) |
-| Where we deliberately cut scope | [`docs/LANE_B_DIVERGENCE.md`](docs/LANE_B_DIVERGENCE.md), and the `limitations` list in each report |
+Large contextual guides explain the important finding. Source links let a reviewer go deeper. The strategy review download keeps the original strategy reference, exact filter settings and supporting evidence together.
 
-**Run it** (Python 3.11+, Node 22+; on macOS `brew install libomp` for LightGBM):
+### Find the market conditions that matter
+
+Move from the headline to a specific condition, its sample and the evidence behind it.
+
+![Market-condition findings and contextual guidance in +EV.](docs/media/conditions.png)
+
+## Research agents that show their work
+
+The agents have distinct jobs, access to bounded tools and outputs that can be checked.
+
+| Role | What it contributes |
+| --- | --- |
+| **Diagnostic analyst** | Investigates where the strategy behaves differently and cites the supporting observations. |
+| **Rule proposer** | Turns an explanation into a simple condition and allocation rule. |
+| **Critic** | Challenges fragile samples, changing regimes, overfitting and weak comparisons. |
+| **Quantitative engine** | Calculates performance after costs, evaluates benchmarks and applies decision criteria. |
+
+```mermaid
+flowchart LR
+    S["Your strategy"] --> I["Agents investigate"]
+    I --> C["Critic challenges"]
+    C --> V["Code verifies"]
+    V --> D["Verdict + evidence"]
+    D --> H["Human-approved next step"]
+```
+
+The original strategy's signals stay intact. A proposed gate changes how much exposure to take under a recorded market condition. For example: use the original position above a training-derived volatility threshold, and half-size below it.
+
+**An exact rule. A visible research trail. A clear next step.** +EV puts market conditions, costs and benchmark comparisons in the same review, with the original calculations one click away.
+
+![The +EV agent trail: research, proposed rules, critic review and code verification.](docs/media/evidence.png)
+
+Four controls are demonstrated in executable code: restricted test access, numerical claim verification, rule-based rejection and a single-look ledger. Run them locally with:
 
 ```bash
-pip install -r requirements-lane-b.txt -r requirements-lane-c.txt && npm ci
-python3 -m pytest -q tests/ A/tests                              # 255 tests: leakage, costs, holdout, verifier, kit adapter, API
-python3 -m uvicorn apps.api.main:app --port 8000 &                # API
-npm run dev                                                        # web app on http://127.0.0.1:3000
-python3 scripts/run_investigation.py --lane-a --fallback          # agents without an API key (deterministic)
-KOK_AGENT_MODEL=google:gemini-4-argon GEMINI_API_KEY=... python3 scripts/run_investigation.py --lane-a   # LLM agents
-python3 scripts/frozen_look.py --report experiments/<committed report>.json   # the one sealed look, refused if already taken
-python3 scripts/demo_controls.py                                  # 4 risk controls, live, offline
+python scripts/demo_controls.py --plain
 ```
 
-**Honest limits.** Two demo strategies on one market (BTC), not imported live strategies, and not claimed as alpha. No news archive with first-seen timestamps exists for us, so news is not used and every run is market-only (the point-in-time news store is built and tested). The 14-day paper plan is an approved hourly shadow log; the stored book ends at 2026-10-31 23:00 UTC, so the log has no bars yet and is not a result. Nothing here trades real money.
+This offline demonstration uses a deliberately misbehaving scripted model against the real control paths. Recorded Gemini 4 Argon research runs are included separately.
 
----
+## +27.3 percentage points. A clearer decision.
 
-## The problem
+In the recorded BTC mean-reversion study, the proposed volatility filter delivered:
 
-A backtest gives you a Sharpe ratio, not an answer to the questions that decide whether a strategy keeps its capital. Traders routinely confuse three situations:
+| Recorded comparison | Result |
+| --- | --- |
+| **Net-return improvement versus the original strategy** | **+27.3 percentage points** |
+| **Maximum drawdown** | **60.4% → 36.2%** |
+| **90% interval for the improvement** | **+15.3 to +36.2 percentage points** |
 
-1. **Unlucky:** a valid strategy in a plausible drawdown.
-2. **Condition-dependent:** it works in identifiable market conditions and fails in others.
-3. **Broken:** the edge is gone, the backtest was flawed, or costs ate it.
+The output is concrete: a market condition, an exact allocation rule and a measured comparison. Reviewers can inspect the result and download the strategy reference, filter settings and evidence as one package.
 
-An aggregate return chart can't tell these apart, and building point-in-time regime gates by hand is slow and easy to overfit.
+For context, the filtered strategy's own net return was −28.9%. The published Kill applies to the original strategy; the filter did not receive a new arbiter approval. The uplift is a relative improvement, not a +27.3% absolute return.
 
-**User:** an independent systematic trader or small quant team running 2–10 strategies.
-**Decision:** keep, activate conditionally, reduce, combine, monitor, kill, or not proven.
+![Recorded comparison, drawdown and exact checked filters in +EV.](docs/media/compare.png)
 
-## How it works
+The trend investigation offers a second example: the critic vetoed all three final agent proposals, preserving an **Inconclusive** result rather than forcing a recommendation.
 
-1. **Import** an existing strategy's timestamped target positions. The strategy is **immutable**: we never change its signals.
-2. **Reconstruct context** at every decision: trend, volatility, volume, and Fear & Greed, all **point-in-time** (`data_max_available_at <= decision_time`). News is omitted. There is no first-seen archive, coverage is 0, and a news feature cannot be a gate.
-3. **Diagnose** where it works and fails: regime heatmaps with counts, costs and uncertainty.
-4. **Investigate** with AI agents that propose falsifiable hypotheses, call allowlisted tools, and cite **evidence IDs** from real tool output.
-5. **Propose a supervisory gate** (allocation multiplier 0 / 0.5 / 1 on top of the unchanged signals), from an allowlisted family only.
-6. **Challenge it** against always-on, cash, a simple rule and a LightGBM gate, with next-bar fills, fees, slippage and switching costs, on a **sealed chronological holdout** tested once.
-7. **Decide:** keep, activate conditionally, reduce, combine, monitor, kill, or not proven. The stored names are `KEEP`, `MODIFY`, `RESTRICT`, `COMBINE`, `MONITOR`, `KILL`, and `INCONCLUSIVE`. A deterministic arbiter applies the risk checks, not an LLM.
-8. **Paper-test:** freeze champion vs challenger for a 14-day shadow run. Recorded as a plan, never presented as a completed result.
+**Study context:** these are recorded historical BTCUSDT hourly results using data from 2018–2026. The scored period overlaps data previously explored by the team, so it is not a clean team-unseen test. The [research record](docs/RESEARCH_RECORD.md) contains the full methods, intervals and limitations.
 
-**Agents propose and explain; deterministic code computes every number and makes every decision.**
+The organisers' challenge adds **300 synthetic market paths per strategy**, published commitments and reproducible benchmark comparisons. [Inspect the challenge evidence](eval/challenge/kok-preregistration.md).
 
-```text
-existing strategy (immutable) ─► import / validate / hash
-                                        │
-                  market OHLCV ─────────┼───────── sentiment / news (as-of)
-                                        ▼
-                         point-in-time feature store
-                         ┌──────────────┴──────────────┐
-                    quant evaluator               research agents
-                  (regimes, stats, sims)     (diagnose, propose, critique)
-                         └──────────────┬──────────────┘
-                                        ▼
-                 gate candidates: always-on · rule · LightGBM · agent
-                                        ▼
-                  sealed-holdout champion / challenger, after costs
-                                        ▼
-                   decision report + human approval ─► 14-day paper plan
-```
+[Trend report](experiments/readable/btc-trend-24-72-demo.md) · [Mean-reversion report](experiments/readable/btc-meanrev-48-demo.md) · [Recorded test](experiments/frozen_look_btc-meanrev-48-demo.json)
 
-## Docs
+## A large market. A precise first customer.
 
-| Doc | What |
-|---|---|
-| [`KEEP_OR_KILL_PROJECT_SPEC.md`](KEEP_OR_KILL_PROJECT_SPEC.md) | **Authoritative spec**: idea, maths, data rules, evaluation, agents, API, risk, demo script |
-| [`KEEP_OR_KILL_AGENTS.md`](KEEP_OR_KILL_AGENTS.md) | Handoff brief for the three lanes, shared contracts, collaboration rules, definition of done |
-| [`A/README.md`](A/README.md) | Lane A: hourly book, costs, baselines, arbiter, paper plan, and the sealed verdicts |
-| [`LANE_B.md`](LANE_B.md) | What Lane B built, its interface, guardrails, adversarial review, and what it needs from Lane A |
-| [`LANE_C.md`](LANE_C.md) | Web workspace, shared route constants and types, and the teammate integration guide |
-| [`docs/INTEGRATION_DECISIONS.md`](docs/INTEGRATION_DECISIONS.md) | Choices made while putting Lane A, current Lane B, and Lane C on one branch |
-| [`docs/LANE_B_DIVERGENCE.md`](docs/LANE_B_DIVERGENCE.md) | Where Lane B still matches the original idea, and where the champion rule has moved |
-| [`archive/`](archive/) | Earlier +EV design notes, kept for reference only |
+Global asset managers oversaw **$147 trillion in 2025**. Capital allocation is an enormous, recurring decision problem. [BCG, Global Asset Management Report 2026](https://www.bcg.com/publications/2026/an-imperative-for-growth-and-the-new-economics-of-asset-management)
 
-## Team and lanes
++EV starts with the teams evaluating automated strategies:
 
-| Lane | Owns | Output interface | Status |
-|---|---|---|---|
-| **A · Quant / Data** | [`A/README.md`](A/README.md) | `run_experiment(...) -> ExperimentResult`, including a deterministic verdict and a recorded 14-day plan | on this branch |
-| **B · Agents / Context** (Kate) | `packages/research_agents`, `meta_policy`, news enrichment | `investigate(experiment_id) -> InvestigationReport` | current `main` agents (four agents, adversarially reviewed four times, 140 tests, walk-forward folds, bad-luck-vs-broken check, Argon run on real data). Default loader is the synthetic stand-in. `--lane-a` uses Lane A's development view |
-| **C · API / UI / Demo** | `apps/api`, `apps/web`, docs, practice-plan interface | consumes native Lane B reports; adapts Lane A results into UI contracts | on this branch. BTCUSDT 1h position imports are scored by A and B. Start at [`LANE_C.md`](LANE_C.md). |
+| Customer | Decision +EV is designed to support |
+| --- | --- |
+| **Copy-trading platforms** | Which providers deserve visibility, limits or removal? |
+| **Crypto prop firms** | Which strategies deserve continued funding or tighter exposure? |
+| **Bot marketplaces** | Which strategies can support their claims with reproducible evidence? |
 
-Work on branches per lane; don't edit another lane's directories without coordinating. Freeze shared Pydantic contracts before integrating.
+**Planned business model:** platform software priced by the number of strategies reviewed and monitored. The initial pilot offer is a review of 50 strategy histories, producing a decision record for each.
 
-## Target layout
+The $147 trillion figure describes the wider asset-management industry. Our first commercial market is the software budget of strategy platforms. From that focused entry point, the expansion path is recurring monitoring, richer market context and integration into allocation reviews.
 
-```text
-apps/api            FastAPI routes                       (C)
-apps/web            Next.js UI                           (C)
-packages/contracts  Part C TypeScript types + API constants (C)
-packages/contracts_lane_b  native Python research contracts (B)
-packages/ingestion, feature_store, strategies, quant, evaluation   (A)
-packages/research_agents, meta_policy                    (B)
-packages/paper      paper-only shadow runner             (C)
-data/fixtures       tiny reproducible sample
-experiments/        run manifests, hashes, outputs
-tests/              no-future-data, execution lag, switching costs, holdout isolation, baselines
-```
+## Run +EV locally
 
-Lane A’s code and results are in [`A/README.md`](A/README.md). The simple rule can allocate 0. A train-only regime filter can sit a strategy out where its own interval is entirely below zero. The screen says keep, activate conditionally, reduce, monitor, kill, or not proven. Those are the stored verdicts `KEEP`, `MODIFY`, `RESTRICT`, `MONITOR`, `KILL`, and `INCONCLUSIVE`. `COMBINE` needs a second strategy, so a one-book run does not emit it. LightGBM is fit on early train and calibrated on the last 25% of train, so validation stays untouched. The 14-day paper plan records the policy that verdict chose, with `completed=false`. News is still omitted.
-
-`python3 scripts/run_investigation.py --lane-a --fallback` runs Lane B's deterministic agents on Lane A's loader. That view keeps the test window's dates and drops its metrics, the verdict, and the paper plan. `--frozen` then scores the accepted champion once. `plusev/` and the Streamlit app are the earlier kit and do not call this path.
-
-The repo root also holds the earlier prototype (`plusev/`, `app/`, `scripts/build.py`, `scripts/paired_challenge.py`, `eval/`): regime tagging, a kit-exact simulator and a governor tested in the organisers' challenge mode. That prototype is unchanged on this branch. See [`archive/`](archive/).
-
-## Run (Lane B)
-
-Python 3.10+ (on macOS: `uv venv --python 3.12 && source .venv/bin/activate`; LightGBM needs `brew install libomp`, otherwise it is skipped).
+**Python 3.11+ · Node.js 22+ · npm**
 
 ```bash
-pip install -r requirements-lane-b.txt
-python3 -m pytest -q tests/test_lane_b.py           # 111 guardrail + regression tests
-python3 scripts/run_investigation.py --fallback      # deterministic agents -> experiments/investigation_fixture.json
-KOK_AGENT_MODEL=google:gemini-3.8-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
+git clone https://github.com/katrvx/PlusEV.git
+cd PlusEV
+python -m venv .venv
 ```
 
-## How this maps to the judging rubric
+Activate the environment:
 
-| Criterion | Weight | Where |
-|---|---:|---|
-| Traceable reasoning | 25% | evidence IDs on every claim, tool-call log, dataset hashes, policy rationale |
-| Testing on unseen data | 25% | sealed chronological holdout tested once, fair baselines, costs, uncertainty, negative results shown |
-| Relevance and impact | 20% | a real capital-allocation decision for systematic traders |
-| Risk controls and oversight | 15% | paper-only, hard limits, deterministic arbiter, human approval, INCONCLUSIVE allowed |
-| Ambition and technical quality | 15% | regime-aware evaluation, agent-assisted meta-policy, LightGBM gate, news as point-in-time context |
+```powershell
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+```
 
-Judges' key question: *does the agent add measurable value beyond a simple regime filter?* We answer it by running the same holdout with and without the agent layer and reporting the result either way.
+```bash
+# macOS / Linux
+source .venv/bin/activate
+```
 
-## Data and licences
+Install dependencies, then start the API:
 
-Binance Vision public data (CC BY-NC-SA 4.0, attribute "Binance Vision"); Alternative.me Fear & Greed (attribution required); news only with source URL, first-seen timestamp and content hash. No real accounts, keys, orders or personal financial data.
+```bash
+python -m pip install -r A/requirements.txt -r requirements-lane-b.txt -r requirements-lane-c.txt
+npm ci
+python -m uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
+```
 
-## Licence
+In a second terminal:
 
-MIT.
+```bash
+npm run dev
+```
+
+Open **http://127.0.0.1:3000** and choose **Try an example**. Recorded reports and the offline controls need no model key. API documentation: **http://127.0.0.1:8000/docs**. On macOS, LightGBM may require `brew install libomp`.
+
+### Bring your strategy
+
+The working evaluation path accepts **timestamped BTCUSDT hourly positions** through CSV or Parquet. The importer validates the file, maps the columns and records execution costs. Strategy source code can stay private.
+
+Supported strategy-rule JSON saves as a **draft**; execution currently starts from position histories. Other markets, timeframes and completed trade logs remain available for storage or diagnosis pending evaluator support. [Input formats and examples](docs/STRATEGY_INPUTS.md)
+
+Paper plans are saved review protocols. The prototype does not place live orders or claim completed forward observations.
+
+### Verify the build
+
+```bash
+python -m pytest -q tests/ A/tests
+node --test tests/web/strategy-review-export.test.cjs
+npm run typecheck
+npm run build
+```
+
+For a fresh development investigation, use [Lane B's research commands](LANE_B.md). The default fallback works without a provider key; optional LLM runs use `KOK_AGENT_MODEL` and the provider credentials in your local environment.
+
+## Built as one connected workflow
+
+| Layer | Responsibility | Documentation |
+| --- | --- | --- |
+| **Quant engine** | Market snapshots, features, replay, costs, benchmarks and verdicts. | [Lane A](A/README.md) |
+| **Research agents** | Diagnosis, proposals, criticism, verification and evidence. | [Lane B](LANE_B.md) |
+| **Product and API** | Strategy intake, readable reports, chart interactions, downloads and approvals. | [Lane C](LANE_C.md) |
+
+The workspace uses **Next.js, React and TypeScript**, backed by **FastAPI**, with research agents built using **PydanticAI**. [Shared API contracts](packages/contracts/api.ts) · [Integration decisions](docs/INTEGRATION_DECISIONS.md)
+
+Next: connect rule definitions to evaluation, validate on new prospective data, expand timestamped market context and test recurring reviews with platform teams.
+
+Market data: Binance / Binance Vision and Alternative.me. [Data documentation](A/README.md) · [Mascot assets](docs/MASCOT_ASSET_GUIDE.md) · [MIT licence](LICENSE)
+
+**+EV — make every strategy earn its capital.**
