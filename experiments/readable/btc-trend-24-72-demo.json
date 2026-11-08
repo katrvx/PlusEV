@@ -1,0 +1,1129 @@
+{
+ "version": 1,
+ "headline": {
+  "finding": "Not proven. No filter passed, so the strategy stays unchanged.",
+  "meaning": "The held-out intervals still contain zero, and the critic rejected every proposed filter. The agents proposed 3 filters; 3 were rejected. The critic rejected all of them; the reasons are listed with each filter.",
+  "next_action": "Don't add capital or change the strategy on this evidence. Re-test it on data after the held-out window. Any saved paper plan stays saved, not running.",
+  "verdict": "INCONCLUSIVE",
+  "verdict_label": "Not proven",
+  "verdict_scope": "the original strategy, always on",
+  "verdict_source": "Lane A arbiter"
+ },
+ "stages": [
+  {
+   "stage": "Training",
+   "window": "2018-02-08 to 2023-05-07",
+   "what_happened": "The agents studied when the strategy makes and loses money, found 4 pattern(s), and tried 16 filter(s) on this data only.",
+   "result": "Original strategy +276.0% after costs (90% interval -40.8% to +2069.1%); before costs +760.2%, worst drawdown 65.5%.",
+   "evidence_ids": [
+    "ev_cost_attribu_bffac1ead1",
+    "ev_regime_perfo_b6c4c31002"
+   ]
+  },
+  {
+   "stage": "Validation",
+   "window": "2023-05-07 to 2025-02-02",
+   "what_happened": "Code scored 6 rule(s) once on data the agents never saw: their proposals and the reference rules, after costs.",
+   "result": "Original strategy +134.4% (90% interval +13.9% to +412.5%); cash +0.0%.",
+   "evidence_ids": [
+    "ev_arbiter_eval_c025d0b4bd",
+    "ev_arbiter_eval_90b1635947",
+    "ev_arbiter_eval_ff70b921ea",
+    "ev_arbiter_eval_93f7683b84",
+    "ev_arbiter_eval_f37c166e4a",
+    "ev_arbiter_eval_36fc1581cf"
+   ]
+  },
+  {
+   "stage": "Held-out test",
+   "window": "2025-02-02 to 2026-10-31",
+   "what_happened": "Scored once by Lane A's arbiter for the original strategy and its reference rules. No agent filter earned a look.",
+   "result": "the held-out intervals still contain zero, and the critic rejected every proposed filter.",
+   "evidence_ids": []
+  }
+ ],
+ "filters": [
+  {
+   "policy_id": "agent::gate_fg_q33_zero",
+   "label": "Flat when Fear & Greed index is low (≤ 28)",
+   "plain_rule": "When Fear & Greed index is above 28: full size. Otherwise: no position. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is not met.",
+   "proposed_by": "Proposer agent",
+   "stages_checked": [
+    "Training folds",
+    "Validation"
+   ],
+   "outcome": "rejected",
+   "outcome_label": "Rejected",
+   "reason": "The critic rejected it: Severe sentiment regime shift between train and validation causes the gate to be almost always on in validation: allocation_mix is 1.0 for 96.58% of in-position decisions and 0.0…",
+   "validation_vs_original_pp": 0.3204690522959699,
+   "validation_vs_original_ci_pp": [
+    -0.020050196430847458,
+    0.8678062529029135
+   ],
+   "validation_own_return": 1.6645107890555084,
+   "average_size_on_validation": 0.9658028635664418,
+   "held_out": null,
+   "details": [
+    "validation: delta vs always-on +0.3205 (90% CI -0.0201..+0.8678), net return +1.6645 = delta vs cash",
+    "validation CI includes zero; the frozen test decides",
+    "vs Lane A regime filter on validation: +0.5235 (reference, not a veto)",
+    "degenerate: one multiplier on 97% of in-position validation decisions",
+    "walk-forward on train folds: beats always-on on 2/3 (-0.4774, +0.2833, +0.2212); stability check, not a veto",
+    "critic veto: verdict 'reject'",
+    "critic (blocking): Severe sentiment regime shift between train and validation (ev_strategy_hea_36802850f0: sentiment_regime_shares total_variation 0.4016, with fear dropping from 50.52% in train to 10.37% in validation) causes the gate to be almost always on in validation: allocation_mix is 1.0 for 96.58% of in-position decisions and 0.0 for only 3.42% (ev_arbiter_eval_c025d0b4bd, vs 30.38% gated in train). Evaluating a 0.33-quantile gate on a 3.42% validation tail is fragile and under-sampled.",
+    "critic: Many gate policies were attempted on train until the gate-test budget was exhausted. Across evaluated train gates, every 90% ci_delta spans zero, including this gate's train ci_delta of [-10.75, 4.739] (ev_test_gate_tr_f2ebe6b36c).",
+    "critic: The apparent validation gain (+0.3205) comes from gating just 3.42% of validation exposure during a major sentiment_regime shift (greed rose from 49.48% to 89.63%, ev_strategy_hea_36802850f0) and increased validation turnover slightly from 250 to 254 (ev_arbiter_eval_c025d0b4bd), rather than cutting turnover as hypothesized on train (540 vs 752).",
+    "critic: Walk-forward fold 1 on train shows negative delta_net_return_vs_always_on of -0.4774 (net_return 0.05084 vs always_on, 90% CI [-1.956, 0.1134] in ev_walk_forward_3ec0c800b1), contradicting the full-train positive delta (+0.2488).",
+    "critic: Testing the fear_greed median threshold (39) in agent::p4_fg_med produced a negative train delta_net_return_vs_always_on of -0.6991 (ev_test_gate_tr_bf17dcf725), showing sensitivity to the exact quantile cut (28 at the 0.33 quantile in ev_feature_grid_6306a31306)."
+   ],
+   "spec": {
+    "policy_id": "agent::gate_fg_q33_zero",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "fear_greed",
+      "op": ">",
+      "threshold": 28.0
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_regime_perfo_b6c4c31002",
+    "ev_feature_grid_6306a31306",
+    "ev_test_gate_tr_f2ebe6b36c",
+    "ev_arbiter_eval_c025d0b4bd",
+    "ev_test_gate_tr_f2ebe6b36c",
+    "ev_arbiter_eval_c025d0b4bd",
+    "ev_strategy_hea_36802850f0",
+    "ev_walk_forward_3ec0c800b1",
+    "ev_walk_forward_1e3c448299",
+    "ev_walk_forward_736807d328",
+    "ev_test_gate_tr_bf17dcf725",
+    "ev_feature_grid_6306a31306"
+   ]
+  },
+  {
+   "policy_id": "agent::gate_fg_q33_half",
+   "label": "Half size when Fear & Greed index is low (≤ 28)",
+   "plain_rule": "When Fear & Greed index is above 28: full size. Otherwise: half size. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to half size when the condition is not met.",
+   "proposed_by": "Proposer agent",
+   "stages_checked": [
+    "Training folds",
+    "Validation"
+   ],
+   "outcome": "rejected",
+   "outcome_label": "Rejected",
+   "reason": "The critic rejected it: Because sentiment_regime shifted sharply between train and validation, this gate is almost always on at full size in validation: allocation_mix is 1.0 for 96.58% of in-position de…",
+   "validation_vs_original_pp": 0.15750979750366279,
+   "validation_vs_original_ci_pp": [
+    -0.005730734534033876,
+    0.43106890604772974
+   ],
+   "validation_own_return": 1.5015515342632013,
+   "average_size_on_validation": 0.982901431783221,
+   "held_out": null,
+   "details": [
+    "validation: delta vs always-on +0.1575 (90% CI -0.0057..+0.4311), net return +1.5016 = delta vs cash",
+    "validation CI includes zero; the frozen test decides",
+    "vs Lane A regime filter on validation: +0.3606 (reference, not a veto)",
+    "degenerate: one multiplier on 97% of in-position validation decisions",
+    "walk-forward on train folds: beats always-on on 2/3 (-0.2450, +0.1571, +0.1175); stability check, not a veto",
+    "critic veto: verdict 'reject'",
+    "critic (blocking): Because sentiment_regime shifted sharply between train and validation (fear share fell from 50.52% to 10.37%, total_variation 0.4016 in ev_strategy_hea_36802850f0), this gate is almost always on at full size in validation: allocation_mix is 1.0 for 96.58% of in-position decisions and 0.5 for only 3.42% (ev_arbiter_eval_90b1635947, vs 30.38% at 0.5 in train). A half-sizing rule active on only 3.42% of validation bars is too rarely triggered to provide reliable out-of-sample evidence.",
+    "critic: Selected after multiple train trials where most candidates lost to always_on; the train 90% ci_delta [-5.495, 2.387] is wide and spans zero (ev_test_gate_tr_74ae879b29).",
+    "critic: The rationale claims turnover reduction, which occurred on train (646 vs 752, though n_switches rose from 752 to 819 in ev_test_gate_tr_74ae879b29), but on validation turnover slightly increased from 250 to 252 and n_switches rose from 250 to 263 (ev_arbiter_eval_90b1635947).",
+    "critic: Walk-forward fold 1 on train underperforms always_on with delta_net_return_vs_always_on of -0.2450 (90% CI [-1.159, 0.07208], ev_walk_forward_a0edce91b1), and walk-forward fold 3 yields negative net_return of -0.06705 (ev_walk_forward_0a8fe898de).",
+    "critic: Scaling fear_greed at the median (39 in ev_feature_grid_6306a31306) to 0.5 in agent::p6_fg_med_half produced a negative train delta_net_return_vs_always_on of -0.1312 (ev_test_gate_tr_d16ce2e569)."
+   ],
+   "spec": {
+    "policy_id": "agent::gate_fg_q33_half",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "fear_greed",
+      "op": ">",
+      "threshold": 28.0
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.5,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_regime_perfo_b6c4c31002",
+    "ev_feature_grid_6306a31306",
+    "ev_test_gate_tr_74ae879b29",
+    "ev_arbiter_eval_90b1635947",
+    "ev_test_gate_tr_74ae879b29",
+    "ev_arbiter_eval_90b1635947",
+    "ev_strategy_hea_36802850f0",
+    "ev_walk_forward_a0edce91b1",
+    "ev_walk_forward_3160a22e94",
+    "ev_walk_forward_0a8fe898de",
+    "ev_test_gate_tr_d16ce2e569",
+    "ev_feature_grid_6306a31306"
+   ]
+  },
+  {
+   "policy_id": "agent::gate_mom7d_q33_half",
+   "label": "Half size when 7-day price momentum is low (≤ -0.02482)",
+   "plain_rule": "When 7-day price momentum is above -0.02482: full size. Otherwise: half size. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to half size when the condition is not met.",
+   "proposed_by": "Proposer agent",
+   "stages_checked": [
+    "Training folds",
+    "Validation"
+   ],
+   "outcome": "rejected",
+   "outcome_label": "Rejected",
+   "reason": "The critic rejected it: The proposal is partly motivated by H1/H4 regime performance in trend_regime, where the bear bucket has only n_trades = 2 across 15278 decisions.",
+   "validation_vs_original_pp": -0.2801587897814395,
+   "validation_vs_original_ci_pp": [
+    -0.9376040648453194,
+    0.005308255880907505
+   ],
+   "validation_own_return": 1.063882946978099,
+   "average_size_on_validation": 0.9389421370252041,
+   "held_out": null,
+   "details": [
+    "validation: delta vs always-on -0.2802 (90% CI -0.9376..+0.0053), net return +1.0639 = delta vs cash",
+    "does not beat always-on on validation after costs",
+    "validation CI includes zero; the frozen test decides",
+    "vs Lane A regime filter on validation: -0.0771 (reference, not a veto)",
+    "walk-forward on train folds: beats always-on on 2/3 (+0.0198, +0.1486, -0.0159); stability check, not a veto",
+    "critic veto: verdict 'reject'",
+    "critic (blocking): The proposal is partly motivated by H1/H4 regime performance in trend_regime, where the bear bucket has only n_trades = 2 across 15278 decisions (ev_regime_perfo_b6c4c31002 explicitly flags small trade-count buckets as fragile).",
+    "critic: The train gain (+0.3637, 90% ci_delta [-2.579, 3.247] in ev_test_gate_tr_6e097a66c6) did not generalize to validation (-0.2802 in ev_arbiter_eval_ff70b921ea). Both train and validation exhibit higher turnover and switching than always_on (train turnover 885 vs 752, n_switches 1259 vs 752; validation turnover 296 vs 250, n_switches 401 vs 250).",
+    "critic: Validation directly contradicts the train improvement and triggers the proposal's own falsification test: delta_net_return_vs_always_on is -0.2802 (90% CI [-0.9376, 0.005308]), net_return drops from 1.344 to 1.064, Sharpe drops from 1.602 to 1.437, Sortino drops from 1.645 to 1.453, and max_drawdown worsens from 0.2895 to 0.2957 (ev_arbiter_eval_ff70b921ea).",
+    "critic: Walk-forward fold 3 on train also has a negative delta_net_return_vs_always_on of -0.01590 (net_return -0.2005, 90% CI [-0.3019, 0.1207] in ev_walk_forward_a15c875ec9)."
+   ],
+   "spec": {
+    "policy_id": "agent::gate_mom7d_q33_half",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "momentum_7d",
+      "op": ">",
+      "threshold": -0.0248157846952937
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.5,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_regime_perfo_b6c4c31002",
+    "ev_cost_attribu_bffac1ead1",
+    "ev_feature_grid_6306a31306",
+    "ev_test_gate_tr_6e097a66c6",
+    "ev_arbiter_eval_ff70b921ea",
+    "ev_test_gate_tr_6e097a66c6",
+    "ev_arbiter_eval_ff70b921ea",
+    "ev_regime_perfo_b6c4c31002",
+    "ev_walk_forward_e7b725933f",
+    "ev_walk_forward_91a0845af8",
+    "ev_walk_forward_a15c875ec9"
+   ]
+  },
+  {
+   "policy_id": "rule::trend_up_and_vol_below_train_median",
+   "label": "Simple reference rule",
+   "plain_rule": "When 24-hour price momentum is above 0 and 7-day volatility is at or below 0.006409: full size. Otherwise: no position. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is not met.",
+   "proposed_by": "Reference rule (Lane A)",
+   "stages_checked": [
+    "Training folds",
+    "Validation"
+   ],
+   "outcome": "reference",
+   "outcome_label": "Comparison only",
+   "reason": "A comparison the agents' filters must beat. Never a candidate.",
+   "validation_vs_original_pp": -1.5996619835259125,
+   "validation_vs_original_ci_pp": [
+    -3.77230462488003,
+    -0.6202574319502335
+   ],
+   "validation_own_return": -0.25562024676637396,
+   "average_size_on_validation": 0.559460418885339,
+   "held_out": null,
+   "details": [
+    "competitor: always carried to the frozen test for comparison",
+    "validation: delta vs always-on -1.5997, net return -0.2556 = delta vs cash",
+    "walk-forward on train folds: beats always-on on 0/3 (-0.4436, -0.5077, -0.2446); stability check, not a veto"
+   ],
+   "spec": {
+    "policy_id": "rule::trend_up_and_vol_below_train_median",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "momentum_24h",
+      "op": ">",
+      "threshold": 0.0
+     },
+     {
+      "feature": "realized_vol_7d",
+      "op": "<=",
+      "threshold": 0.006409240155854519
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_arbiter_eval_93f7683b84"
+   ]
+  },
+  {
+   "policy_id": "meta::lgbm_gate_v1",
+   "label": "LightGBM model filter",
+   "plain_rule": "A rule supplied by Lane A; its exact settings are in the spec.",
+   "exposure_change": "Changes position size between 0, half and full by market regime.",
+   "proposed_by": "Reference rule (Lane A)",
+   "stages_checked": [
+    "Validation"
+   ],
+   "outcome": "reference",
+   "outcome_label": "Comparison only",
+   "reason": "A comparison the agents' filters must beat. Never a candidate.",
+   "validation_vs_original_pp": -1.711857375404519,
+   "validation_vs_original_ci_pp": [
+    -4.20158673882677,
+    -0.5638639530482535
+   ],
+   "validation_own_return": -0.36781563864498046,
+   "average_size_on_validation": 0.44024375813513195,
+   "held_out": null,
+   "details": [
+    "competitor: always carried to the frozen test for comparison",
+    "validation: delta vs always-on -1.7119, net return -0.3678 = delta vs cash",
+    "Lane A refit walk-forward (model refit before each train fold): beats always-on on 0/3 (-1.0167, -1.0240, -0.4176); stability check, not a veto"
+   ],
+   "spec": {
+    "policy_id": "meta::lgbm_gate_v1",
+    "family": "lgbm_gate",
+    "features": [
+     "momentum_24h",
+     "momentum_7d",
+     "realized_vol_7d",
+     "atr_14",
+     "price_drawdown",
+     "volume_zscore",
+     "fear_greed"
+    ],
+    "thresholds": [
+     0.4811733154542407,
+     0.5211733154542407
+    ],
+    "base_rate": 0.5011733154542407,
+    "band": 0.02,
+    "fitted_on": "train",
+    "calibrated_on": "train_tail",
+    "seed": 7,
+    "model_hash": "4eab16b86c48336b"
+   },
+   "evidence_ids": [
+    "ev_arbiter_eval_f37c166e4a"
+   ]
+  },
+  {
+   "policy_id": "rule::regime_filter",
+   "label": "Lane A regime filter",
+   "plain_rule": "A rule supplied by Lane A; its exact settings are in the spec.",
+   "exposure_change": "Changes position size between 0, half and full by market regime.",
+   "proposed_by": "Reference rule (Lane A)",
+   "stages_checked": [
+    "Training folds",
+    "Validation"
+   ],
+   "outcome": "reference",
+   "outcome_label": "Comparison only",
+   "reason": "A comparison the agents' filters must beat. Never a candidate.",
+   "validation_vs_original_pp": -0.20304388581964572,
+   "validation_vs_original_ci_pp": [
+    -0.6971521319216459,
+    0.026385831232387604
+   ],
+   "validation_own_return": 1.1409978509398928,
+   "average_size_on_validation": 0.9886403975860845,
+   "held_out": null,
+   "details": [
+    "competitor: always carried to the frozen test for comparison",
+    "validation: delta vs always-on -0.2030, net return +1.1410 = delta vs cash",
+    "degenerate: one multiplier on 99% of in-position validation decisions",
+    "walk-forward on train folds: beats always-on on 2/3 (+0.0005, +0.0587, -0.1519); stability check, not a veto",
+    "Lane A: Train intervals only: full size in trend_regime=bull, vol_regime=low, liquidity_regime=deep, sentiment_regime=greed; allocation 0 in the remaining regimes."
+   ],
+   "spec": {
+    "policy_id": "rule::regime_filter",
+    "family": "regime_gate",
+    "flat_buckets": [],
+    "full_buckets": [
+     {
+      "axis": "trend_regime",
+      "bucket": "bull"
+     },
+     {
+      "axis": "vol_regime",
+      "bucket": "low"
+     },
+     {
+      "axis": "liquidity_regime",
+      "bucket": "deep"
+     },
+     {
+      "axis": "sentiment_regime",
+      "bucket": "greed"
+     }
+    ],
+    "allocation_flat": 0.0,
+    "allocation_full": 1.0,
+    "allocation_else": 0.0,
+    "selected_on": "train",
+    "summary": "Train intervals only: full size in trend_regime=bull, vol_regime=low, liquidity_regime=deep, sentiment_regime=greed; allocation 0 in the remaining regimes."
+   },
+   "evidence_ids": [
+    "ev_arbiter_eval_36fc1581cf"
+   ]
+  },
+  {
+   "policy_id": "agent::p3_rvol_q67",
+   "label": "Flat when 7-day volatility is high (> 0.00753)",
+   "plain_rule": "When 7-day volatility is at or below 0.00753: full size. Otherwise: no position. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is not met.",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [
+    "Training"
+   ],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Tried on Training (-116.7 pp vs the original) but the agent did not propose it, so it was never checked on Validation.",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": {
+    "policy_id": "agent::p3_rvol_q67",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "realized_vol_7d",
+      "op": "<=",
+      "threshold": 0.00752986390446431
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_test_gate_tr_ca1e3eaf91"
+   ]
+  },
+  {
+   "policy_id": "agent::p2_volz_med",
+   "label": "Flat when trading volume vs normal is low (≤ -0.07709)",
+   "plain_rule": "When trading volume vs normal is above -0.07709: full size. Otherwise: no position. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is not met.",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [
+    "Training"
+   ],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Tried on Training (-180.0 pp vs the original) but the agent did not propose it, so it was never checked on Validation.",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": {
+    "policy_id": "agent::p2_volz_med",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "volume_zscore",
+      "op": ">",
+      "threshold": -0.0770887175316131
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_test_gate_tr_bca420d2d1"
+   ]
+  },
+  {
+   "policy_id": "agent::p4_fg_med",
+   "label": "Flat when Fear & Greed index is low (≤ 39)",
+   "plain_rule": "When Fear & Greed index is above 39: full size. Otherwise: no position. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is not met.",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [
+    "Training"
+   ],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Tried on Training (-69.9 pp vs the original) but the agent did not propose it, so it was never checked on Validation.",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": {
+    "policy_id": "agent::p4_fg_med",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "fear_greed",
+      "op": ">",
+      "threshold": 39.0
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_test_gate_tr_bf17dcf725"
+   ]
+  },
+  {
+   "policy_id": "agent::p1_mom7d_med",
+   "label": "Flat when 7-day price momentum is low (≤ 0.004282)",
+   "plain_rule": "When 7-day price momentum is above 0.004282: full size. Otherwise: no position. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is not met.",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [
+    "Training"
+   ],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Tried on Training (-53.3 pp vs the original) but the agent did not propose it, so it was never checked on Validation.",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": {
+    "policy_id": "agent::p1_mom7d_med",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "momentum_7d",
+      "op": ">",
+      "threshold": 0.00428240561340587
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_test_gate_tr_23445473f1"
+   ]
+  },
+  {
+   "policy_id": "agent::p8_volz_q33_half",
+   "label": "Half size when trading volume vs normal is low (≤ -0.2419)",
+   "plain_rule": "When trading volume vs normal is above -0.2419: full size. Otherwise: half size. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to half size when the condition is not met.",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [
+    "Training"
+   ],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Tried on Training (-139.9 pp vs the original) but the agent did not propose it, so it was never checked on Validation.",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": {
+    "policy_id": "agent::p8_volz_q33_half",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "volume_zscore",
+      "op": ">",
+      "threshold": -0.241884982460844
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.5,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_test_gate_tr_6c5d42fac8"
+   ]
+  },
+  {
+   "policy_id": "agent::p7_rvol_q67_half",
+   "label": "Half size when 7-day volatility is high (> 0.00753)",
+   "plain_rule": "When 7-day volatility is at or below 0.00753: full size. Otherwise: half size. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to half size when the condition is not met.",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [
+    "Training"
+   ],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Tried on Training (-36.4 pp vs the original) but the agent did not propose it, so it was never checked on Validation.",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": {
+    "policy_id": "agent::p7_rvol_q67_half",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "realized_vol_7d",
+      "op": "<=",
+      "threshold": 0.00752986390446431
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.5,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_test_gate_tr_fb1d7e6337"
+   ]
+  },
+  {
+   "policy_id": "agent::p6_fg_med_half",
+   "label": "Half size when Fear & Greed index is low (≤ 39)",
+   "plain_rule": "When Fear & Greed index is above 39: full size. Otherwise: half size. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to half size when the condition is not met.",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [
+    "Training"
+   ],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Tried on Training (-13.1 pp vs the original) but the agent did not propose it, so it was never checked on Validation.",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": {
+    "policy_id": "agent::p6_fg_med_half",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "fear_greed",
+      "op": ">",
+      "threshold": 39.0
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.5,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_test_gate_tr_d16ce2e569"
+   ]
+  },
+  {
+   "policy_id": "agent::p5_dd_med",
+   "label": "Flat when distance below the recent high is low (≤ -0.04068)",
+   "plain_rule": "When distance below the recent high is above -0.04068: full size. Otherwise: no position. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is not met.",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [
+    "Training"
+   ],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Tried on Training (-205.5 pp vs the original) but the agent did not propose it, so it was never checked on Validation.",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": {
+    "policy_id": "agent::p5_dd_med",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "price_drawdown",
+      "op": ">",
+      "threshold": -0.0406775377470655
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_test_gate_tr_70e103381b"
+   ]
+  },
+  {
+   "policy_id": "agent::p10_mom7d_q33_zero",
+   "label": "Flat when 7-day price momentum is low (≤ -0.02482)",
+   "plain_rule": "When 7-day price momentum is above -0.02482: full size. Otherwise: no position. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is not met.",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [
+    "Training"
+   ],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Tried on Training (+49.0 pp vs the original) but the agent did not propose it, so it was never checked on Validation.",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": {
+    "policy_id": "agent::p10_mom7d_q33_zero",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "momentum_7d",
+      "op": ">",
+      "threshold": -0.0248157846952937
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_test_gate_tr_6a4527890e"
+   ]
+  },
+  {
+   "policy_id": "agent::p11_fg_q33_half",
+   "label": "Half size when Fear & Greed index is low (≤ 28)",
+   "plain_rule": "When Fear & Greed index is above 28: full size. Otherwise: half size. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to half size when the condition is not met.",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [
+    "Training"
+   ],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Tried on Training (+33.5 pp vs the original) but the agent did not propose it, so it was never checked on Validation.",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": {
+    "policy_id": "agent::p11_fg_q33_half",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "fear_greed",
+      "op": ">",
+      "threshold": 28.0
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.5,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_test_gate_tr_74ae879b29"
+   ]
+  },
+  {
+   "policy_id": "agent::p12_fg_q33_zero",
+   "label": "Flat when Fear & Greed index is low (≤ 28)",
+   "plain_rule": "When Fear & Greed index is above 28: full size. Otherwise: no position. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is not met.",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [
+    "Training"
+   ],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Tried on Training (+24.9 pp vs the original) but the agent did not propose it, so it was never checked on Validation.",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": {
+    "policy_id": "agent::p12_fg_q33_zero",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "fear_greed",
+      "op": ">",
+      "threshold": 28.0
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_test_gate_tr_f2ebe6b36c"
+   ]
+  },
+  {
+   "policy_id": "agent::p9_mom7d_q33_half",
+   "label": "Half size when 7-day price momentum is low (≤ -0.02482)",
+   "plain_rule": "When 7-day price momentum is above -0.02482: full size. Otherwise: half size. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to half size when the condition is not met.",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [
+    "Training"
+   ],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Tried on Training (+36.4 pp vs the original) but the agent did not propose it, so it was never checked on Validation.",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": {
+    "policy_id": "agent::p9_mom7d_q33_half",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "momentum_7d",
+      "op": ">",
+      "threshold": -0.0248157846952937
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.5,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_test_gate_tr_6e097a66c6"
+   ]
+  },
+  {
+   "policy_id": "agent::p13_rvol_q80_half",
+   "label": "p13 rvol q80 half",
+   "plain_rule": "Not recorded: the settings of this training trial were not kept in the report.",
+   "exposure_change": "Not recorded",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Refused before it ran: agent gate-test budget exhausted",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": null,
+   "evidence_ids": []
+  },
+  {
+   "policy_id": "agent::p14_fg_q33_rvol_q80_half",
+   "label": "p14 fg q33 rvol q80 half",
+   "plain_rule": "Not recorded: the settings of this training trial were not kept in the report.",
+   "exposure_change": "Not recorded",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Refused before it ran: agent gate-test budget exhausted",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": null,
+   "evidence_ids": []
+  },
+  {
+   "policy_id": "agent::p15_mom7d_volz_q20_half",
+   "label": "p15 mom7d volz q20 half",
+   "plain_rule": "Not recorded: the settings of this training trial were not kept in the report.",
+   "exposure_change": "Not recorded",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Refused before it ran: agent gate-test budget exhausted",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": null,
+   "evidence_ids": []
+  },
+  {
+   "policy_id": "agent::p16_volz_q20_half",
+   "label": "p16 volz q20 half",
+   "plain_rule": "Not recorded: the settings of this training trial were not kept in the report.",
+   "exposure_change": "Not recorded",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Refused before it ran: agent gate-test budget exhausted",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": null,
+   "evidence_ids": []
+  }
+ ],
+ "filter_counts": {
+  "rejected": 3,
+  "not_run": 16,
+  "selected_for_further_testing": 0,
+  "approved": 0,
+  "reference": 3
+ },
+ "trace": [
+  {
+   "step": 1,
+   "actor": "Diagnostic agent",
+   "actor_kind": "AI agent",
+   "action": "proposed",
+   "title": "Found 4 pattern(s) in when the strategy works",
+   "summary": "On TRAIN, btc-trend-24-72-demo generates a gross_return of 7.602 across turnover of 752, but fees (4.402) and slippage (0.4402) reduce net_return to 2.760 (90% CI [-0.4083, 20.69]).",
+   "items": [
+    "Works better in an up-trend (medium confidence)",
+    "Works better in deep liquidity, thin liquidity (medium confidence)",
+    "Works better in greedy sentiment, low volatility (medium confidence)",
+    "Works worse in a sideways market (low confidence)"
+   ],
+   "changed_conclusion": null,
+   "evidence_ids": [
+    "ev_cost_attribu_bffac1ead1",
+    "ev_regime_perfo_b6c4c31002"
+   ]
+  },
+  {
+   "step": 2,
+   "actor": "Context agent",
+   "actor_kind": "AI agent",
+   "action": "checked",
+   "title": "Checked market mood around the best and worst weeks",
+   "summary": "Across the 4 best and 4 worst train weeks, overall Fear & Greed levels and 7-day changes do not cleanly separate good and bad weeks, though sample size is small (4 weeks per side).",
+   "items": [
+    "2 of the 4 best train weeks (best_week_1 and best_week_4) co-occurred with a greed-to-fear flip in the prior 3 days (72 bars), compared with the train base rate of 0.0956072351421189 (binomial_p_valu… (moderate)",
+    "0 of the 4 worst train weeks (worst_week_1, worst_week_2, worst_week_3, worst_week_4) co-occurred with either a fear-to-greed flip (train base rate 0.0930013576840538, binomial_p_value = 1) or a gree… (none)",
+    "Starting Fear & Greed levels and in-week averages do not cleanly separate best and worst weeks compared with the train mean Fear & Greed of 42.7779111120808. (weak)",
+    "Prior 7-day Fear & Greed changes and extreme sentiment shares overlap across best and worst weeks rather than separating them. (weak)"
+   ],
+   "changed_conclusion": null,
+   "evidence_ids": [
+    "ev_sentiment_ep_d4e0482482"
+   ]
+  },
+  {
+   "step": 3,
+   "actor": "Proposer agent",
+   "actor_kind": "AI agent",
+   "action": "proposed",
+   "title": "Tried 16 filter(s) on Training, proposed 3",
+   "summary": "Each filter only changes position size. The strategy's own signals are never touched.",
+   "items": [
+    "Flat when Fear & Greed index is low (≤ 28): H3 shows positive mean_net_return in sentiment_regime=greed (6.813e-05) while fear spans zero ([-4.077e-05, 6.468e-05]).",
+    "Half size when Fear & Greed index is low (≤ 28): Based on H3 (weak returns in sentiment_regime=fear), scaling allocation to 0.5 when fear_greed <= 28 preserves avg_holding_bars (63.47) while reducing turnover…",
+    "Half size when 7-day price momentum is low (≤ -0.02482): H1 and H4 show strong returns in trend_regime=bull (mean_net_return 0.0001275) and weak/negative returns in non-bull regimes."
+   ],
+   "changed_conclusion": null,
+   "evidence_ids": [
+    "ev_cost_attribu_bffac1ead1",
+    "ev_feature_grid_6306a31306",
+    "ev_regime_perfo_b6c4c31002",
+    "ev_test_gate_tr_6e097a66c6",
+    "ev_test_gate_tr_74ae879b29",
+    "ev_test_gate_tr_f2ebe6b36c"
+   ]
+  },
+  {
+   "step": 4,
+   "actor": "Code: scoring",
+   "actor_kind": "Code",
+   "action": "checked",
+   "title": "Scored 6 rule(s) on Validation and Training folds",
+   "summary": "2 of 3 agent filter(s) beat the original on Validation. Reference rules were scored the same way.",
+   "items": [
+    "Flat when Fear & Greed index is low (≤ 28): +32.0 pp vs the original, own return +166.5%",
+    "Half size when Fear & Greed index is low (≤ 28): +15.8 pp vs the original, own return +150.2%",
+    "Half size when 7-day price momentum is low (≤ -0.02482): -28.0 pp vs the original, own return +106.4%",
+    "Simple reference rule: -160.0 pp vs the original, own return -25.6%",
+    "LightGBM model filter: -171.2 pp vs the original, own return -36.8%",
+    "Lane A regime filter: -20.3 pp vs the original, own return +114.1%"
+   ],
+   "changed_conclusion": null,
+   "evidence_ids": [
+    "ev_regime_perfo_b6c4c31002",
+    "ev_regime_perfo_b6c4c31002",
+    "ev_regime_perfo_b6c4c31002",
+    "ev_arbiter_eval_93f7683b84",
+    "ev_arbiter_eval_f37c166e4a",
+    "ev_arbiter_eval_36fc1581cf"
+   ]
+  },
+  {
+   "step": 5,
+   "actor": "Code: health check",
+   "actor_kind": "Code",
+   "action": "checked",
+   "title": "Asked: unlucky or broken?",
+   "summary": "43 of 45 validation 14-day blocks fall inside the training range [-0.1334, +0.1952]: a loss alone does not show the strategy broke.",
+   "items": [],
+   "changed_conclusion": null,
+   "evidence_ids": [
+    "ev_strategy_hea_36802850f0"
+   ]
+  },
+  {
+   "step": 6,
+   "actor": "Critic agent",
+   "actor_kind": "AI agent",
+   "action": "challenged",
+   "title": "Challenged 3 filter(s): rejected 3",
+   "summary": "The critic looks for leakage, overfitting and fragile samples. It can block a filter, not approve one.",
+   "items": [
+    "Flat when Fear & Greed index is low (≤ 28): rejected — Severe sentiment regime shift between train and validation causes the gate to be almost always on in validation: allocation_mix is 1.0 for 96.58% of in-position decisions and 0.0 for only 3.42%.",
+    "Half size when Fear & Greed index is low (≤ 28): rejected — Because sentiment_regime shifted sharply between train and validation, this gate is almost always on at full size in validation: allocation_mix is 1.0 for 96.58% of in-position decisions and 0.5 for…",
+    "Half size when 7-day price momentum is low (≤ -0.02482): rejected — The proposal is partly motivated by H1/H4 regime performance in trend_regime, where the bear bucket has only n_trades = 2 across 15278 decisions."
+   ],
+   "changed_conclusion": "The filter with the best Validation number (Flat when Fear & Greed index is low (≤ 28), +32.0 pp) was rejected by the critic, so it could not be selected.",
+   "evidence_ids": [
+    "ev_arbiter_eval_90b1635947",
+    "ev_arbiter_eval_c025d0b4bd",
+    "ev_arbiter_eval_ff70b921ea",
+    "ev_feature_grid_6306a31306",
+    "ev_regime_perfo_b6c4c31002",
+    "ev_strategy_hea_36802850f0",
+    "ev_test_gate_tr_6e097a66c6",
+    "ev_test_gate_tr_74ae879b29"
+   ]
+  },
+  {
+   "step": 7,
+   "actor": "Code: selection rule",
+   "actor_kind": "Code",
+   "action": "decided",
+   "title": "No filter earned the held-out test",
+   "summary": "The rule was fixed before the run: beat the original with an interval above zero, beat cash, change something real, and not be rejected by the critic.",
+   "items": [
+    "Selected: none",
+    "no agent gate met the pre-registered rule"
+   ],
+   "changed_conclusion": null,
+   "evidence_ids": []
+  },
+  {
+   "step": 8,
+   "actor": "Lane A arbiter",
+   "actor_kind": "Code",
+   "action": "decided",
+   "title": "Strategy verdict: INCONCLUSIVE",
+   "summary": "the held-out intervals still contain zero, and the critic rejected every proposed filter.",
+   "items": [
+    "Applies to: the original strategy, always on"
+   ],
+   "changed_conclusion": null,
+   "evidence_ids": []
+  }
+ ],
+ "takeaway": {
+  "strategy": {
+   "strategy_id": "btc-trend-24-72-demo",
+   "what_we_have": "positions_and_reference",
+   "name": "BTC trend 24/72",
+   "rule": "Long BTCUSDT when the 24-hour moving average of the close is above the 72-hour average; otherwise flat.",
+   "parameters": {
+    "fast_bars": 24,
+    "slow_bars": 72,
+    "bar": "1h",
+    "side": "long or flat"
+   },
+   "source": "A/kok_a/strategies.py (_trend, version trend-sma-24-72-v1)",
+   "runnable_code_included": false,
+   "note": "The analysis used this strategy's positions. Its definition and the file that generates them are listed here; this report itself contains no runnable code."
+  },
+  "selected_filter": null,
+  "selected_filter_note": "No filter was selected, so there are no filter settings to take away.",
+  "evidence": [
+   {
+    "label": "Full agent report (every claim linked to a tool result)",
+    "path": "experiments/investigation_argon_lane_a.json"
+   },
+   {
+    "label": "Unlucky or broken check",
+    "evidence_id": "ev_strategy_hea_36802850f0"
+   }
+  ],
+  "plans": "Nothing here places orders. Any saved paper plan stays saved, not running."
+ },
+ "glossary": [
+  {
+   "term": "Original strategy",
+   "meaning": "The strategy exactly as supplied, always on. Nothing here changes its signals."
+  },
+  {
+   "term": "Filter",
+   "meaning": "A rule that only changes position size (0, half or full) depending on market conditions. Also called a gate."
+  },
+  {
+   "term": "Training",
+   "meaning": "The oldest data. Agents may study it and try filters on it."
+  },
+  {
+   "term": "Validation",
+   "meaning": "Later data the agents never saw. Code scores each proposed filter here, once."
+  },
+  {
+   "term": "Held-out test",
+   "meaning": "The newest data, sealed. Opened once, after the selection is committed, and never used to choose."
+  },
+  {
+   "term": "pp",
+   "meaning": "Percentage points: the difference between two returns, e.g. -29% vs -56% is +27 pp."
+  },
+  {
+   "term": "90% interval",
+   "meaning": "The range the result would likely fall in on similar data. If it contains zero, the effect is not proven."
+  },
+  {
+   "term": "Critic",
+   "meaning": "An AI agent whose job is to find reasons a filter will not hold up. It can reject a filter; it cannot approve one by itself."
+  },
+  {
+   "term": "Training folds",
+   "meaning": "Three slices of the Training data used as a stability check. Not unseen data."
+  }
+ ],
+ "generated_by": "code (packages/research_agents/presentation.py); no new numbers, no new decisions"
+}

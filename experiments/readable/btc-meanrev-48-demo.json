@@ -1,0 +1,773 @@
+{
+ "version": 1,
+ "headline": {
+  "finding": "Kill the original strategy. The agents' best filter lost less, but still lost money.",
+  "meaning": "On the held-out test the filter beat the original by +27.3 pp (90% interval +15.3 to +36.2 pp), and its own return was -28.9%. Most of that gain comes from holding a smaller position. A filter that loses less is not a new Keep verdict.",
+  "next_action": "Stop running this strategy. Do not deploy the filter as a fix. Any saved paper plan stays saved, not running.",
+  "verdict": "KILL",
+  "verdict_label": "Kill",
+  "verdict_scope": "the original strategy, always on",
+  "verdict_source": "Lane A arbiter"
+ },
+ "stages": [
+  {
+   "stage": "Training",
+   "window": "2018-02-08 to 2023-05-07",
+   "what_happened": "The agents studied when the strategy makes and loses money, found 3 pattern(s), and tried 6 filter(s) on this data only.",
+   "result": "Original strategy -89.6% after costs (90% interval -98.3% to -40.9%); before costs -56.2%, worst drawdown 92.4%.",
+   "evidence_ids": [
+    "ev_cost_attribu_3b02c64a23",
+    "ev_regime_perfo_df1c1d3a42"
+   ]
+  },
+  {
+   "stage": "Validation",
+   "window": "2023-05-07 to 2025-02-02",
+   "what_happened": "Code scored 6 rule(s) once on data the agents never saw: their proposals and the reference rules, after costs.",
+   "result": "Original strategy -19.5% (90% interval -55.9% to +51.1%); cash +0.0%.",
+   "evidence_ids": [
+    "ev_arbiter_eval_331dcbf243",
+    "ev_arbiter_eval_336eb0d1c6",
+    "ev_arbiter_eval_7567c6a362",
+    "ev_arbiter_eval_451aa59487",
+    "ev_arbiter_eval_714efadfec",
+    "ev_arbiter_eval_e5f63efcd4"
+   ]
+  },
+  {
+   "stage": "Held-out test",
+   "window": "2025-02-02 to 2026-10-31",
+   "what_happened": "Opened once (2026-11-08), after the report that chose the filter was committed. Nothing was chosen here.",
+   "result": "Beat the original by +27.3 pp (90% interval +15.3 to +36.2 pp). Worst drawdown 60.4% → 36.2%. Its own return was -28.9% — it still lost money.",
+   "evidence_ids": []
+  }
+ ],
+ "filters": [
+  {
+   "policy_id": "agent::vol_median_05_1",
+   "label": "Half size when 7-day volatility is low (≤ 0.006409)",
+   "plain_rule": "When 7-day volatility is above 0.006409: full size. Otherwise: half size. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to half size when the condition is not met.",
+   "proposed_by": "Proposer agent",
+   "stages_checked": [
+    "Training",
+    "Training folds",
+    "Validation",
+    "Held-out test"
+   ],
+   "outcome": "selected_for_further_testing",
+   "outcome_label": "Selected for further testing · not approved",
+   "reason": "Earned one held-out test, then lost money there (-28.9%), so it is not approved. Losing less than the original is not a fix.",
+   "validation_vs_original_pp": 0.2676008382296087,
+   "validation_vs_original_ci_pp": [
+    0.011091412158337866,
+    0.4088607111933503
+   ],
+   "validation_own_return": 0.07276541127297365,
+   "average_size_on_validation": 0.5665859564164649,
+   "held_out": {
+    "looked_at": "2026-11-08T11:27:16.184157+00:00",
+    "vs_original_pp": 0.2727322285056284,
+    "vs_original_ci_pp": [
+     0.1528625359852689,
+     0.3616151497628489
+    ],
+    "own_return": -0.28921116015313264,
+    "original_return": -0.561943388658761,
+    "max_drawdown": 0.3615098273580968,
+    "original_max_drawdown": 0.604354358504603,
+    "summary": "Beat the original by +27.3 pp (90% interval +15.3 to +36.2 pp). Worst drawdown 60.4% → 36.2%. Its own return was -28.9% — it still lost money.",
+    "source": "experiments/frozen_look_btc-meanrev-48-demo.json"
+   },
+   "details": [
+    "validation: delta vs always-on +0.2676 (90% CI +0.0111..+0.4089), net return +0.0728 = delta vs cash",
+    "vs Lane A regime filter on validation: -0.2383 (reference, not a veto)",
+    "walk-forward on train folds: beats always-on on 3/3 (+0.2832, +0.0568, +0.1796); stability check, not a veto",
+    "critic: While multiple agent trials were explored on train and walk-forward fold 2 had a wide CI including zero ([-0.1346, 0.2441]), walk-forward folds 1 and 3 had positive CIs ([0.09795, 0.5821] and [0.05546, 0.3293]) and unseen validation confirms a statistically significant improvement ([0.01109, 0.4089]).",
+    "critic: In walk-forward fold 2 (ev_walk_forward_839ca8afd7), delta_net_return_vs_always_on drops to 0.05681 with a 90% ci_delta of [-0.1346, 0.2441] and net_return of -0.06429, showing the effect is not consistently positive across train sub-periods."
+   ],
+   "spec": {
+    "policy_id": "agent::vol_median_05_1",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "realized_vol_7d",
+      "op": ">",
+      "threshold": 0.00640924015585452
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.5,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_regime_perfo_df1c1d3a42",
+    "ev_feature_grid_6306a31306",
+    "ev_test_gate_tr_83c2982722",
+    "ev_arbiter_eval_7567c6a362",
+    "ev_test_gate_tr_83c2982722",
+    "ev_arbiter_eval_7567c6a362",
+    "ev_strategy_hea_312a17ad14",
+    "ev_walk_forward_2f373971d2",
+    "ev_walk_forward_839ca8afd7",
+    "ev_walk_forward_9d4fad6285"
+   ]
+  },
+  {
+   "policy_id": "agent::vol_median_0_1",
+   "label": "Flat when 7-day volatility is low (≤ 0.006409)",
+   "plain_rule": "When 7-day volatility is above 0.006409: full size. Otherwise: no position. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is not met.",
+   "proposed_by": "Proposer agent",
+   "stages_checked": [
+    "Training",
+    "Training folds",
+    "Validation"
+   ],
+   "outcome": "rejected",
+   "outcome_label": "Rejected",
+   "reason": "The critic rejected it: Due to a severe volatility regime shift between train and validation, this fixed train-median threshold leaves the gate off (0.0 allocation) 86.68% of the time and active only 13.…",
+   "validation_vs_original_pp": 0.5823376857336173,
+   "validation_vs_original_ci_pp": [
+    -0.035387515216757315,
+    1.0169497692494096
+   ],
+   "validation_own_return": 0.3875022587769823,
+   "average_size_on_validation": 0.13317191283292978,
+   "held_out": null,
+   "details": [
+    "validation: delta vs always-on +0.5823 (90% CI -0.0354..+1.0169), net return +0.3875 = delta vs cash",
+    "validation CI includes zero; the frozen test decides",
+    "vs Lane A regime filter on validation: +0.0764 (reference, not a veto)",
+    "walk-forward on train folds: beats always-on on 3/3 (+0.6898, +0.1030, +0.4077); stability check, not a veto",
+    "critic veto: verdict 'reject'",
+    "critic (blocking): Due to a severe volatility regime shift between train and validation (vol_regime=high dropped from 50.0% in train to 14.87% in validation, total variation 0.3513, ev_strategy_hea_312a17ad14), this fixed train-median threshold leaves the gate off (0.0 allocation) 86.68% of the time and active only 13.32% of the time on validation, reducing exposure to 0.0468 and turnover to 84 switches (ev_arbiter_eval_331dcbf243).",
+    "critic: Multiple agent policies across volatility and ATR thresholds were tested on train; selecting a fixed nominal volatility threshold (0.006409) does not adapt to non-stationary baseline volatility across regimes. Walk-forward fold 2 (ev_walk_forward_53bfb98595) also shows weak stability (delta 0.1030, 90% CI [-0.2689, 0.5254]).",
+    "critic: In walk-forward fold 2 (ev_walk_forward_53bfb98595), net_return is negative (-0.01807) and the 90% ci_delta [-0.2689, 0.5254] includes 0.",
+    "critic: On validation (ev_arbiter_eval_331dcbf243), the 90% ci_delta is [-0.03539, 1.017], which includes 0 and fails the proposal's own falsification test."
+   ],
+   "spec": {
+    "policy_id": "agent::vol_median_0_1",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "realized_vol_7d",
+      "op": ">",
+      "threshold": 0.00640924015585452
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_regime_perfo_df1c1d3a42",
+    "ev_feature_grid_6306a31306",
+    "ev_test_gate_tr_672dbef69d",
+    "ev_arbiter_eval_331dcbf243",
+    "ev_test_gate_tr_672dbef69d",
+    "ev_arbiter_eval_331dcbf243",
+    "ev_strategy_hea_312a17ad14",
+    "ev_walk_forward_23eb940bb2",
+    "ev_walk_forward_53bfb98595",
+    "ev_walk_forward_d58fb34ae3"
+   ]
+  },
+  {
+   "policy_id": "agent::vol_q67_0_1",
+   "label": "Flat when 7-day volatility is low (≤ 0.00753)",
+   "plain_rule": "When 7-day volatility is above 0.00753: full size. Otherwise: no position. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is not met.",
+   "proposed_by": "Proposer agent",
+   "stages_checked": [
+    "Training",
+    "Training folds",
+    "Validation"
+   ],
+   "outcome": "rejected",
+   "outcome_label": "Rejected",
+   "reason": "The critic rejected it: On validation, the gate is almost always off: allocation_mix is 93.89% at 0.0 and only 6.109% at 1.0, resulting in an exposure of just 0.02147 and only 44 position switches across…",
+   "validation_vs_original_pp": 0.47068874920923576,
+   "validation_vs_original_ci_pp": [
+    -0.18923694287362147,
+    0.8592221291128743
+   ],
+   "validation_own_return": 0.27585332225260073,
+   "average_size_on_validation": 0.061091450921959396,
+   "held_out": null,
+   "details": [
+    "validation: delta vs always-on +0.4707 (90% CI -0.1892..+0.8592), net return +0.2759 = delta vs cash",
+    "validation CI includes zero; the frozen test decides",
+    "vs Lane A regime filter on validation: -0.0353 (reference, not a veto)",
+    "walk-forward on train folds: beats always-on on 3/3 (+1.0076, +0.3703, +0.6975); stability check, not a veto",
+    "critic veto: verdict 'reject'",
+    "critic (blocking): On validation (ev_arbiter_eval_336eb0d1c6), the gate is almost always off: allocation_mix is 93.89% at 0.0 and only 6.109% at 1.0, resulting in an exposure of just 0.02147 and only 44 position switches across 15278 decisions (5369 in position). This extreme sparsity is caused by the shift in vol_regime=high from 50.0% in train to 14.87% in validation (ev_strategy_hea_312a17ad14).",
+    "critic: The threshold (0.007530) was selected after multiple train trials on the same feature family and fails to generalize statistically on validation (ci_delta [-0.1892, 0.8592]) as well as in walk-forward fold 2 (ci_delta [-0.2365, 1.102]).",
+    "critic: On validation (ev_arbiter_eval_336eb0d1c6), the 90% ci_delta is [-0.1892, 0.8592] (and ci_net_return is [-0.001340, 0.6699]), failing the proposal's falsification criterion that the 90% ci_delta must not include 0.",
+    "critic: In walk-forward fold 2 (ev_walk_forward_1de1a150d6), the 90% ci_delta [-0.2365, 1.102] also includes 0."
+   ],
+   "spec": {
+    "policy_id": "agent::vol_q67_0_1",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "realized_vol_7d",
+      "op": ">",
+      "threshold": 0.00752986390446431
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_regime_perfo_df1c1d3a42",
+    "ev_feature_grid_6306a31306",
+    "ev_test_gate_tr_7719f642ad",
+    "ev_arbiter_eval_336eb0d1c6",
+    "ev_test_gate_tr_7719f642ad",
+    "ev_arbiter_eval_336eb0d1c6",
+    "ev_strategy_hea_312a17ad14",
+    "ev_walk_forward_45ba401866",
+    "ev_walk_forward_1de1a150d6",
+    "ev_walk_forward_ef2b7465a2"
+   ]
+  },
+  {
+   "policy_id": "rule::trend_up_and_vol_below_train_median",
+   "label": "Simple reference rule",
+   "plain_rule": "When 24-hour price momentum is above 0 and 7-day volatility is at or below 0.006409: full size. Otherwise: no position. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is not met.",
+   "proposed_by": "Reference rule (Lane A)",
+   "stages_checked": [
+    "Training folds",
+    "Validation"
+   ],
+   "outcome": "reference",
+   "outcome_label": "Comparison only",
+   "reason": "A comparison the agents' filters must beat. Never a candidate.",
+   "validation_vs_original_pp": -0.21233360187687134,
+   "validation_vs_original_ci_pp": [
+    -0.9181056612632413,
+    0.1553085639312478
+   ],
+   "validation_own_return": -0.40716902883350636,
+   "average_size_on_validation": 0.09498975600670516,
+   "held_out": null,
+   "details": [
+    "competitor: always carried to the frozen test for comparison",
+    "validation: delta vs always-on -0.2123, net return -0.4072 = delta vs cash",
+    "walk-forward on train folds: beats always-on on 3/3 (+0.2204, +0.0154, +0.2455); stability check, not a veto"
+   ],
+   "spec": {
+    "policy_id": "rule::trend_up_and_vol_below_train_median",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "momentum_24h",
+      "op": ">",
+      "threshold": 0.0
+     },
+     {
+      "feature": "realized_vol_7d",
+      "op": "<=",
+      "threshold": 0.006409240155854519
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_arbiter_eval_451aa59487"
+   ]
+  },
+  {
+   "policy_id": "meta::lgbm_gate_v1",
+   "label": "LightGBM model filter",
+   "plain_rule": "A rule supplied by Lane A; its exact settings are in the spec.",
+   "exposure_change": "Changes position size between 0, half and full by market regime.",
+   "proposed_by": "Reference rule (Lane A)",
+   "stages_checked": [
+    "Validation"
+   ],
+   "outcome": "reference",
+   "outcome_label": "Comparison only",
+   "reason": "A comparison the agents' filters must beat. Never a candidate.",
+   "validation_vs_original_pp": -0.4129300614529534,
+   "validation_vs_original_ci_pp": [
+    -0.9729616805880864,
+    -0.1404031342871252
+   ],
+   "validation_own_return": -0.6077654884095884,
+   "average_size_on_validation": 0.4846340100577389,
+   "held_out": null,
+   "details": [
+    "competitor: always carried to the frozen test for comparison",
+    "validation: delta vs always-on -0.4129, net return -0.6078 = delta vs cash",
+    "Lane A refit walk-forward (model refit before each train fold): beats always-on on 2/3 (+0.0314, +0.0500, -0.1474); stability check, not a veto"
+   ],
+   "spec": {
+    "policy_id": "meta::lgbm_gate_v1",
+    "family": "lgbm_gate",
+    "features": [
+     "momentum_24h",
+     "momentum_7d",
+     "realized_vol_7d",
+     "atr_14",
+     "price_drawdown",
+     "volume_zscore",
+     "fear_greed"
+    ],
+    "thresholds": [
+     0.500761642578573,
+     0.5407616425785731
+    ],
+    "base_rate": 0.520761642578573,
+    "band": 0.02,
+    "fitted_on": "train",
+    "calibrated_on": "train_tail",
+    "seed": 7,
+    "model_hash": "d1004dd73788f064"
+   },
+   "evidence_ids": [
+    "ev_arbiter_eval_714efadfec"
+   ]
+  },
+  {
+   "policy_id": "rule::regime_filter",
+   "label": "Lane A regime filter",
+   "plain_rule": "A rule supplied by Lane A; its exact settings are in the spec.",
+   "exposure_change": "Changes position size between 0, half and full by market regime.",
+   "proposed_by": "Reference rule (Lane A)",
+   "stages_checked": [
+    "Training folds",
+    "Validation"
+   ],
+   "outcome": "reference",
+   "outcome_label": "Comparison only",
+   "reason": "A comparison the agents' filters must beat. Never a candidate.",
+   "validation_vs_original_pp": 0.5059420024530956,
+   "validation_vs_original_ci_pp": [
+    -0.11925847984295887,
+    0.9070216418123387
+   ],
+   "validation_own_return": 0.3111065754964606,
+   "average_size_on_validation": 0.12777053455019557,
+   "held_out": null,
+   "details": [
+    "competitor: always carried to the frozen test for comparison",
+    "validation: delta vs always-on +0.5059, net return +0.3111 = delta vs cash",
+    "walk-forward on train folds: beats always-on on 3/3 (+0.7282, +0.0878, +0.4779); stability check, not a veto",
+    "Lane A: Train intervals only: flat in trend_regime=bull, vol_regime=low; allocation 1 in the remaining regimes."
+   ],
+   "spec": {
+    "policy_id": "rule::regime_filter",
+    "family": "regime_gate",
+    "flat_buckets": [
+     {
+      "axis": "trend_regime",
+      "bucket": "bull"
+     },
+     {
+      "axis": "vol_regime",
+      "bucket": "low"
+     }
+    ],
+    "full_buckets": [],
+    "allocation_flat": 0.0,
+    "allocation_full": 1.0,
+    "allocation_else": 1.0,
+    "selected_on": "train",
+    "summary": "Train intervals only: flat in trend_regime=bull, vol_regime=low; allocation 1 in the remaining regimes."
+   },
+   "evidence_ids": [
+    "ev_arbiter_eval_e5f63efcd4"
+   ]
+  },
+  {
+   "policy_id": "agent::atr_median_0_1",
+   "label": "Flat when 14-bar average true range is low (≤ 0.008876)",
+   "plain_rule": "When 14-bar average true range is above 0.008876: full size. Otherwise: no position. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is not met.",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [
+    "Training"
+   ],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Tried on Training (+13.4 pp vs the original) but the agent did not propose it, so it was never checked on Validation.",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": {
+    "policy_id": "agent::atr_median_0_1",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "atr_14",
+      "op": ">",
+      "threshold": 0.0088758715619821
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_test_gate_tr_a2e3b18cad"
+   ]
+  },
+  {
+   "policy_id": "agent::vol_med_mom7d_33_0_1",
+   "label": "Flat when 7-day volatility is low (≤ 0.006409) or 7-day price momentum is low (≤ -0.02482)",
+   "plain_rule": "When 7-day volatility is above 0.006409 and 7-day price momentum is above -0.02482: full size. Otherwise: no position. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is not met.",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [
+    "Training"
+   ],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Tried on Training (+33.9 pp vs the original) but the agent did not propose it, so it was never checked on Validation.",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": {
+    "policy_id": "agent::vol_med_mom7d_33_0_1",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "realized_vol_7d",
+      "op": ">",
+      "threshold": 0.00640924015585452
+     },
+     {
+      "feature": "momentum_7d",
+      "op": ">",
+      "threshold": -0.0248157846952937
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_test_gate_tr_94ce5d5d69"
+   ]
+  },
+  {
+   "policy_id": "agent::vol_q33_0_1",
+   "label": "Flat when 7-day volatility is low (≤ 0.00535)",
+   "plain_rule": "When 7-day volatility is above 0.00535: full size. Otherwise: no position. Thresholds were set on Training data.",
+   "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is not met.",
+   "proposed_by": "Proposer agent (training trial)",
+   "stages_checked": [
+    "Training"
+   ],
+   "outcome": "not_run",
+   "outcome_label": "Not run on Validation",
+   "reason": "Tried on Training (+38.0 pp vs the original) but the agent did not propose it, so it was never checked on Validation.",
+   "validation_vs_original_pp": null,
+   "validation_vs_original_ci_pp": null,
+   "validation_own_return": null,
+   "average_size_on_validation": null,
+   "held_out": null,
+   "details": [],
+   "spec": {
+    "policy_id": "agent::vol_q33_0_1",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "realized_vol_7d",
+      "op": ">",
+      "threshold": 0.00534956285628434
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "evidence_ids": [
+    "ev_test_gate_tr_87c1f7c605"
+   ]
+  }
+ ],
+ "filter_counts": {
+  "rejected": 2,
+  "not_run": 3,
+  "selected_for_further_testing": 1,
+  "approved": 0,
+  "reference": 3
+ },
+ "trace": [
+  {
+   "step": 1,
+   "actor": "Diagnostic agent",
+   "actor_kind": "AI agent",
+   "action": "proposed",
+   "title": "Found 3 pattern(s) in when the strategy works",
+   "summary": "On the train split, the strategy loses money overall (always_on gross_return -0.5621, net_return -0.8963, 90% CI [-0.9831, -0.4089], Sharpe -0.5991).",
+   "items": [
+    "Works worse in low volatility (high confidence)",
+    "Works better in high volatility (low confidence)",
+    "Works worse in a down-trend (low confidence)"
+   ],
+   "changed_conclusion": null,
+   "evidence_ids": [
+    "ev_cost_attribu_3b02c64a23",
+    "ev_regime_perfo_df1c1d3a42"
+   ]
+  },
+  {
+   "step": 2,
+   "actor": "Context agent",
+   "actor_kind": "AI agent",
+   "action": "checked",
+   "title": "Checked market mood around the best and worst weeks",
+   "summary": "Across the 4 worst and 4 best train weeks, pre-week Fear & Greed levels, 7-day changes, and 3-day sentiment flips do not separate good and bad weeks.",
+   "items": [
+    "Starting Fear & Greed levels do not clearly separate the 4 worst weeks (52, 41, 61, 13) from the 4 best weeks (61, 14, 94, 75) compared with the train base rate mean_fear_greed of 42.7779111120808; b… (none)",
+    "7-day Fear & Greed changes prior to week start were mixed across both groups: +10, +2, -7, and +3 before worst_week_1, worst_week_2, worst_week_3, and worst_week_4 respectively, versus -6, -27, +1, a… (weak)",
+    "Greed/fear flips in the 3 days before a week started did not separate best and worst weeks: a fear-to-greed flip occurred in 1 of 4 worst weeks (worst_week_1) and 1 of 4 best weeks (best_week_1) comp… (none)",
+    "During the weeks themselves, all 4 worst weeks had 0 extreme_greed_share_in_week (train base rate 0.0964807016778304) and mean_fear_greed_in_week below the train mean of 42.7779111120808 (33.40476190… (weak)"
+   ],
+   "changed_conclusion": "Nothing strong enough to act on; it did not change the filters.",
+   "evidence_ids": [
+    "ev_sentiment_ep_bb5d9083a9"
+   ]
+  },
+  {
+   "step": 3,
+   "actor": "Proposer agent",
+   "actor_kind": "AI agent",
+   "action": "proposed",
+   "title": "Tried 6 filter(s) on Training, proposed 3",
+   "summary": "Each filter only changes position size. The strategy's own signals are never touched.",
+   "items": [
+    "Flat when 7-day volatility is low (≤ 0.006409): H1 and H2 show vol_regime=low loses -9.325e-05 per decision (90% CI [-0.0001297, -5.438e-05]) while vol_regime=high earns 2.387e-05.",
+    "Flat when 7-day volatility is low (≤ 0.00753): Per H1 and H2, restricting full allocation to the top tertile of volatility (realized_vol_7d > 0.007530) avoids low-vol losses (-9.325e-05 per decision) and fo…",
+    "Half size when 7-day volatility is low (≤ 0.006409): A softer de-risking variant for H1 and H2 that scales down to 0.5 when realized_vol_7d <= 0.006409 rather than halting completely."
+   ],
+   "changed_conclusion": null,
+   "evidence_ids": [
+    "ev_feature_grid_6306a31306",
+    "ev_regime_perfo_df1c1d3a42",
+    "ev_test_gate_tr_672dbef69d",
+    "ev_test_gate_tr_7719f642ad",
+    "ev_test_gate_tr_83c2982722"
+   ]
+  },
+  {
+   "step": 4,
+   "actor": "Code: scoring",
+   "actor_kind": "Code",
+   "action": "checked",
+   "title": "Scored 6 rule(s) on Validation and Training folds",
+   "summary": "3 of 3 agent filter(s) beat the original on Validation. Reference rules were scored the same way.",
+   "items": [
+    "Half size when 7-day volatility is low (≤ 0.006409): +26.8 pp vs the original, own return +7.3%",
+    "Flat when 7-day volatility is low (≤ 0.006409): +58.2 pp vs the original, own return +38.8%",
+    "Flat when 7-day volatility is low (≤ 0.00753): +47.1 pp vs the original, own return +27.6%",
+    "Simple reference rule: -21.2 pp vs the original, own return -40.7%",
+    "LightGBM model filter: -41.3 pp vs the original, own return -60.8%",
+    "Lane A regime filter: +50.6 pp vs the original, own return +31.1%"
+   ],
+   "changed_conclusion": null,
+   "evidence_ids": [
+    "ev_regime_perfo_df1c1d3a42",
+    "ev_regime_perfo_df1c1d3a42",
+    "ev_regime_perfo_df1c1d3a42",
+    "ev_arbiter_eval_451aa59487",
+    "ev_arbiter_eval_714efadfec",
+    "ev_arbiter_eval_e5f63efcd4"
+   ]
+  },
+  {
+   "step": 5,
+   "actor": "Code: health check",
+   "actor_kind": "Code",
+   "action": "checked",
+   "title": "Asked: unlucky or broken?",
+   "summary": "45 of 45 validation 14-day blocks fall inside the training range [-0.1623, +0.1235]: a loss alone does not show the strategy broke.",
+   "items": [],
+   "changed_conclusion": null,
+   "evidence_ids": [
+    "ev_strategy_hea_312a17ad14"
+   ]
+  },
+  {
+   "step": 6,
+   "actor": "Critic agent",
+   "actor_kind": "AI agent",
+   "action": "challenged",
+   "title": "Challenged 3 filter(s): rejected 2",
+   "summary": "The critic looks for leakage, overfitting and fragile samples. It can block a filter, not approve one.",
+   "items": [
+    "Flat when 7-day volatility is low (≤ 0.006409): rejected — Due to a severe volatility regime shift between train and validation, this fixed train-median threshold leaves the gate off (0.0 allocation) 86.68% of the time and active only 13.32% of the time on v…",
+    "Flat when 7-day volatility is low (≤ 0.00753): rejected — On validation, the gate is almost always off: allocation_mix is 93.89% at 0.0 and only 6.109% at 1.0, resulting in an exposure of just 0.02147 and only 44 position switches across 15278 decisions (53…",
+    "Half size when 7-day volatility is low (≤ 0.006409): approved for one held-out test — While multiple agent trials were explored on train and walk-forward fold 2 had a wide CI including zero ([-0.1346, 0.2441]), walk-forward folds 1 and 3 had positive CIs ([0.09795, 0.5821] and [0.0554…"
+   ],
+   "changed_conclusion": "The filter with the best Validation number (Flat when 7-day volatility is low (≤ 0.006409), +58.2 pp) was rejected by the critic, so it could not be selected.",
+   "evidence_ids": [
+    "ev_arbiter_eval_331dcbf243",
+    "ev_arbiter_eval_336eb0d1c6",
+    "ev_arbiter_eval_7567c6a362",
+    "ev_strategy_hea_312a17ad14",
+    "ev_test_gate_tr_672dbef69d",
+    "ev_test_gate_tr_7719f642ad",
+    "ev_test_gate_tr_83c2982722",
+    "ev_walk_forward_1de1a150d6"
+   ]
+  },
+  {
+   "step": 7,
+   "actor": "Code: selection rule",
+   "actor_kind": "Code",
+   "action": "decided",
+   "title": "Selected one filter for the held-out test",
+   "summary": "The rule was fixed before the run: beat the original with an interval above zero, beat cash, change something real, and not be rejected by the critic.",
+   "items": [
+    "Selected: Half size when 7-day volatility is low (≤ 0.006409)",
+    "champion agent::vol_median_05_1 beats always-on and cash on validation and passed the critic"
+   ],
+   "changed_conclusion": null,
+   "evidence_ids": []
+  },
+  {
+   "step": 8,
+   "actor": "Code: held-out test",
+   "actor_kind": "Code",
+   "action": "checked",
+   "title": "Opened the held-out test once",
+   "summary": "Beat the original by +27.3 pp (90% interval +15.3 to +36.2 pp). Worst drawdown 60.4% → 36.2%. Its own return was -28.9% — it still lost money.",
+   "items": [],
+   "changed_conclusion": "Selection did not become approval: the filter still lost money.",
+   "evidence_ids": []
+  },
+  {
+   "step": 9,
+   "actor": "Lane A arbiter",
+   "actor_kind": "Code",
+   "action": "decided",
+   "title": "Strategy verdict: KILL",
+   "summary": "held-out drawdown 60.4% is past the 40% cap and its net-return interval is entirely below zero. The agents' filter is not part of this verdict.",
+   "items": [
+    "Applies to: the original strategy, always on"
+   ],
+   "changed_conclusion": null,
+   "evidence_ids": []
+  }
+ ],
+ "takeaway": {
+  "strategy": {
+   "strategy_id": "btc-meanrev-48-demo",
+   "what_we_have": "positions_and_reference",
+   "name": "BTC mean reversion 48",
+   "rule": "Buy BTCUSDT when the 48-hour z-score of the close falls below -1; sell when it returns to 0.",
+   "parameters": {
+    "window_bars": 48,
+    "entry_z": -1.0,
+    "exit_z": 0.0,
+    "bar": "1h",
+    "side": "long or flat"
+   },
+   "source": "A/kok_a/strategies.py (_mean_reversion, version meanrev-z48-v1)",
+   "runnable_code_included": false,
+   "note": "The analysis used this strategy's positions. Its definition and the file that generates them are listed here; this report itself contains no runnable code."
+  },
+  "selected_filter": {
+   "policy_id": "agent::vol_median_05_1",
+   "label": "Half size when 7-day volatility is low (≤ 0.006409)",
+   "plain_rule": "When 7-day volatility is above 0.006409: full size. Otherwise: half size. Thresholds were set on Training data.",
+   "status": "Selected for further testing · not approved",
+   "spec": {
+    "policy_id": "agent::vol_median_05_1",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "realized_vol_7d",
+      "op": ">",
+      "threshold": 0.00640924015585452
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.5,
+    "thresholds_selected_on": "train"
+   }
+  },
+  "selected_filter_note": "Exact settings of the selected filter. It was tested once on held-out data and is not approved.",
+  "evidence": [
+   {
+    "label": "Full agent report (every claim linked to a tool result)",
+    "path": "experiments/investigation_argon_meanrev.json"
+   },
+   {
+    "label": "The one held-out test look",
+    "path": "experiments/frozen_look_btc-meanrev-48-demo.json"
+   },
+   {
+    "label": "Half size when 7-day volatility is low (≤ 0.006409): scoring evidence",
+    "evidence_id": "ev_regime_perfo_df1c1d3a42"
+   },
+   {
+    "label": "Half size when 7-day volatility is low (≤ 0.006409): scoring evidence",
+    "evidence_id": "ev_feature_grid_6306a31306"
+   },
+   {
+    "label": "Half size when 7-day volatility is low (≤ 0.006409): scoring evidence",
+    "evidence_id": "ev_test_gate_tr_83c2982722"
+   },
+   {
+    "label": "Unlucky or broken check",
+    "evidence_id": "ev_strategy_hea_312a17ad14"
+   }
+  ],
+  "plans": "Nothing here places orders. Any saved paper plan stays saved, not running."
+ },
+ "glossary": [
+  {
+   "term": "Original strategy",
+   "meaning": "The strategy exactly as supplied, always on. Nothing here changes its signals."
+  },
+  {
+   "term": "Filter",
+   "meaning": "A rule that only changes position size (0, half or full) depending on market conditions. Also called a gate."
+  },
+  {
+   "term": "Training",
+   "meaning": "The oldest data. Agents may study it and try filters on it."
+  },
+  {
+   "term": "Validation",
+   "meaning": "Later data the agents never saw. Code scores each proposed filter here, once."
+  },
+  {
+   "term": "Held-out test",
+   "meaning": "The newest data, sealed. Opened once, after the selection is committed, and never used to choose."
+  },
+  {
+   "term": "pp",
+   "meaning": "Percentage points: the difference between two returns, e.g. -29% vs -56% is +27 pp."
+  },
+  {
+   "term": "90% interval",
+   "meaning": "The range the result would likely fall in on similar data. If it contains zero, the effect is not proven."
+  },
+  {
+   "term": "Critic",
+   "meaning": "An AI agent whose job is to find reasons a filter will not hold up. It can reject a filter; it cannot approve one by itself."
+  },
+  {
+   "term": "Training folds",
+   "meaning": "Three slices of the Training data used as a stability check. Not unseen data."
+  }
+ ],
+ "generated_by": "code (packages/research_agents/presentation.py); no new numbers, no new decisions"
+}
