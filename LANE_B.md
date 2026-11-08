@@ -69,6 +69,20 @@ Spec section 8: a poor result alone is not proof that a strategy broke. Code, no
 
 On real data: 10 of 10 validation blocks fall inside the train range [−9.1%, +10.1%]. The −7.1% validation loss is therefore not by itself evidence that the strategy broke. One assumption did change: sentiment went from about 51% "fear" bars on train to 99% on validation. That is exactly why the agent's Fear & Greed gate collapsed.
 
+## Two strategies on real data
+
+Both of Lane A's demo strategies on the same BTCUSDT 1h snapshot (validation results; the test stays sealed):
+
+| | `btc-trend-24-72-demo` | `btc-meanrev-48-demo` |
+|---|---|---|
+| Train net (gross) | +5.1% (+27.8%) | −22.0% (+10.4%): costs eat the edge |
+| Validation always-on | −7.1%, 90% CI spans zero | −40.3%, 90% CI entirely below zero |
+| Bad luck vs broken | `within_training_range`: 10/10 two-week blocks inside the train range. Sentiment shifted | `outside_training_range`: 3/10 blocks below the range, more than chance. Cost per bar and sentiment shifted |
+| Best agent gate | `fear_greed > 53`, rejected: off 99% of validation after the sentiment shift | flat in low volatility: +14.3% vs always-on (CI above zero), 3/3 train folds, +3.8% vs the regime filter, but still −26% net, so it loses to cash and is rejected |
+| Lane B verdict | INCONCLUSIVE: looks like bad luck plus a regime change | INCONCLUSIVE for the gate, with a note to Lane A's arbiter that the strategy loses to cash: a kill candidate |
+
+Reports: `experiments/investigation_argon_lane_a.json` (Argon) and `experiments/investigation_lane_a_btc-meanrev-48-demo_deterministic_fallback.json` (deterministic agents).
+
 ## Run on Lane A
 
 The default loader is still `fixtures/lane_a_stub.py`, so `tests/test_lane_b.py` does not need the Binance snapshot.
@@ -77,7 +91,7 @@ The default loader is still `fixtures/lane_a_stub.py`, so `tests/test_lane_b.py`
 python3 scripts/run_investigation.py --lane-a --fallback
 python3 scripts/run_investigation.py --lane-a --fallback --experiment-id synthetic-btcusdt-1h-v1
 python3 scripts/run_investigation.py --lane-a --fallback --frozen
-# --lane-a writes experiments/investigation_lane_a_<mode>.json by default (never the synthetic fixture's name)
+# --lane-a writes experiments/investigation_lane_a_<strategy>_<mode>.json by default (never the synthetic fixture's name)
 KOK_AGENT_MODEL=google:gemini-4-argon GEMINI_API_KEY=... python3 scripts/run_investigation.py --lane-a   # LLM agents on real data
 ```
 

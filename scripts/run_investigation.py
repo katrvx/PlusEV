@@ -3,6 +3,7 @@
     python3 scripts/run_investigation.py                         # deterministic fallback on the Lane A stand-in
     python3 scripts/run_investigation.py --lane-a --fallback    # same agents, Lane A's development view
     python3 scripts/run_investigation.py --lane-a --fallback --frozen   # one sealed look at the accepted champion
+    python3 scripts/run_investigation.py --lane-a --fallback --experiment-id btc-meanrev-48-demo   # Lane A's second strategy
     KOK_AGENT_MODEL=google:gemini-3.8-flash GEMINI_API_KEY=... python3 scripts/run_investigation.py   # LLM agents
 """
 
@@ -30,7 +31,7 @@ def main():
     ap.add_argument("--frozen", action="store_true", help="with --lane-a, score each accepted candidate once on the sealed test")
     ap.add_argument("--out", type=Path, default=None,
                     help="default: experiments/investigation_fixture.json for the stand-in (Lane C labels it synthetic), "
-                         "experiments/investigation_lane_a_<mode>.json for --lane-a (real data, never the fixture name)")
+                         "experiments/investigation_lane_a_<strategy>_<mode>.json for --lane-a (real data, never the fixture name)")
     a = ap.parse_args()
     if a.frozen and not a.lane_a:
         raise SystemExit("--frozen scores Lane A's sealed test; pass --lane-a")
@@ -51,7 +52,7 @@ def main():
     else:
         report = investigate(a.experiment_id, force_fallback=a.fallback)
     if a.out is None:
-        name = f"investigation_lane_a_{report.agent_mode}.json" if a.lane_a else "investigation_fixture.json"
+        name = f"investigation_lane_a_{report.strategy_id}_{report.agent_mode}.json" if a.lane_a else "investigation_fixture.json"
         a.out = ROOT / "experiments" / name
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(report.model_dump_json(indent=2))
