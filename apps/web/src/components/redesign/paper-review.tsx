@@ -5,6 +5,7 @@ import { ArrowLeft, Check, CircleHelp, FileText, Loader2, LockKeyhole, ShieldChe
 import { API_ROUTES } from "../../../../../packages/contracts/api";
 import type { Experiment, PaperPlan, Strategy } from "./types";
 import { api } from "../../lib/api";
+import { canReviewPlan } from "./decision";
 import KineticText from "./kinetic-text";
 import { MascotCallout } from "./mascot";
 import "./paper-review.css";
@@ -22,7 +23,7 @@ export default function PaperReview({ experiment, strategy, onSaved, onBack }: {
   const nativeReport = isNativeReportSource(strategy.source) || isNativeReportSource(experiment.source);
   const reportNotEligible = nativeReport || experiment.paper_eligible === false;
   const publishedKill = reportNotEligible && experiment.verdict === "KILL";
-  const eligible = !reportNotEligible && experiment.status === "completed" && experiment.policy.holdout_frozen && experiment.policy.test_evaluated;
+  const eligible = !reportNotEligible && canReviewPlan(experiment);
   const example = experiment.mode === "demo";
   async function save() {
     if (!approved || saving || submitRef.current || !eligible) return;

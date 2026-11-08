@@ -21,16 +21,44 @@ from __future__ import annotations
 import json
 import os
 import re
-from decimal import Decimal, InvalidOperation
+import sys
+import time
 
 from pydantic import ValidationError
 from pydantic_ai import Agent, ModelRetry, RunContext
+from pydantic_ai.usage import UsageLimits
 
 from .allowlist import ALLOCATIONS, GATE_FEATURES, check_gate
-from .models import CritiqueSet, DiagnosticReport, ProposalSet, ThresholdCondition
+from .models import ContextReport, CritiqueSet, DiagnosticReport, ProposalSet, ThresholdCondition
 from .tools import HoldoutAccessError, ToolContext, spec_hash
 
 MODEL_ENV = "KOK_AGENT_MODEL"
+
+# Hard bounds so a slow or looping model can never hang the run (any breach -> fallback, disclosed).
+STAGE_TIMEOUT_S = float(os.environ.get("KOK_STAGE_TIMEOUT", "400"))     # whole agent stage
+REQUEST_TIMEOUT_S = float(os.environ.get("KOK_REQUEST_TIMEOUT", "180"))  # single model request (strong models can take >90s)
+MAX_REQUESTS = int(os.environ.get("KOK_MAX_REQUESTS", "15"))            # model round-trips per stage
+
+
+def _log(msg: str) -> None:
+    print(f"[agents] {msg}", file=sys.stderr, flush=True)
+
+
+def _run(agent: Agent, prompt: str, ctx: ToolContext, stage: str):
+    _log(f"{stage}: start (timeout {STAGE_TIMEOUT_S:.0f}s, max {MAX_REQUESTS} model requests)")
+    t0 = time.monotonic()
+    result = agent.run_sync(prompt, deps=ctx, timeout=STAGE_TIMEOUT_S,
+                            usage_limits=UsageLimits(request_limit=MAX_REQUESTS),
+                            model_settings={"timeout": REQUEST_TIMEOUT_S, "temperature": 0.2})
+    try:
+        u = result.usage
+        if not hasattr(u, "requests"):   # older pydantic-ai: usage() was a method
+            u = u()
+        stats = f", {u.requests} requests, {u.total_tokens} tokens"
+    except Exception:  # noqa: BLE001 - usage reporting must never discard a successful stage
+        stats = ""
+    _log(f"{stage}: done in {time.monotonic() - t0:.0f}s{stats}")
+    return result.output
 
 
 def configured_model() -> str | None:
@@ -43,100 +71,9 @@ def model_name(model) -> str | None:
     return model if isinstance(model, str) else getattr(model, "model_name", type(model).__name__)
 
 
-# ------------------------------------------------------------------ claim verification (shared with fallback)
+# ------------------------------------------------------------------ claim verification lives in verify.py
 
-NUM_RE = re.compile(r"(?<![A-Za-z_\d.])[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?%?(?![A-Za-z_\d])")
-TRIVIAL = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 90, 95, 100}
-
-
-def _evidence_numbers(obj, out: list[float]) -> list[float]:
-    if isinstance(obj, bool):
-        return out
-    if isinstance(obj, (int, float)):
-        out.append(float(obj))
-    elif isinstance(obj, dict):
-        for v in obj.values():
-            _evidence_numbers(v, out)
-    elif isinstance(obj, (list, tuple)):
-        for v in obj:
-            _evidence_numbers(v, out)
-    return out
-
-
-def unsupported_numbers(text: str, payloads: list[dict]) -> list[str]:
-    """Numbers in text that can't be matched (allowing %, bp and print rounding) to any cited payload."""
-    nums = _evidence_numbers(payloads, [])
-    bad = []
-    for tok in NUM_RE.findall(text):
-        pct = tok.endswith("%")
-        raw = tok.rstrip("%")
-        try:
-            d = Decimal(raw)
-        except InvalidOperation:
-            continue
-        val = float(d)
-        if not pct and val == int(val) and abs(val) in TRIVIAL:
-            continue
-        tol = 0.5 * 10 ** d.as_tuple().exponent
-        targets = [val / 100] if pct else [val, val / 100, val / 1e4]
-        if not any(abs(t - v) <= max(tol / (100 if pct else 1), 0.005 * abs(v)) for t in targets for v in nums):
-            bad.append(tok)
-    return bad
-
-
-def verify_diagnostic(ctx: ToolContext, out: DiagnosticReport) -> list[str]:
-    problems = []
-    for h in out.hypotheses:
-        missing = ctx.store.missing(h.evidence_ids)
-        if missing:
-            problems.append(f"{h.hypothesis_id}: unknown evidence ids {missing}")
-            continue
-        cited = [ctx.store.get(e).payload for e in h.evidence_ids]
-        buckets = {f"{r['regime_feature']}={r['bucket']}" for p in cited for r in p.get("rows", [])}
-        bad_conds = [c for c in h.conditions if c not in buckets]
-        if bad_conds:
-            problems.append(f"{h.hypothesis_id}: conditions {bad_conds} are not regime buckets in the cited regime_performance rows {sorted(buckets)}")
-        bad_nums = unsupported_numbers(h.statement, cited)
-        if bad_nums:
-            problems.append(f"{h.hypothesis_id}: numbers {bad_nums} do not appear in the cited evidence")
-    bad_summary = unsupported_numbers(out.summary, [e.payload for e in ctx.store.all()])
-    if bad_summary:
-        problems.append(f"summary: numbers {bad_summary} do not appear in any tool output")
-    return problems
-
-
-def verify_proposals(ctx: ToolContext, out: ProposalSet, hypothesis_ids: set[str]) -> list[str]:
-    problems = []
-    for p in out.proposals:
-        missing = ctx.store.missing(p.evidence_ids)
-        if missing:
-            problems.append(f"{p.proposal_id}: unknown evidence ids {missing}")
-        unknown = set(p.based_on) - hypothesis_ids
-        if unknown:
-            problems.append(f"{p.proposal_id}: based_on refers to unknown hypotheses {sorted(unknown)}; valid: {sorted(hypothesis_ids)}")
-        issues = check_gate([c.model_dump() for c in p.conditions], p.allocation_when_true, p.allocation_when_false,
-                            ctx.experiment.coverage, ctx.train_quantiles)
-        if issues:
-            problems.append(f"{p.proposal_id} violates the allowlist: {issues}. Call feature_grid and use its thresholds.")
-    return problems
-
-
-def verify_critiques(ctx: ToolContext, out: CritiqueSet, proposals: ProposalSet) -> list[str]:
-    problems = []
-    by_id = {p.proposal_id: spec_hash(p.to_policy_spec()) for p in proposals.proposals}
-    seen = {c.proposal_id for c in out.critiques}
-    if seen != set(by_id):
-        problems.append(f"critique exactly these proposals: {sorted(by_id)} (got {sorted(seen)})")
-    for c in out.critiques:
-        missing = ctx.store.missing(c.evidence_ids)
-        if missing:
-            problems.append(f"{c.proposal_id}: unknown evidence ids {missing}")
-            continue
-        h = by_id.get(c.proposal_id)
-        own = [e for e in c.evidence_ids if ctx.store.get(e).payload.get("spec_hash") == h]
-        if h and not own:
-            problems.append(f"{c.proposal_id}: cite at least one evaluation of this exact gate (see trial_log evidence_id)")
-    return problems
+from .verify import MIN_TRADES, unsupported_numbers, verify_context, verify_critiques, verify_diagnostic, verify_proposals  # noqa: E402,F401
 
 
 # ------------------------------------------------------------------ tool wrappers (what the LLM sees)
@@ -155,6 +92,7 @@ def _retry_on_bad_args(fn):
 
 
 def _train_only(ctx: RunContext[ToolContext], split: str) -> dict | None:
+    _log(f"  tool call: split={split!r}")
     if split == "train":
         return None
     if isinstance(split, str) and split.strip().lower() == "test":
@@ -178,12 +116,19 @@ def cost_attribution(ctx: RunContext[ToolContext], split: str = "train") -> dict
 
 def news_context(ctx: RunContext[ToolContext], start: str, end: str, decision_cutoff: str | None = None) -> dict:
     """Point-in-time news first seen between start and end (ISO datetimes; naive = UTC), not after decision_cutoff.
-    Only the development period is available. Contextual evidence only, never causal proof."""
+    Only the TRAIN period is available to you. Contextual evidence only, never causal proof."""
     try:
-        return _retry_on_bad_args(ctx.deps.news_context)(start, end, decision_cutoff)
+        return _retry_on_bad_args(ctx.deps.news_context)(start, end, decision_cutoff, agent=True)
     except HoldoutAccessError as exc:
         ctx.deps.attempt_holdout("news_context")
         return {"error": str(exc)}
+
+
+def sentiment_episodes(ctx: RunContext[ToolContext]) -> dict:
+    """Fear & Greed around the unchanged strategy's 4 worst and 4 best TRAIN weeks: level, 7-day change and
+    greed/fear flips in the 3 days before each week, plus train base rates and binomial p-values. Cite its evidence_id."""
+    _log("  tool call: sentiment_episodes")
+    return ctx.deps.sentiment_context()
 
 
 def feature_grid(ctx: RunContext[ToolContext]) -> dict:
@@ -196,11 +141,16 @@ def test_gate_train(ctx: RunContext[ToolContext], conditions: list[ThresholdCond
     """Evaluate a threshold gate on the TRAIN split only. conditions: 1-2 items of
     {"feature": str, "op": "<=" or ">", "threshold": float}; thresholds must come from feature_grid.
     Allocations must be 0.0, 0.5 or 1.0. Every call is logged and counts against a fixed budget."""
+    _log(f"  tool call: test_gate_train {policy_id}")
     spec = {"policy_id": f"agent::{policy_id}", "family": "threshold_gate",
             "conditions": [c.model_dump() if isinstance(c, ThresholdCondition) else c for c in conditions],
             "allocation_when_true": allocation_when_true, "allocation_when_false": allocation_when_false,
             "thresholds_selected_on": "train"}
-    return _retry_on_bad_args(ctx.deps.test_gate_train)(spec)
+    token = ctx.deps.enter_tool()
+    try:
+        return _retry_on_bad_args(ctx.deps.test_gate_train)(spec, stage_token=token)
+    finally:
+        ctx.deps.exit_tool()
 
 
 def lookup_evidence(ctx: RunContext[ToolContext], evidence_id: str) -> dict:
@@ -210,6 +160,13 @@ def lookup_evidence(ctx: RunContext[ToolContext], evidence_id: str) -> dict:
     return ctx.deps.store.get(evidence_id).model_dump(mode="json")
 
 
+def strategy_health(ctx: RunContext[ToolContext]) -> dict:
+    """Bad luck vs broken, computed by code: are the unchanged strategy's validation 14-day results inside its
+    train-only range, and which assumptions (exposure, turnover, costs, volatility, regime frequencies) changed
+    between train and validation? Returns an evidence_id to cite."""
+    return ctx.deps.health or {"error": "strategy health is not available for this loader"}
+
+
 def trial_log(ctx: RunContext[ToolContext]) -> list[dict]:
     """Every policy attempted so far (including refused ones), with train and arbiter validation results."""
     return [t.model_dump() for t in ctx.deps.trials]
@@ -217,29 +174,51 @@ def trial_log(ctx: RunContext[ToolContext]) -> list[dict]:
 
 # ------------------------------------------------------------------ agents
 
-DIAGNOSTIC_INSTRUCTIONS = """You are a quantitative research analyst supervising an EXISTING trading strategy that must not be changed.
+DIAGNOSTIC_INSTRUCTIONS = f"""You are a quantitative research analyst supervising an EXISTING trading strategy that must not be changed.
 Find WHEN it works and when it fails, using TRAIN data: regime_performance and cost_attribution; news_context only as context.
 Rules: every hypothesis cites evidence_id values returned by tools; its conditions must be regime buckets exactly as written in
-regime_performance rows (e.g. 'vol_regime=high'); any number you write must be copied from the cited tool output; treat buckets
-with fewer than 20 trades or confidence intervals spanning zero as weak; say what would falsify each hypothesis; news
-co-occurrence is not causation. Validation and test periods are not available to you."""
+regime_performance rows (e.g. 'vol_regime=high'); any number you write must be copied from the cited tool output; all confidence intervals are 90%; treat buckets
+with fewer than {MIN_TRADES} trades or confidence intervals spanning zero as weak; say what would falsify each hypothesis; news
+co-occurrence is not causation. Validation and test periods are not available to you.
+Numbers: copy them from the cited tool output and round to 3-4 significant digits (0.3043, -3.54e-05, 5.15%);
+rounding is fine, changing digits or computing new numbers is not."""
+
+CONTEXT_INSTRUCTIONS = """You are the context analyst for an EXISTING trading strategy that must not be changed. Call sentiment_episodes
+(TRAIN only) and report what market sentiment (Fear & Greed) was doing around the strategy's worst and best weeks:
+levels, 7-day changes, and greed/fear flips just before a week started, compared with the train base rates.
+Rules: every finding cites the sentiment_episodes evidence_id and names the episode_ids it uses; any number you write is
+copied from that output; describe co-occurrence in time only, never a cause ('because', 'caused', 'led to' are rejected);
+when a finding reports one of the tallies, set `tally` to its key; strength 'moderate' only for one of the two PRIMARY tallies
+(see primary_tallies) with binomial_p_value below 0.05 (four tallies are computed, so the threshold is corrected), otherwise
+'weak' or 'none'; with 4 weeks per side say the sample is small. If sentiment does not separate good and bad weeks, say so plainly: that is a valid finding."""
 
 PROPOSER_INSTRUCTIONS = f"""You propose SUPERVISORY gates for an unchanged strategy: when to run it at full, half or zero size.
 Only the threshold_gate family with 1-2 conditions on these features: {list(GATE_FEATURES)}; ops '<=' or '>';
 allocations in {list(ALLOCATIONS)}; thresholds MUST be values returned by feature_grid. You may evaluate candidates with
 test_gate_train (TRAIN only, limited budget, every attempt is logged and disclosed). Use unique proposal ids, base each
 proposal on the given hypotheses, cite evidence ids, and state a falsification test. Prefer fewer, simpler gates.
-Code, not you, will evaluate your proposals on validation and pick at most one for the frozen test."""
+Code, not you, will evaluate your proposals on validation and pick at most one for the frozen test.
+Numbers: copy them from the cited tool output and round to 3-4 significant digits (0.3043, -3.54e-05, 5.15%);
+rounding is fine, changing digits or computing new numbers is not."""
 
 CRITIC_INSTRUCTIONS = """You are an independent critic. For each proposed gate, look for: look-ahead or leakage, overfitting (many
 trials, effects only in train, validation contradicting train), fragile sample sizes, a gate that is almost always on or off
 (see allocation_mix), and counterexamples. Use trial_log (it includes the arbiter's validation runs) and lookup_evidence.
 Critique every proposal exactly once and cite that gate's own evaluation evidence id. You cannot change thresholds.
-Verdict 'approve_for_frozen_test' only if the validation evidence supports it."""
+trial_log also holds the arbiter's walk-forward runs (note 'walk-forward fold k'): the same gate on later TRAIN sub-periods.
+Use them to check whether an effect is stable over time; thresholds were chosen on all of train, so they are not unseen data.
+strategy_health says whether the unchanged strategy's validation result is ordinary bad luck or outside its training
+range, and which assumptions changed (e.g. a regime that became much more frequent). A gate whose feature's regime
+shifted between train and validation may only look good or bad because of that shift: say so.
+All confidence intervals are 90%. Put only issues that should BLOCK the frozen test in fragile_samples; non-blocking
+remarks go in observations. Verdict 'approve_for_frozen_test' only if the validation evidence supports it.
+Numbers: copy them from the cited tool output and round to 3-4 significant digits (0.3043, -3.54e-05, 5.15%);
+rounding is fine, changing digits or computing new numbers is not."""
 
 
 def _check(problems: list[str]) -> None:
     if problems:
+        _log("  validator rejected output: " + "; ".join(problems)[:300])
         raise ModelRetry("; ".join(problems))
 
 
@@ -250,6 +229,18 @@ def _diagnostic_agent(model) -> Agent:
     @agent.output_validator
     def _v(ctx: RunContext[ToolContext], out: DiagnosticReport) -> DiagnosticReport:
         _check(verify_diagnostic(ctx.deps, out))
+        return out
+
+    return agent
+
+
+def _context_agent(model) -> Agent:
+    agent = Agent(model, output_type=ContextReport, deps_type=ToolContext, instructions=CONTEXT_INSTRUCTIONS,
+                  tools=[sentiment_episodes], retries=3, defer_model_check=True)
+
+    @agent.output_validator
+    def _v(ctx: RunContext[ToolContext], out: ContextReport) -> ContextReport:
+        _check(verify_context(ctx.deps, out))
         return out
 
     return agent
@@ -269,7 +260,7 @@ def _proposer_agent(model, hypothesis_ids: set[str]) -> Agent:
 
 def _critic_agent(model, proposals: ProposalSet) -> Agent:
     agent = Agent(model, output_type=CritiqueSet, deps_type=ToolContext, instructions=CRITIC_INSTRUCTIONS,
-                  tools=[trial_log, lookup_evidence], retries=3, defer_model_check=True)
+                  tools=[trial_log, lookup_evidence, strategy_health], retries=3, defer_model_check=True)
 
     @agent.output_validator
     def _v(ctx: RunContext[ToolContext], out: CritiqueSet) -> CritiqueSet:
@@ -281,16 +272,24 @@ def _critic_agent(model, proposals: ProposalSet) -> Agent:
 
 def run_diagnostic(ctx: ToolContext, model) -> DiagnosticReport:
     prompt = f"Strategy {ctx.experiment.strategy_id} (version {ctx.experiment.strategy_version}). Diagnose where it works and fails."
-    return _diagnostic_agent(model).run_sync(prompt, deps=ctx).output
+    return _run(_diagnostic_agent(model), prompt, ctx, "diagnostic")
 
 
-def run_proposer(ctx: ToolContext, model, diagnostic: DiagnosticReport) -> ProposalSet:
+def run_context(ctx: ToolContext, model) -> ContextReport:
+    prompt = f"Strategy {ctx.experiment.strategy_id}. What was market sentiment doing around its best and worst train weeks?"
+    return _run(_context_agent(model), prompt, ctx, "context")
+
+
+def run_proposer(ctx: ToolContext, model, diagnostic: DiagnosticReport, context: ContextReport | None = None) -> ProposalSet:
     ids = {h.hypothesis_id for h in diagnostic.hypotheses}
     prompt = "Hypotheses:\n" + json.dumps([h.model_dump() for h in diagnostic.hypotheses], indent=1)
-    return _proposer_agent(model, ids).run_sync(prompt, deps=ctx).output
+    if context and context.findings:
+        prompt += ("\n\nSentiment context (co-occurrence only, not causes; base proposals on the hypotheses above):\n"
+                   + json.dumps([{"statement": f.statement, "strength": f.strength} for f in context.findings], indent=1))
+    return _run(_proposer_agent(model, ids), prompt, ctx, "proposer")
 
 
 def run_critic(ctx: ToolContext, model, proposals: ProposalSet) -> CritiqueSet:
     payload = [{**p.model_dump(), "spec_hash": spec_hash(p.to_policy_spec())} for p in proposals.proposals]
     prompt = "Proposals to critique:\n" + json.dumps(payload, indent=1)
-    return _critic_agent(model, proposals).run_sync(prompt, deps=ctx).output
+    return _run(_critic_agent(model, proposals), prompt, ctx, "critic")

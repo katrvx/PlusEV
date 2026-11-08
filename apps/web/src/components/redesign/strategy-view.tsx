@@ -37,6 +37,7 @@ type StrategyRecord = Omit<Strategy, "source"> & {
 const strategyRecord = (strategy: Strategy) => strategy as StrategyRecord;
 const isDefinitionStrategy = (strategy: Strategy) => strategyRecord(strategy).source === "strategy_definition";
 const isNativeReportSource = (source?: string) => source === "native_report" || source === "native_report_example";
+const isRecordedInvestigationSource = (source?: string) => source === "recorded_investigation";
 const familyLabel = (family?: StrategyDefinition["rule"]["family"]) => family === "ema_crossover"
   ? "EMA crossover"
   : family === "rsi_mean_reversion"
@@ -123,6 +124,9 @@ function DataDisclosure({ strategy }: { strategy: Strategy }) {
 }
 
 function ResearchState({ strategy, experiment, health, onRun, onExample, running }: { strategy: Strategy; experiment: Experiment | null; health: Health | null; onRun: () => void; onExample: () => void; running: boolean }) {
+  if (isRecordedInvestigationSource(strategy.source)) {
+    return <div className="sv-research-state sv-research-state-note"><FileText size={17} aria-hidden="true" /><span>Recorded investigation. Open Explore to read it. This page is not rerun from a file drop.</span></div>;
+  }
   if (strategy.kind === "trades" || strategy.status === "diagnosis_only") {
     return <div className="sv-research-state sv-research-state-note"><FileText size={17} aria-hidden="true" /><span>Completed trades are for diagnosis. Add position history to test an on/off rule.</span></div>;
   }
@@ -162,7 +166,8 @@ function ResearchState({ strategy, experiment, health, onRun, onExample, running
 }
 
 function ExperimentResult({ experiment }: { experiment: Experiment }) {
-  const isDemo = experiment.mode === "demo";
+  const recorded = experiment.message.startsWith("Recorded Argon");
+  const isDemo = experiment.mode === "demo" && !recorded;
   if (experiment.status !== "completed" || experiment.equity.length === 0) {
     if (experiment.status === "awaiting_engine" || experiment.mode === "pending") {
       return <div className="sv-result-empty" role="status"><LockKeyhole size={16} aria-hidden="true" /><span>{experiment.message || "Measured results will appear here when the research engine is connected."}</span></div>;
@@ -171,7 +176,7 @@ function ExperimentResult({ experiment }: { experiment: Experiment }) {
   }
 
   return <section className="sv-result" aria-labelledby="sv-result-title">
-    <div className="sv-section-heading"><div><h2 id="sv-result-title">{isDemo ? "Example curve." : "Recorded curve."}</h2></div><StatusLine tone={isDemo ? "accent" : "success"}>{isDemo ? "Illustrative" : "Measured"}</StatusLine></div>
+    <div className="sv-section-heading"><div><h2 id="sv-result-title">{recorded ? "Validation blocks." : isDemo ? "Example curve." : "Recorded curve."}</h2></div><StatusLine tone={isDemo ? "accent" : "success"}>{recorded ? "Not the sealed test" : isDemo ? "Illustrative" : "Measured"}</StatusLine></div>
     <div className="sv-chart-wrap"><ResearchChart data={experiment.equity} series={["base", "cash"]} label="Original strategy value" mode={experiment.mode} height={310} reveal /></div>
     <div className="sv-chart-caption"><span><i className="sv-line sv-line-original" />Original strategy</span><span><i className="sv-line sv-line-cash" />Cash reference</span><span>{experiment.windows.test && experiment.windows.test !== "pending" ? experiment.windows.test : "Recorded period"}</span></div>
   </section>;
@@ -182,11 +187,12 @@ export default function StrategyView({ strategy, experiment, health, onImport, o
 
   const isDemo = strategy.status === "demo";
   const isNativeReport = isNativeReportSource(strategy.source);
+  const isReadOnlyReport = isNativeReport || isRecordedInvestigationSource(strategy.source);
   const isDefinition = isDefinitionStrategy(strategy);
   const period = strategy.date_start && strategy.date_end ? `${dateLabel(strategy.date_start)} → ${dateLabel(strategy.date_end)}` : "Not recorded";
   const definition = strategyRecord(strategy).definition;
   const enginePending = !isDefinition && !isDemo && health?.research_engine !== true;
-  const mascotPose = isNativeReport
+  const mascotPose = isReadOnlyReport
       ? "bull-take-note"
       : experiment?.status === "failed"
         ? "bull-neutral"
@@ -199,7 +205,7 @@ export default function StrategyView({ strategy, experiment, health, onImport, o
               : isDemo
                 ? "bull-take-note"
                 : "bull-read-sheet";
-  const mascotTitle = isNativeReport
+  const mascotTitle = isReadOnlyReport
       ? "Saved verdict."
       : experiment?.status === "failed"
         ? "Research needs another pass."
@@ -216,7 +222,7 @@ export default function StrategyView({ strategy, experiment, health, onImport, o
                   : isDemo
                     ? "Example ready."
                     : "Next: test the conditions.";
-  const mascotCopy = isNativeReport
+  const mascotCopy = isReadOnlyReport
       ? "Open the saved verdict and evidence. No new run is started."
       : experiment?.status === "failed"
         ? "The last run did not finish. Review the message below before trying again."
@@ -240,7 +246,7 @@ export default function StrategyView({ strategy, experiment, health, onImport, o
       <MascotCallout pose={mascotPose} title={mascotTitle} className="sv-mascot-callout sv-mascot-callout-intro">{mascotCopy}</MascotCallout>
     </header>
 
-    {isNativeReport ? <div className="sv-notice" role="note"><FileText size={15} aria-hidden="true" /><span>Saved research report — read-only. No new run is started.</span></div> : isDemo && <div className="sv-notice" role="note"><FlaskConical size={15} aria-hidden="true" /><span>Example data — illustrative, not measured performance.</span></div>}
+    {isRecordedInvestigationSource(strategy.source) ? <div className="sv-notice" role="note"><FlaskConical size={15} aria-hidden="true" /><span>Argon investigation on the hourly book, 2018-02-01 through 2026-10-31.</span></div> : isReadOnlyReport ? <div className="sv-notice" role="note"><FileText size={15} aria-hidden="true" /><span>Saved research report — read-only. No new run is started.</span></div> : isDemo && <div className="sv-notice" role="note"><FlaskConical size={15} aria-hidden="true" /><span>Example data — illustrative, not measured performance.</span></div>}
 
     <section className="sv-check" aria-labelledby="sv-check-title" data-guide-target="strategy-input">
       <h2 id="sv-check-title" className="sv-visually-hidden">Strategy details</h2>
@@ -251,7 +257,7 @@ export default function StrategyView({ strategy, experiment, health, onImport, o
         <div><span>Symbol</span><strong>{strategy.symbol}</strong></div>
         <div><span>Timeframe</span><strong>{strategy.timeframe}</strong></div>
         <div><span>Period</span><strong>{period}</strong></div>
-        <div><span>Rows</span><strong>{isNativeReport ? "Not recorded" : countLabel(strategy.row_count)}</strong></div>
+        <div><span>Rows</span><strong>{isReadOnlyReport ? "Not recorded" : countLabel(strategy.row_count)}</strong></div>
       </div>}
       <CostRows strategy={strategy} />
     </section>

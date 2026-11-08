@@ -40,6 +40,13 @@ class RegimeRow(BaseModel):
 
 
 class CostBreakdown(BaseModel):
+    """gross_return and net_return are compounded, so they match baselines.always_on.
+
+    switching is only extra turnover caused by a gate, and is 0 for the unchanged strategy.
+    fees and slippage are that strategy's own turnover. Lane A scales the three cost fields
+    onto the compounded gap, so gross - fees - slippage - switching = net.
+    """
+
     split: Split
     gross_return: float
     fees: float
@@ -59,6 +66,8 @@ class Metrics(BaseModel):
     n_switches: int
     exposure: float
     ci_net_return: tuple[float, float] | None = None
+    cvar_05: float | None = None          # Lane A: mean of the worst 5% of bar returns
+    avg_holding_bars: float | None = None  # Lane A: average consecutive bars in the market
 
 
 class BaselineRow(BaseModel):
@@ -94,7 +103,10 @@ class GateEvaluation(BaseModel):
     always_on: Metrics
     delta_net_return_vs_always_on: float
     ci_delta: tuple[float, float] | None = None
-    allocation_mix: dict[str, float] = Field(default_factory=dict)   # share of decisions at 0 / 0.5 / 1
+    allocation_mix: dict[str, float] = Field(default_factory=dict)   # share of in-position bars at 0 / 0.5 / 1
+    n_decisions: int = 0                                             # every bar in the split
+    n_in_position: int = 0                                           # bars where the strategy wants exposure; denominator of allocation_mix
+    fold: int | None = None                                          # set by GateRunner.evaluate_folds (expanding train folds)
     audit_id: str
 
 

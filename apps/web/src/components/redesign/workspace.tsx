@@ -45,7 +45,12 @@ const workflow = [
 ] as const;
 
 const errorText = (value: unknown) => value instanceof Error ? value.message : "Something went wrong. Please retry.";
-const chooseExample = (items: Strategy[]) => items.find(item => item.source === "native_report" && item.strategy_id === "btc-meanrev-48-demo") || items.find(item => item.source === "native_report" && item.synthetic === false);
+function recordedExample(items: Strategy[]) {
+  return items.find(item => item.source === "native_report" && item.strategy_id === "btc-meanrev-48-demo")
+    || items.find(item => item.strategy_id === "btc-trend-24-72-demo")
+    || items.find(item => item.source === "recorded_investigation")
+    || items.find(item => item.status === "demo");
+}
 type UrlState = { view: MainView; tab: ExploreTab; strategy: string; experiment: string; date: string; compare: boolean; viewExplicit: boolean };
 
 const EMPTY_URL_STATE: UrlState = { view: "strategy", tab: "overview", strategy: "", experiment: "", date: "", compare: false, viewExplicit: false };
@@ -205,7 +210,7 @@ export default function Workspace() {
   entryOpenRef.current = entryOpen;
   const selected = strategies.find(item => item.strategy_id === selectedId) || null;
   const filteredStrategies = strategies.filter(strategy => `${strategy.name} ${strategy.symbol} ${strategy.timeframe}`.toLowerCase().includes(strategyQuery.trim().toLowerCase()));
-  const exampleStrategy = chooseExample(strategies);
+  const exampleStrategy = recordedExample(strategies);
   const selectedIdRef = useRef(selectedId);
   selectedIdRef.current = selectedId;
   const dismissToast = useCallback(() => setToast(""), []);
@@ -272,7 +277,7 @@ export default function Workspace() {
   }, [strategies]);
 
   useEffect(() => {
-    const example = chooseExample(strategies);
+    const example = recordedExample(strategies);
     if (!example) { setExampleExperiment(null); return; }
     let cancelled = false;
     api.experiments(example.strategy_id).then(items => { if (!cancelled) setExampleExperiment(items[0] || null); }).catch(() => { if (!cancelled) setExampleExperiment(null); });
@@ -391,7 +396,7 @@ export default function Workspace() {
       <button className="kk-wordmark" type="button" onClick={() => { scrollTop(); setEntryOpen(true); setMobileNav(false); setStrategyMenu(false); setDisplayMenu(false); writeUrl({ view: "strategy", tab: "overview", strategy: "", experiment: "", date: "", compare: false }); }} aria-label="+EV home"><span><span className="kk-slash">+</span>EV</span></button>
       <div className="kk-header-context">
         {selected ? <button ref={strategyTriggerRef} type="button" className="kk-strategy-trigger" title={selected.name} aria-label={`Switch strategy: ${selected.name}`} aria-expanded={strategyMenu} aria-haspopup="dialog" onClick={() => setStrategyMenu(value => !value)}>Strategies<ChevronDown size={15} /></button> : <span className="kk-context-quiet">No strategy selected</span>}
-        {strategyMenu && <div ref={strategyPanelRef} className="kk-switcher" role="dialog" aria-label="Switch strategy"><div className="kk-switcher-head"><span>Switch strategy</span><button type="button" onClick={() => { setStrategyMenu(false); strategyTriggerRef.current?.focus(); }} aria-label="Close strategy switcher"><X size={15} /></button></div><label className="kk-switcher-search"><span className="kk-sr-only">Find a strategy</span><input value={strategyQuery} onChange={event => setStrategyQuery(event.target.value)} placeholder="Find a strategy" aria-label="Find a strategy" /></label><div className="kk-switcher-list">{filteredStrategies.map(strategy => <button type="button" key={strategy.strategy_id} className={strategy.strategy_id === selectedId ? "selected" : ""} onClick={() => selectStrategy(strategy)}><span><strong>{strategy.name}</strong><small>{strategy.symbol} · {strategy.timeframe} · {strategy.source === "native_report" ? "Recorded research" : strategy.status === "demo" ? "Illustrative example" : strategy.definition ? "Saved rules" : "Imported history"}</small></span><ArrowUpRight size={14} /></button>)}{filteredStrategies.length === 0 && <p className="kk-switcher-empty">No matching strategy.</p>}<button type="button" className="kk-switcher-add" onClick={() => openImport()}><Plus size={15} />Verify a strategy</button><button type="button" onClick={() => selectView("strategy")}>Source &amp; inputs<ArrowUpRight size={14} /></button><button type="button" onClick={() => selectView("observe")}>Saved paper plans<ArrowUpRight size={14} /></button><button type="button" onClick={() => selectView("portfolio")}>All strategies<ArrowUpRight size={14} /></button><button type="button" onClick={() => openRuleDraft()}>Draft strategy rules<ArrowUpRight size={14} /></button></div></div>}
+        {strategyMenu && <div ref={strategyPanelRef} className="kk-switcher" role="dialog" aria-label="Switch strategy"><div className="kk-switcher-head"><span>Switch strategy</span><button type="button" onClick={() => { setStrategyMenu(false); strategyTriggerRef.current?.focus(); }} aria-label="Close strategy switcher"><X size={15} /></button></div><label className="kk-switcher-search"><span className="kk-sr-only">Find a strategy</span><input value={strategyQuery} onChange={event => setStrategyQuery(event.target.value)} placeholder="Find a strategy" aria-label="Find a strategy" /></label><div className="kk-switcher-list">{filteredStrategies.map(strategy => <button type="button" key={strategy.strategy_id} className={strategy.strategy_id === selectedId ? "selected" : ""} onClick={() => selectStrategy(strategy)}><span><strong>{strategy.name}</strong><small>{strategy.symbol} · {strategy.timeframe} · {strategy.source === "recorded_investigation" || strategy.source === "native_report" || strategy.source === "native_report_example" ? "Recorded" : strategy.status === "demo" ? "Example" : strategy.definition ? "Saved rules" : "Imported"}</small></span><ArrowUpRight size={14} /></button>)}{filteredStrategies.length === 0 && <p className="kk-switcher-empty">No matching strategy.</p>}<button type="button" className="kk-switcher-add" onClick={() => openImport()}><Plus size={15} />Verify a strategy</button><button type="button" onClick={() => selectView("strategy")}>Source &amp; inputs<ArrowUpRight size={14} /></button><button type="button" onClick={() => selectView("observe")}>Saved paper plans<ArrowUpRight size={14} /></button><button type="button" onClick={() => selectView("portfolio")}>All strategies<ArrowUpRight size={14} /></button><button type="button" onClick={() => openRuleDraft()}>Draft strategy rules<ArrowUpRight size={14} /></button></div></div>}
       </div>
       <nav id="kk-primary-nav" className={`kk-nav ${mobileNav ? "open" : ""}`} aria-label="Verification workflow">{workflow.map((item, index) => {
         const current = item.key === "review" ? view === "compare" && compareReview : view === item.view && !compareReview && (view !== "explore" || tab === item.tab);

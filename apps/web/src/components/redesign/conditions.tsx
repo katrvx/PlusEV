@@ -125,8 +125,10 @@ function IntervalGraphic({ regimes, selectedId, onSelect, demo }: { regimes: Reg
         const low = position(regime.confidence_low);
         const high = position(regime.confidence_high);
         const returnPosition = position(regime.net_return);
-        return <button key={regime.id} className={`cv-interval-row ${selectedId === regime.id ? "selected" : ""}`} type="button" onClick={() => onSelect(regime.id)} aria-label={`${trendLabel(regime.trend)}, ${volatilityLabel(regime.volatility)}. Result ${signedPercent(regime.net_return)} across ${regime.trades} trades. Likely range ${rangePercent(regime.confidence_low, regime.confidence_high)}.`}>
-          <span className="cv-interval-label"><strong>{trendLabel(regime.trend)}</strong><small>{volatilityLabel(regime.volatility)}</small></span>
+        const title = regime.label ?? trendLabel(regime.trend);
+        const detail = regime.label ? null : volatilityLabel(regime.volatility);
+        return <button key={regime.id} className={`cv-interval-row ${selectedId === regime.id ? "selected" : ""}`} type="button" onClick={() => onSelect(regime.id)} aria-label={`${title}${detail ? `, ${detail}` : ""}. Result ${signedPercent(regime.net_return)} across ${regime.trades} trades. Likely range ${rangePercent(regime.confidence_low, regime.confidence_high)}.`}>
+          <span className="cv-interval-label"><strong>{title}</strong>{detail ? <small>{detail}</small> : null}</span>
           <span className="cv-interval-track"><i className="cv-interval-zero" style={{ left: zero }} /><i className="cv-interval-line" style={{ left: low, width: `calc(${high} - ${low})` }} /><i className="cv-interval-point" style={{ left: returnPosition }} /></span>
           <span className={`cv-interval-value ${regime.net_return < 0 ? "negative" : "positive"}`}>{signedPercent(regime.net_return)}</span>
         </button>;
@@ -139,7 +141,7 @@ function IntervalGraphic({ regimes, selectedId, onSelect, demo }: { regimes: Reg
 function SituationDetail({ regime, scope, source, demo, onEvidence, onClose }: { regime: Regime; scope: string; source: string; demo: boolean; onEvidence: (id: string) => void; onClose: () => void }) {
   const smallSample = regime.trades < 20;
   return <aside className="cv-situation-detail" aria-live="polite">
-    <div className="cv-detail-top"><h3>{trendLabel(regime.trend)} · {volatilityLabel(regime.volatility)}</h3><button className="cv-close" type="button" aria-label="Close selected situation" onClick={onClose}><span aria-hidden="true">×</span></button></div>
+    <div className="cv-detail-top"><h3>{regime.label ?? `${trendLabel(regime.trend)} · ${volatilityLabel(regime.volatility)}`}</h3><button className="cv-close" type="button" aria-label="Close selected situation" onClick={onClose}><span aria-hidden="true">×</span></button></div>
     <p className="cv-detail-scope">{scope}</p>
     <dl className="cv-detail-facts"><div><dt>{demo ? "Illustrative result" : "Recorded result"}</dt><dd className={regime.net_return < 0 ? "negative" : "positive"}>{signedPercent(regime.net_return)}</dd></div><div><dt>Likely range</dt><dd>{rangePercent(regime.confidence_low, regime.confidence_high)}</dd></div><div><dt>Trades</dt><dd>{regime.trades}</dd></div><div><dt>Source</dt><dd>{source}</dd></div></dl>
     {smallSample && <p className="cv-small-sample"><Info size={15} />Fewer than 20 trades; treat this as a pattern to investigate.</p>}

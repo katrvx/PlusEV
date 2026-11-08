@@ -6,8 +6,9 @@ agents must at least match. Like the agents, it reads TRAIN data only.
 
 from __future__ import annotations
 
-from .models import Critique, CritiqueSet, DiagnosticReport, GateProposal, Hypothesis, ProposalSet, ThresholdCondition
-from .tools import ToolContext, spec_hash
+from .models import ContextFinding, ContextReport, Critique, CritiqueSet, DiagnosticReport, GateProposal, Hypothesis, ProposalSet, ThresholdCondition
+from .health import feature_shift
+from .tools import ToolContext, is_fold, spec_hash
 
 MIN_TRADES = 20
 DEGENERATE_SHARE = 0.95   # a gate that keeps one multiplier on >= 95% of decisions is barely a gate
@@ -91,7 +92,10 @@ def critique(ctx: ToolContext, proposals: ProposalSet) -> CritiqueSet:
     out = []
     for p in proposals.proposals:
         h = spec_hash(p.to_policy_spec())
-        train = next((t for t in ctx.trials if t.spec_hash == h and t.split == "train" and t.status == "evaluated"), None)
+        train = next((t for t in ctx.trials if t.spec_hash == h and t.split == "train" and t.status == "evaluated"
+                      and not is_fold(t)), None)
+        folds = [t for t in ctx.trials if t.spec_hash == h and is_fold(t) and t.status == "evaluated"
+                 and t.delta_net_return_vs_always_on is not None]
         val = next((t for t in ctx.trials if t.spec_hash == h and t.split == "validation" and t.status == "evaluated"), None)
         risks, fragile, counter, evs = [], [], [], []
         for t in (train, val):
@@ -107,14 +111,58 @@ def critique(ctx: ToolContext, proposals: ProposalSet) -> CritiqueSet:
             if train and train.delta_net_return_vs_always_on and val.delta_net_return_vs_always_on is not None \
                     and (train.delta_net_return_vs_always_on > 0) != (val.delta_net_return_vs_always_on > 0):
                 counter.append("train and validation disagree in sign")
+            obs = []
             if val.ci_delta and val.ci_delta[0] <= 0:
-                risks.append("validation improvement CI includes zero")
-            agent_tests = ctx.agent_tests_used()
-            if agent_tests > 6:
-                risks.append(f"{agent_tests} agent train tests; multiple-comparison risk")
+                obs.append("validation improvement CI includes zero")
+            if folds:
+                wins = sum(t.delta_net_return_vs_always_on > 0 for t in folds)
+                if 2 * wins < len(folds):
+                    risks.append(f"beats always-on on only {wins} of {len(folds)} walk-forward train folds: unstable over time")
+                evs.append(folds[-1].evidence_id)
+            shifted = feature_shift(ctx.health, [c.feature for c in p.conditions])
+            if shifted:
+                obs.append(f"the regime behind this gate's feature shifted between train and validation ({', '.join(shifted)}): "
+                           "the validation result may reflect that shift, not a stable effect")
+                evs.append(ctx.health["evidence_id"])
+            if ctx.agent_tests_used() > 6:
+                risks.append("many agent train tests (see trial log): multiple-comparison risk")
             verdict = "approve_for_frozen_test" if (val.delta_net_return_vs_always_on or 0) > 0 and not fragile and not counter else "reject"
         out.append(Critique(proposal_id=p.proposal_id, verdict=verdict, overfit_risks=risks, fragile_samples=fragile,
-                            counterexamples=counter,
+                            counterexamples=counter, observations=obs if val is not None else [],
                             leakage_concerns=[] if all(c.feature != "news_sentiment" for c in p.conditions) else ["check news first-seen times"],
                             evidence_ids=evs or [ctx.feature_grid()["evidence_id"]]))
     return CritiqueSet(critiques=out)
+
+
+def context(ctx: ToolContext) -> ContextReport:
+    """Deterministic agent 4: state the two pre-registered tallies with their base rates; no causal language."""
+    out = ctx.sentiment_context()
+    if "error" in out:
+        return ContextReport(summary="Sentiment context was not available for this loader.", limitations=[out["error"]])
+    eid = out["evidence_id"]
+    specs = [("C1", "worst_weeks_after_greed_to_fear_flip", "worst_weeks", "worst", "a greed-to-fear flip"),
+             ("C2", "best_weeks_after_fear_to_greed_flip", "best_weeks", "best", "a fear-to-greed flip")]
+    findings = []
+    for fid, key, eps_key, word, flip in specs:
+        t = out[key]
+        p = t["binomial_p_value"]
+        if not t["n_weeks"]:
+            findings.append(ContextFinding(
+                finding_id=fid, evidence_ids=[eid], strength="none", tally=key,
+                statement=f"No non-overlapping {word} train weeks could be chosen, so this tally is empty.",
+                caveats=["train period too short for separate best and worst weeks"]))
+            continue
+        strength = "moderate" if p is not None and p < out["moderate_p_threshold"] else ("weak" if t["n_with_flip"] else "none")
+        flag = "greed_to_fear_flip_in_prior_3_days" if word == "worst" else "fear_to_greed_flip_in_prior_3_days"
+        findings.append(ContextFinding(
+            finding_id=fid, evidence_ids=[eid], strength=strength, tally=key,
+            episode_ids=[e["episode_id"] for e in out[eps_key] if e[flag]],
+            statement=(f"{t['n_with_flip']} of {t['n_weeks']} {word} train weeks started within 3 days after {flip}; "
+                       f"the train base rate is {t['base_rate']:.3g} (binomial p {p:.3g})."),
+            caveats=["small sample of weeks per side", "co-occurrence in time, not a cause"]))
+    separated = any(f.strength == "moderate" for f in findings)
+    summary = ("Sentiment flips line up with the strategy's extreme weeks more often than chance on train."
+               if separated else
+               "On train, sentiment flips do not line up with the strategy's best or worst weeks more often than chance.")
+    return ContextReport(summary=summary, findings=findings,
+                         limitations=["Fear & Greed only; no news archive with first-seen timestamps is available"])

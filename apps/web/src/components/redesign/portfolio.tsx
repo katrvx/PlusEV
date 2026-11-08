@@ -5,6 +5,7 @@ import { ArrowUpRight, Search, SlidersHorizontal, Upload } from "lucide-react";
 import type { Experiment, Strategy } from "./types";
 import KineticText from "./kinetic-text";
 import { MascotCallout } from "./mascot";
+import { getStrategyVerdict, type StrategyVerdictKey } from "./strategy-verdict";
 import "./portfolio.css";
 
 export type PortfolioProps = {
@@ -15,12 +16,16 @@ export type PortfolioProps = {
   onImport: () => void;
 };
 
-type Verdict = "keep" | "restrict" | "monitor" | "kill" | "not_proven" | "example";
+type Verdict = StrategyVerdictKey | "example";
 
-const verdictPriority: Verdict[] = ["kill", "restrict", "not_proven", "monitor", "keep", "example"];
+const verdictPriority: Verdict[] = ["kill", "reduce", "restrict", "conditional", "modify", "combine", "not_proven", "monitor", "keep", "example"];
 
 const verdictLabel: Record<Verdict, string> = {
   keep: "Keep",
+  conditional: "Conditional",
+  modify: "Modify",
+  reduce: "Reduce",
+  combine: "Combine",
   restrict: "Restrict",
   monitor: "Monitor",
   kill: "Kill",
@@ -30,15 +35,8 @@ const verdictLabel: Record<Verdict, string> = {
 
 const verdictFromExperiment = (experiment: Experiment | undefined, strategy: Strategy): Verdict => {
   // A demo is useful for orientation, but it must never read like a measured call.
-  if (strategy.status === "demo" || experiment?.mode === "demo") return "example";
-  if (!experiment || experiment.status !== "completed" || experiment.mode === "pending") return "not_proven";
-  switch (experiment.verdict) {
-    case "CONDITIONAL": return "restrict";
-    case "KEEP": return "keep";
-    case "MONITOR": return "monitor";
-    case "KILL": return "kill";
-    default: return "not_proven";
-  }
+  const result = getStrategyVerdict(strategy, experiment || null);
+  return result.example ? "example" : result.key;
 };
 
 const latestExperiment = (experiments: Experiment[], strategyId: string) => experiments
@@ -49,9 +47,7 @@ const reasonFor = (strategy: Strategy, experiment: Experiment | undefined, verdi
   if (verdict === "example") return "Illustrative workspace example. Inspect the evidence before treating it as a decision.";
   if (strategy.status === "draft" || strategy.readiness === "awaiting_market_data") return "Rule saved; market data and evaluation are still pending.";
   if (strategy.kind === "trades" || strategy.status === "diagnosis_only") return "Completed trades are for diagnosis; no keep or cut call is proven.";
-  if (!experiment) return "No research run has been recorded for this strategy.";
-  if (experiment.status !== "completed" || experiment.mode === "pending") return experiment.message || "The evaluator has not produced a measured result.";
-  return experiment.recommendation || "The report has no one-line recommendation yet. Open the evidence trail.";
+  return getStrategyVerdict(strategy, experiment || null).reason;
 };
 
 const shortSymbol = (strategy: Strategy) => [strategy.symbol, strategy.timeframe].filter(Boolean).join(" · ") || "Details pending";
@@ -99,7 +95,7 @@ export default function Portfolio({ strategies, experiments, loading, onSelect, 
   const counts = records.reduce<Record<Verdict, number>>((total, record) => {
     total[record.verdict] += 1;
     return total;
-  }, { keep: 0, restrict: 0, monitor: 0, kill: 0, not_proven: 0, example: 0 });
+  }, { keep: 0, conditional: 0, modify: 0, reduce: 0, combine: 0, restrict: 0, monitor: 0, kill: 0, not_proven: 0, example: 0 });
 
   return <section className="pf-page" aria-labelledby="pf-title">
     <header className="pf-hero">
@@ -118,7 +114,7 @@ export default function Portfolio({ strategies, experiments, loading, onSelect, 
       <div className="pf-section-head"><div><span className="pf-kicker">DECISIONS TO REVIEW</span><h2 id="pf-triage-title">What deserves your attention?</h2></div><span className="pf-count">{strategies.length} {strategies.length === 1 ? "strategy" : "strategies"}</span></div>
       <div className="pf-toolbar" aria-label="Filter strategies">
         <label className="pf-search"><Search size={17} aria-hidden="true" /><span className="pf-visually-hidden">Search strategies</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search by name or symbol" /></label>
-        <div className="pf-filter-group"><SlidersHorizontal size={16} aria-hidden="true" />{(["all", ...verdictPriority] as const).map(value => <FilterButton key={value} value={value} selected={filter === value} count={value === "all" ? records.length : counts[value]} onClick={() => setFilter(value)} />)}</div>
+        <div className="pf-filter-group"><SlidersHorizontal size={16} aria-hidden="true" />{(["all", ...verdictPriority] as const).map(value => <FilterButton key={value} value={value} selected={filter === value} count={value === "all" ? records.length : counts[value as Verdict]} onClick={() => setFilter(value)} />)}</div>
       </div>
 
       {loading ? <div className="pf-empty" role="status"><span className="pf-loading-line" aria-hidden="true" /><p>Loading the strategy register.</p></div>

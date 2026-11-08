@@ -63,6 +63,8 @@ def allocation(spec: dict, context: pd.DataFrame, lgbm=None) -> pd.Series:
     raise ValueError(f"unknown gate family {family}")
 
 
-def allocation_mix(alloc: pd.Series) -> dict[str, float]:
-    """Share of decisions at each multiplier; used to flag degenerate gates."""
-    return {str(k): float((alloc == k).mean()) for k in ALLOWED_MULTIPLIERS}
+def allocation_mix(alloc: pd.Series, target_position: pd.Series | None = None) -> dict[str, float]:
+    """Share of IN-POSITION decisions at each multiplier (bars where the strategy is flat are not gated)."""
+    if target_position is not None:
+        alloc = alloc[target_position != 0]
+    return {str(k): float((alloc == k).mean()) if len(alloc) else 0.0 for k in ALLOWED_MULTIPLIERS}

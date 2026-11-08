@@ -2,6 +2,7 @@
 
 import { ArrowRight, ChevronDown, CircleHelp, Download, LockKeyhole, TriangleAlert } from "lucide-react";
 import { API_ROUTES } from "../../../../../packages/contracts/api";
+import { canReviewPlan, comparisonSeries, selectedBaseline, verdictHeadline } from "./decision";
 import ResearchChart from "./research-chart";
 import CheckedFilters from "./checked-filters";
 import KineticText from "./kinetic-text";
@@ -16,6 +17,7 @@ const percent = (value: number | null | undefined, digits = 1) => value === null
 const ratio = (value: number | null | undefined, digits = 0) => value === null || value === undefined ? "—" : `${(value * 100).toFixed(digits)}%`;
 const points = (value: number | null | undefined) => value === null || value === undefined ? "—" : `${value > 0 ? "+" : ""}${(value * 100).toFixed(1)} p.p.`;
 const number = (value: number | null | undefined) => value === null || value === undefined ? "—" : value.toLocaleString("en-GB", { maximumFractionDigits: 2 });
+const hours = (value: number | null | undefined) => value === null || value === undefined ? "—" : `${value.toLocaleString("en-GB", { maximumFractionDigits: 1 })} h`;
 const choiceList = (labels: string[]) => labels.length < 2 ? labels[0] || "the supplied choices" : labels.length === 2 ? `${labels[0]} or ${labels[1]}` : `${labels.slice(0, -1).join(", ")}, or ${labels[labels.length - 1]}`;
 const interval = (values: [number, number] | null | undefined, formatter: (value: number) => string) => values ? `[${formatter(values[0])}, ${formatter(values[1])}]` : "—";
 const fall = (value: number | null | undefined) => value === null || value === undefined ? "—" : `${(value * 100).toFixed(1)}%`;
@@ -40,8 +42,9 @@ function outcome(experiment: SharedResearchProps["experiment"]) {
   const sealed = experiment.frozen_evaluation?.evaluation;
   if (sealed) return sealedOutcome(sealed);
   const original = experiment.baselines.find(item => item.id === "always_on");
-  const candidate = experiment.baselines.find(item => item.id === "agent_gate" || item.id === "proposed");
-  if (!original || !candidate) return { title: "Not proven.", body: "The candidate has not passed unseen data." };
+  const candidate = selectedBaseline(experiment);
+  const headline = verdictHeadline(experiment.verdict);
+  if (!original || !candidate) return { title: headline, body: experiment.recommendation || "The evaluator has not supplied an original and a selected rule for the same period." };
   const delta = candidate.net_return - original.net_return;
   const alternatives = experiment.baselines.filter(item => item.id === "always_on" || item.id === "cash" || item.id === "simple_rule");
   const alternativeLabels = alternatives.map(item => ruleName(item.id, item.name));
@@ -54,10 +57,10 @@ function outcome(experiment: SharedResearchProps["experiment"]) {
         : `It is ahead of ${beaten.join(", ")}; keep the other choices visible.`
     : "Keep the supplied baselines visible while reviewing the result.";
   if (experiment.mode === "demo") return { title: "Illustrative comparison only.", body: `Proposed rule: ${points(delta)} vs strategy as-is on the recorded window. ${baselineContext} Illustrative only; not measured market performance.` };
-  if (!experiment.policy.holdout_frozen || !experiment.policy.test_evaluated || experiment.mode !== "measured") return { title: "A pattern worth testing, not a conclusion.", body: `The proposed rule is ${points(delta)} versus strategy as-is, but the new-data test is not complete. ${baselineContext}` };
-  if (delta > 0) return { title: "The proposed rule improved this unseen comparison.", body: `It is ${points(delta)} versus strategy as-is after the recorded costs. ${baselineContext} Review the assumptions before a paper test.` };
-  if (delta < 0) return { title: "The proposed rule did not improve this unseen comparison.", body: `Strategy as-is was ${points(Math.abs(delta))} ahead on this test. ${baselineContext} Keep the original visible and inspect the failures.` };
-  return { title: "The two approaches were effectively level.", body: "The new-data test did not show a clear improvement from the suggested filter." };
+  if (!experiment.policy.holdout_frozen || !experiment.policy.test_evaluated || experiment.mode !== "measured") return { title: headline, body: experiment.recommendation || `The proposed rule is ${points(delta)} versus strategy as-is, but the new-data test is not complete. ${baselineContext}` };
+  if (candidate.id === "always_on" || candidate.id === original.id) return { title: headline, body: experiment.recommendation || "The evaluator kept the original strategy. No separate filter was selected." };
+  const comparison = delta === 0 ? `${candidate.name} matched the original on this test.` : delta > 0 ? `${candidate.name} is ${points(delta)} versus the original after the recorded costs.` : `The original strategy was ${points(Math.abs(delta))} ahead of ${candidate.name} on this test.`;
+  return { title: headline, body: experiment.recommendation || `${comparison} ${baselineContext}` };
 }
 
 function SealedLook({ evaluation }: { evaluation: NativeEvaluation }) {
@@ -135,17 +138,17 @@ function WindowStrip({ windows, frozen }: { windows: SharedResearchProps["experi
 }
 
 export default function ComparisonView({ experiment, strategy, selectedDate, onSelectDate, onEvidence, onReview }: ComparisonProps) {
-  const ready = experiment.mode === "measured" && experiment.policy.holdout_frozen && experiment.policy.test_evaluated;
+  const ready = experiment.status === "completed" && experiment.mode === "measured" && experiment.policy.holdout_frozen && experiment.policy.test_evaluated;
   const result = outcome(experiment);
   const sealedEvaluation = experiment.frozen_evaluation?.evaluation;
-  const candidate = experiment.baselines.find(item => item.id === "agent_gate" || item.id === "proposed");
+  const candidate = selectedBaseline(experiment);
+  const chart = comparisonSeries(experiment);
   const hasComparisonChoices = candidate !== undefined && experiment.baselines.some(item => item.id === "always_on") && experiment.baselines.some(item => item.id === "cash") && experiment.baselines.some(item => item.id === "simple_rule");
-  const demoPlanReady = experiment.mode === "demo" && experiment.status === "completed" && experiment.policy.holdout_frozen && experiment.policy.test_evaluated && candidate !== undefined;
-  const canReview = candidate !== undefined && (ready || demoPlanReady) && experiment.verdict !== "KILL" && experiment.paper_eligible !== false;
+  const canReview = canReviewPlan(experiment) && experiment.paper_eligible !== false;
   const showReviewButton = candidate !== undefined || sealedEvaluation !== undefined;
   const reviewLabel = experiment.mode === "demo" ? "Review example plan" : "Review paper test";
-  const nextStep = experiment.verdict === "KILL" ? "Keep the original visible and inspect the failures before considering any practice plan." : experiment.mode === "demo" ? "Measured evaluation still required; this plan is only a labelled rehearsal." : "Complete the new-data test before reviewing a paper test.";
-  const mascotPose = ready && !sealedEvaluation && candidate && candidate.net_return >= (experiment.baselines.find(item => item.id === "always_on")?.net_return ?? Number.NEGATIVE_INFINITY) ? "bull-compare" : "bear-point-right";
+  const nextStep = experiment.verdict === "KILL" ? "Keep the original visible and inspect the failures before considering any practice plan." : experiment.verdict === "INCONCLUSIVE" ? "Not proven. A practice plan stays closed until a later test decides." : experiment.mode === "demo" ? "Measured evaluation still required; this plan is only a labelled rehearsal." : "Complete the new-data test before reviewing a paper test.";
+  const mascotPose = ["KEEP", "CONDITIONAL"].includes(experiment.verdict) && ready && !sealedEvaluation ? "bull-compare" : "bear-point-right";
   const mascotTitle = sealedEvaluation ? "A smaller loss is still a loss." : ready ? "Compare the unseen window." : "Keep the test in view.";
   return <section className="cmp-view" aria-labelledby="cmp-title">
     <header className="cmp-heading">
@@ -162,15 +165,15 @@ export default function ComparisonView({ experiment, strategy, selectedDate, onS
     </section>
     <section className="cmp-plot-section" aria-label="Strategy comparison" data-guide-target="compare-chart">
       <p className="cmp-chart-note">{sealedEvaluation ? "No equity curve was supplied for this sealed look; the recorded metrics stay visible below." : experiment.equity.length > 0 && hasComparisonChoices ? "Same supplied dates, four choices: strategy as-is, proposed rule, simple rule and cash." : "No supplied comparison series are available yet."}</p>
-      {sealedEvaluation ? <SealedLook evaluation={sealedEvaluation} /> : experiment.equity.length > 0 ? <ResearchChart data={experiment.equity} series={["base", "rule", "proposed", "cash"]} selectedDate={selectedDate} onSelectDate={onSelectDate} label="Is the rule better?" mode={experiment.mode} height={440} reveal /> : <div className="cmp-empty"><TriangleAlert size={18} /><span>No comparison curve is available yet.</span></div>}
+      {sealedEvaluation ? <SealedLook evaluation={sealedEvaluation} /> : experiment.equity.length > 0 ? <ResearchChart data={experiment.equity} series={chart.series} seriesLabels={chart.labels} selectedDate={selectedDate} onSelectDate={onSelectDate} label="Is the rule better?" mode={experiment.mode} height={440} reveal /> : <div className="cmp-empty"><TriangleAlert size={18} /><span>No comparison curve is available yet.</span></div>}
     </section>
     <CheckedFilters experiment={experiment} strategy={strategy} onEvidence={onEvidence} />
     <details className="cmp-details-disclosure" aria-labelledby="cmp-detail-title"><summary id="cmp-detail-title"><CircleHelp size={16} />Comparison details</summary><div className="cmp-detail-section">
       <WindowStrip windows={experiment.windows} frozen={experiment.policy.holdout_frozen} />
       <DevelopmentComparison report={experiment.native_report} />
       <div className="cmp-section-heading cmp-detail-heading"><div><h2><KineticText trigger="scroll">How did each rule compare?</KineticText></h2><p>Values supplied by the evaluator; the browser does not recalculate returns or risk.</p></div><a className="kk-secondary" href={API_ROUTES.experimentReport(experiment.experiment_id)} download><Download size={15} />Download report</a></div>
-      {experiment.baselines.length > 0 ? <div className="cmp-table-wrap"><table className="cmp-table"><caption className="kk-sr-only">Comparison metrics</caption><thead><tr><th>Approach</th><th>Return</th><th>Sharpe</th><th>Largest fall</th><th>Exposure</th><th>Turnover</th><th>Trades</th></tr></thead><tbody>{experiment.baselines.map(item => <tr key={item.id} className={item.id === "agent_gate" || item.id === "proposed" ? "cmp-proposed" : undefined}><th scope="row">{ruleName(item.id, item.name)}</th><td>{percent(item.net_return)}</td><td>{number(item.sharpe)}</td><td>{percent(item.max_drawdown)}</td><td>{ratio(item.exposure)}</td><td>{number(item.turnover)}×</td><td>{item.trades.toLocaleString("en-GB")}</td></tr>)}</tbody></table></div> : <p className="cmp-detail-empty">Only the sealed metrics supplied by the evaluator are available here. No equity curve or baseline table was attached.</p>}
-      <div className="cmp-explainer"><div><p><strong>Return</strong> is the gain or loss after the costs supplied for this run.</p><p><strong>Sharpe</strong> relates return to variability; a short history is not proof.</p><p><strong>Largest fall</strong> is the biggest drop from a previous high. This report supplies the aggregate value, not a separate drawdown time series.</p><p><strong>Exposure and turnover</strong> describe how much capital was active and how much was traded.</p></div></div>
+      {experiment.baselines.length > 0 ? <div className="cmp-table-wrap"><table className="cmp-table"><caption className="kk-sr-only">Comparison metrics</caption><thead><tr><th>Approach</th><th>Return</th><th>Sharpe</th><th>Sortino</th><th>5% CVaR</th><th>Holding</th><th>Largest fall</th><th>Exposure</th><th>Turnover</th><th>Trades</th></tr></thead><tbody>{experiment.baselines.map(item => { const detail = item as typeof item & { sortino?: number | null; cvar_05?: number | null; avg_holding_bars?: number | null; holding_hours?: number | null }; return <tr key={item.id} className={item.id === candidate?.id ? "cmp-proposed" : undefined}><th scope="row">{ruleName(item.id, item.name)}</th><td>{percent(item.net_return)}</td><td>{number(item.sharpe)}</td><td>{number(detail.sortino)}</td><td>{percent(detail.cvar_05)}</td><td>{hours(detail.holding_hours ?? detail.avg_holding_bars)}</td><td>{percent(item.max_drawdown)}</td><td>{ratio(item.exposure)}</td><td>{item.turnover == null ? "—" : `${number(item.turnover)}×`}</td><td>{item.trades == null ? "—" : item.trades.toLocaleString("en-GB")}</td></tr>; })}</tbody></table></div> : <p className="cmp-detail-empty">Only the sealed metrics supplied by the evaluator are available here. No equity curve or baseline table was attached.</p>}
+      <div className="cmp-explainer"><div><p><strong>Return</strong> is the gain or loss after the costs supplied for this run.</p><p><strong>Sharpe</strong> relates return to variability; a short history is not proof. <strong>Sortino</strong> uses only the downside.</p><p><strong>5% CVaR</strong> is the average of the worst 5% of hourly bars. <strong>Holding</strong> is the average time a position stays on.</p><p><strong>Largest fall</strong> is the biggest drop from a previous high. This report supplies the aggregate value, not a separate drawdown time series.</p><p><strong>Exposure and turnover</strong> describe how much capital was active and how much was traded.</p></div></div>
       <aside className="cmp-limitations" aria-label="Comparison limitations"><TriangleAlert size={16} /><p>{experiment.limitations.length ? experiment.limitations.join(" ") : "Keep the tested period, costs, and rule definition attached to this comparison."}</p></aside>
     </div></details>
   </section>;

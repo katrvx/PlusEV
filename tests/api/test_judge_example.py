@@ -151,3 +151,28 @@ def test_existing_id_wins_over_virtual_example() -> None:
     api.db_insert("experiments", NATIVE_EXAMPLE_EXPERIMENT_ID, existing)
     assert api.native_example_bundle() is None
     assert api.get_experiment(NATIVE_EXAMPLE_EXPERIMENT_ID) == existing
+
+
+def test_legacy_projected_report_reads_through_without_mutating_saved_records() -> None:
+    bundle = api.native_report_example()
+    strategy = {**bundle["strategy"], "source": "recorded_investigation"}
+    experiment = {**bundle["experiment"], "source": "recorded_investigation", "dataset_hash": "recorded-investigation"}
+    api.db_insert("strategies", strategy["strategy_id"], strategy)
+    api.db_insert("experiments", experiment["experiment_id"], experiment)
+
+    restored = api.native_report_example()
+    assert restored["strategy"]["source"] == "native_report"
+    assert api.get_experiment(experiment["experiment_id"])["paper_eligible"] is False
+    assert api.db_get("strategies", "strategy_id", strategy["strategy_id"]) == strategy
+    assert api.db_get("experiments", "experiment_id", experiment["experiment_id"]) == experiment
+
+
+@pytest.mark.parametrize("verdict", ["KILL", "INCONCLUSIVE"])
+def test_measured_rejected_verdict_cannot_create_paper_plan(verdict: str) -> None:
+    experiment = api.demo_experiment("demo_btc_trend_v1", "fixture", "exp_measured_rejected")
+    experiment.update(mode="measured", verdict=verdict)
+    api.db_insert("experiments", experiment["experiment_id"], experiment)
+    with pytest.raises(HTTPException) as caught:
+        api.create_paper_test(api.PaperTestRequest(experiment_id=experiment["experiment_id"], duration_days=14, approved=True))
+    assert caught.value.status_code == 409
+    assert api.paper_tests() == []

@@ -133,7 +133,9 @@ function filterRows(report: TeamReport, strategy: Strategy, experiment: Experime
   const byId = new Map<string, FilterRow>();
   const bySpecHash = new Map<string, FilterRow>();
   const candidateById = new Map(report.candidates.map(candidate => [candidate.policy_id, candidate]));
-  const hasFrozen = (policyId: string) => Boolean(experiment.frozen_evaluation?.evaluation.policy_id === policyId);
+  const hasFrozen = (policyId: string) => Boolean(experiment.frozen_evaluation?.evaluation.policy_id === policyId
+    && experiment.frozen_evaluation.experiment_id === experiment.experiment_id
+    && experiment.frozen_evaluation.strategy_id === strategy.strategy_id);
   const upsert = (policyId: string, seed?: Partial<FilterRow>) => {
     if (!policyId) return undefined;
     const candidate = candidateById.get(policyId);

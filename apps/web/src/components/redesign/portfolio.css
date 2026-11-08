@@ -48,6 +48,10 @@
 .pf-verdict { display: inline-flex; align-items: center; min-height: 31px; padding: 6px 11px; border-radius: 999px; font-size: 13px; font-weight: 750; }
 .pf-verdict::before { width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: currentColor; content: ""; }
 .pf-verdict[data-verdict="keep"] { color: #2b6f50; background: #dcefe5; }
+.pf-verdict[data-verdict="conditional"] { color: #8f5729; background: #fbe4cf; }
+.pf-verdict[data-verdict="modify"] { color: #6d5196; background: #ece5fa; }
+.pf-verdict[data-verdict="reduce"] { color: #985326; background: #ffe5c7; }
+.pf-verdict[data-verdict="combine"] { color: #356c6b; background: #deefec; }
 .pf-verdict[data-verdict="restrict"] { color: #985326; background: #ffe5c7; }
 .pf-verdict[data-verdict="monitor"] { color: #675598; background: #ebe5fa; }
 .pf-verdict[data-verdict="kill"] { color: #9b3e3e; background: #f8dfdf; }

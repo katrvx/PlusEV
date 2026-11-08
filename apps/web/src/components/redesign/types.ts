@@ -23,4 +23,6 @@ export type ResearchChartProps = {
   compact?: boolean;
   /** Quiet first-view mode for overview charts; details stay available below. */
   presentation?: "default" | "overview";
+  /** Names supplied by the evaluator; omitted series retain their default labels. */
+  seriesLabels?: Partial<Record<ChartSeries, string>>;
 };

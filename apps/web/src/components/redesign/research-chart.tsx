@@ -73,7 +73,7 @@ function nearestIndex(data: ResearchChartProps["data"], x: number, xFor: (row: R
   return nearest;
 }
 
-export default function ResearchChart({ data, series = ["base", "rule", "proposed", "cash"], selectedDate, onSelectDate, label = "Strategy value", mode, height, reveal = true, compact = false, presentation = "default" }: ResearchChartProps) {
+export default function ResearchChart({ data, series = ["base", "rule", "proposed", "cash"], seriesLabels, selectedDate, onSelectDate, label = "Strategy value", mode, height, reveal = true, compact = false, presentation = "default" }: ResearchChartProps) {
   const areaGradientId = `kk-chart-area-${useId().replace(/:/g, "")}`;
   const rootRef = useRef<HTMLElement>(null);
   const chartRef = useRef<HTMLDivElement>(null);
@@ -85,7 +85,10 @@ export default function ResearchChart({ data, series = ["base", "rule", "propose
   const [pointerIndexState, setPointerIndexState] = useState<number | null>(null);
   const [pinnedIndex, setPinnedIndex] = useState<number | null>(null);
   const [showData, setShowData] = useState(false);
-  const allowedSeries = useMemo(() => SERIES.filter(item => series.includes(item.id)), [series.join(",")]);
+  const allowedSeries = useMemo(
+    () => SERIES.filter(item => series.includes(item.id)).map(item => ({ ...item, label: seriesLabels?.[item.id] ?? item.label })),
+    [series.join(","), seriesLabels?.base, seriesLabels?.rule, seriesLabels?.proposed, seriesLabels?.cash],
+  );
   const allowedIds = allowedSeries.map(item => item.id);
   const [visibleSeries, setVisibleSeries] = useState<ChartSeries[]>(allowedIds);
   const [localSelectedDate, setLocalSelectedDate] = useState<string | null>(selectedDate ?? null);

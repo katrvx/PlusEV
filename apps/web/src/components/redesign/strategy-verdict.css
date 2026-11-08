@@ -87,6 +87,10 @@
 .svd-monitor .svd-dot { background: #b07a29; }
 .svd-kill .svd-dot { background: #8a3f4e; }
 .svd-restrict .svd-dot { background: var(--kk-accent, #c04a13); }
+.svd-conditional .svd-dot { background: #b36a2d; }
+.svd-modify .svd-dot { background: #7a5bab; }
+.svd-reduce .svd-dot { background: #a05f29; }
+.svd-combine .svd-dot { background: #467a78; }
 .svd-keep .svd-dot { background: #277958; }
 .svd-example { background: color-mix(in srgb, var(--kk-peach, #ffd6bb) 22%, transparent); }
 
@@ -147,6 +151,10 @@
 .svd-compact-row.svd-not_proven .svd-compact-dot { background: var(--kk-lavender, #9389df); }
 .svd-compact-row.svd-monitor .svd-compact-dot { background: #b07a29; }
 .svd-compact-row.svd-kill .svd-compact-dot { background: #8a3f4e; }
+.svd-compact-row.svd-conditional .svd-compact-dot { background: #b36a2d; }
+.svd-compact-row.svd-modify .svd-compact-dot { background: #7a5bab; }
+.svd-compact-row.svd-reduce .svd-compact-dot { background: #a05f29; }
+.svd-compact-row.svd-combine .svd-compact-dot { background: #467a78; }
 .svd-compact-row.svd-keep .svd-compact-dot { background: #277958; }
 
 @media (max-width: 760px) {

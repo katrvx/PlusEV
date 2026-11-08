@@ -1,8 +1,8 @@
 """Part C API for Keep or Kill.
 
-Uploaded strategy data is validated and stored, but does not receive fabricated
-research results. The demo uses a clearly labelled deterministic fixture until
-Parts A and B connect their real point-in-time evaluator and research agents.
+Uploaded strategy data is validated and stored. Seeded demos keep the labelled
+fixture. A BTCUSDT hourly position import is scored by Lane A and Lane B.
+Trade logs and other markets stay pending, with no fixture numbers attached.
 """
 from __future__ import annotations
 
@@ -40,6 +40,7 @@ from .judge_example import (
     is_virtual_strategy,
     strategy_id_for_experiment,
 )
+from .engine import ENGINE_CONNECTED, refusal_reason, run_measured_experiment
 from .team_reports import router as team_reports_router
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -494,7 +495,7 @@ def startup() -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "research_engine": False, "version": "0.1.0-part-c"}
+    return {"status": "ok", "research_engine": ENGINE_CONNECTED, "version": "0.1.0-part-c"}
 
 
 @app.get("/api/strategies")
@@ -505,7 +506,10 @@ def strategies(include_native_example: bool = False) -> list[dict[str, Any]]:
     consumers while allowing the judge flow to request coherent, read-only
     strategy/report pairs.
     """
-    values = db_list("strategies")
+    # Older main snapshots projected the native reports into SQLite.  Treat
+    # those specific records as a stale compatibility cache so the canonical
+    # virtual adapter remains read-only and keeps the native identity intact.
+    values = [item for item in db_list("strategies") if not _is_legacy_native_strategy(item)]
     if include_native_example:
         existing_ids = {str(item.get("strategy_id")) for item in values}
         for strategy_id in NATIVE_REPORT_STRATEGY_IDS:
@@ -522,11 +526,29 @@ def native_example_bundle(strategy_id: str | None = None) -> dict[str, Any] | No
     bundle = build_virtual_bundle(strategy_id=strategy_id or DEFAULT_NATIVE_STRATEGY_ID)
     if not bundle:
         return None
-    if db_get("strategies", "strategy_id", bundle["strategy"]["strategy_id"]):
+    stored_strategy = db_get("strategies", "strategy_id", bundle["strategy"]["strategy_id"])
+    if stored_strategy and not _is_legacy_native_strategy(stored_strategy):
         return None
-    if db_get("experiments", "experiment_id", bundle["experiment"]["experiment_id"]):
+    stored_experiment = db_get("experiments", "experiment_id", bundle["experiment"]["experiment_id"])
+    if stored_experiment and not _is_legacy_native_experiment(stored_experiment):
         return None
     return bundle
+
+
+def _is_legacy_native_strategy(value: dict[str, Any] | None) -> bool:
+    return bool(
+        value
+        and value.get("strategy_id") in NATIVE_REPORT_STRATEGY_IDS
+        and value.get("source") == "recorded_investigation"
+    )
+
+
+def _is_legacy_native_experiment(value: dict[str, Any] | None) -> bool:
+    return bool(
+        value
+        and value.get("strategy_id") in NATIVE_REPORT_STRATEGY_IDS
+        and (value.get("source") == "recorded_investigation" or value.get("dataset_hash") == "recorded-investigation")
+    )
 
 
 @app.get("/api/examples/native-report")
@@ -705,7 +727,7 @@ def trades_template() -> Response:
 
 @app.get("/api/experiments")
 def experiments(strategy_id: str | None = None, include_native_example: bool = False) -> list[dict[str, Any]]:
-    values = db_list("experiments", "created_at DESC")
+    values = [item for item in db_list("experiments", "created_at DESC") if not _is_legacy_native_experiment(item)]
     if strategy_id in NATIVE_REPORT_STRATEGY_IDS:
         if any(item.get("strategy_id") == strategy_id for item in values):
             return [item for item in values if item.get("strategy_id") == strategy_id]
@@ -723,6 +745,10 @@ def experiments(strategy_id: str | None = None, include_native_example: bool = F
 @app.post("/api/experiments")
 def create_experiment(request: ExperimentRequest, background_tasks: BackgroundTasks) -> dict[str, Any]:
     strategy = db_get("strategies", "strategy_id", request.strategy_id)
+    if strategy and is_virtual_strategy(request.strategy_id) and _is_legacy_native_strategy(strategy):
+        bundle = native_example_bundle(request.strategy_id)
+        if bundle:
+            return bundle["experiment"]
     if not strategy:
         if is_virtual_strategy(request.strategy_id):
             bundle = native_example_bundle(request.strategy_id)
@@ -738,10 +764,23 @@ def create_experiment(request: ExperimentRequest, background_tasks: BackgroundTa
             return db_get("experiments", "experiment_id", experiment_id) or experiment
         background_tasks.add_task(run_demo_experiment, experiment_id, strategy["strategy_id"], strategy["dataset_hash"])
         return experiment
+    # Declarative strategy definitions are saved drafts.  They do not carry a
+    # timestamped position history yet, so keep them pending without routing
+    # them through the import-oriented refusal message or the measured engine.
+    if strategy.get("source") == "strategy_definition" or strategy.get("status") == "draft":
+        reason = "This strategy definition is saved, but its market-data attachment is still missing. Add timestamped positions before measured research can run. No metrics were assigned."
     else:
-        now = iso(utc_now())
-        experiment = {"experiment_id": experiment_id, "strategy_id": strategy["strategy_id"], "status": "awaiting_engine", "mode": "pending", "progress": 0, "message": "Imported strategy validated and queued. Parts A/B must supply the point-in-time evaluator before metrics or agent findings can be shown.", "created_at": now, "policy_id": "pending", "dataset_hash": strategy["dataset_hash"], "windows": {"train": "pending", "validation": "pending", "test": "pending"}, "metrics": [], "baselines": [], "equity": [], "regimes": [], "evidence": [], "steps": [], "hypotheses": [], "verdict": "INCONCLUSIVE", "recommendation": "Awaiting the deterministic research engine. No illustrative metrics have been assigned to this upload.", "limitations": ["Parts A/B evaluator is not connected.", "No financial performance claim is made.", "Trade-only imports support diagnosis but not faithful alternate gate simulation."], "policy": {"description": "Pending evaluator", "conditions": [], "holdout_frozen": False, "test_evaluated": False}}
+        reason = refusal_reason(strategy)
+    now = iso(utc_now())
+    if reason:
+        experiment = {"experiment_id": experiment_id, "strategy_id": strategy["strategy_id"], "status": "awaiting_engine", "mode": "pending", "progress": 0, "message": reason, "created_at": now, "policy_id": "pending", "dataset_hash": strategy["dataset_hash"], "windows": {"train": "pending", "validation": "pending", "test": "pending"}, "metrics": [], "baselines": [], "equity": [], "regimes": [], "evidence": [], "steps": [], "hypotheses": [], "verdict": "INCONCLUSIVE", "recommendation": "No illustrative metrics have been assigned to this upload.", "limitations": [reason, "No financial performance claim is made."], "policy": {"description": "Pending evaluator", "conditions": [], "holdout_frozen": False, "test_evaluated": False}}
+        db_insert("experiments", experiment_id, experiment)
+        return experiment
+    experiment = {"experiment_id": experiment_id, "strategy_id": strategy["strategy_id"], "status": "queued", "mode": "pending", "progress": 0, "message": "Imported BTCUSDT hourly positions queued for the Binance spot snapshot.", "created_at": now, "policy_id": "pending", "dataset_hash": strategy["dataset_hash"], "windows": {"train": "pending", "validation": "pending", "test": "pending"}, "metrics": [], "baselines": [], "equity": [], "regimes": [], "evidence": [], "steps": [], "hypotheses": [], "verdict": "INCONCLUSIVE", "recommendation": "Scoring has not finished.", "limitations": ["Results appear after Lane A finishes. Demo fixtures are not copied onto this upload."], "policy": {"description": "Pending measured run", "conditions": [], "holdout_frozen": False, "test_evaluated": False}}
     db_insert("experiments", experiment_id, experiment)
+    if background_tasks is None:
+        return run_measured_experiment(experiment_id, strategy)
+    background_tasks.add_task(run_measured_experiment, experiment_id, strategy)
     return experiment
 
 
@@ -760,7 +799,7 @@ def run_demo_experiment(experiment_id: str, strategy_id: str, dataset_hash: str)
 @app.get("/api/experiments/{experiment_id}")
 def get_experiment(experiment_id: str) -> dict[str, Any]:
     value = db_get("experiments", "experiment_id", experiment_id)
-    if not value and is_virtual_experiment(experiment_id):
+    if (not value or _is_legacy_native_experiment(value)) and is_virtual_experiment(experiment_id):
         bundle = native_example_bundle(strategy_id_for_experiment(experiment_id))
         if bundle:
             return bundle["experiment"]
@@ -772,7 +811,7 @@ def get_experiment(experiment_id: str) -> dict[str, Any]:
 @app.get("/api/experiments/{experiment_id}/report")
 def report(experiment_id: str) -> Response:
     value = db_get("experiments", "experiment_id", experiment_id)
-    if not value and is_virtual_experiment(experiment_id):
+    if (not value or _is_legacy_native_experiment(value)) and is_virtual_experiment(experiment_id):
         bundle = native_example_bundle(strategy_id_for_experiment(experiment_id))
         if bundle:
             value = bundle["experiment"]
@@ -786,7 +825,7 @@ def create_paper_test(request: PaperTestRequest) -> dict[str, Any]:
     if not request.approved:
         raise HTTPException(status_code=400, detail="Human approval is required before freezing a paper test")
     experiment = db_get("experiments", "experiment_id", request.experiment_id)
-    if not experiment and is_virtual_experiment(request.experiment_id):
+    if (not experiment or _is_legacy_native_experiment(experiment)) and is_virtual_experiment(request.experiment_id):
         bundle = native_example_bundle(strategy_id_for_experiment(request.experiment_id))
         if bundle:
             experiment = bundle["experiment"]
@@ -794,11 +833,32 @@ def create_paper_test(request: PaperTestRequest) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="Experiment not found")
     if experiment.get("paper_eligible") is False:
         raise HTTPException(status_code=409, detail="This recorded report has no eligible paper proposal; a sealed score is not an approved candidate verdict")
+    if experiment.get("mode") == "measured" and experiment.get("verdict") in {"KILL", "INCONCLUSIVE"}:
+        raise HTTPException(status_code=409, detail="This measured verdict does not authorize a paper plan")
     if experiment["status"] != "completed" or not experiment.get("policy", {}).get("test_evaluated") or not experiment.get("policy", {}).get("holdout_frozen"):
         raise HTTPException(status_code=409, detail="Only a completed, evaluated experiment can be frozen")
     paper_id = f"paper_{uuid.uuid4().hex[:14]}"
     strategy = db_get("strategies", "strategy_id", experiment["strategy_id"])
-    plan = {"paper_test_id": paper_id, "experiment_id": experiment["experiment_id"], "status": "planned", "duration_days": 14, "approved_at": iso(utc_now()), "policy_id": experiment["policy_id"], "mode": experiment["mode"], "execution": "paper_only", "message": "Frozen plan recorded. No trading or brokerage connection was started.", "snapshot": {"strategy_id": experiment["strategy_id"], "dataset_hash": experiment["dataset_hash"], "policy_id": experiment["policy_id"], "windows": experiment["windows"], "policy": experiment["policy"], "assumptions": strategy.get("assumptions", {}) if strategy else {}}}
+    plan = {
+        "paper_test_id": paper_id,
+        "experiment_id": experiment["experiment_id"],
+        "status": "awaiting_bars",
+        "duration_days": 14,
+        "approved_at": iso(utc_now()),
+        "policy_id": experiment["policy_id"],
+        "mode": experiment["mode"],
+        "execution": "paper_only",
+        "message": "Frozen plan approved. No trading or brokerage connection was started. The shadow log is waiting for the next hourly bar after 2026-10-31 23:00 UTC.",
+        "shadow": {
+            "interval": "1h",
+            "horizon_bars": 14 * 24,
+            "horizon_days": 14,
+            "fills_recorded": 0,
+            "conclusion": None,
+            "message": "Champion and challenger stay frozen. Each closed hour after 2026-10-31 23:00 UTC is logged. The stored book ends on that bar, so this 14-day path is not a result.",
+        },
+        "snapshot": {"strategy_id": experiment["strategy_id"], "dataset_hash": experiment["dataset_hash"], "policy_id": experiment["policy_id"], "windows": experiment["windows"], "policy": experiment["policy"], "assumptions": strategy.get("assumptions", {}) if strategy else {}},
+    }
     db_insert("paper_tests", paper_id, plan)
     return plan
 
@@ -808,7 +868,270 @@ def paper_tests() -> list[dict[str, Any]]:
     return db_list("paper_tests", "approved_at DESC")
 
 
+def _range_label(train_range: dict[str, Any] | None) -> str:
+    if not train_range:
+        return "not recorded"
+    return f"{train_range.get('low', 0):+.1%} to {train_range.get('high', 0):+.1%}"
+
+
+def _ci_label(interval: list[Any]) -> str:
+    if len(interval) < 2 or interval[0] is None or interval[1] is None:
+        return "not recorded"
+    return f"{float(interval[0]):+.1%} to {float(interval[1]):+.1%}"
+
+
+def _regime_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
+    chosen = None
+    for item in report.get("evidence") or []:
+        if item.get("tool") != "regime_performance":
+            continue
+        args = item.get("args") or {}
+        if args.get("split") != "train" or args.get("regime_feature") is not None:
+            continue
+        chosen = item
+        break
+    if not chosen:
+        return []
+    names = {"trend_regime": "Trend", "vol_regime": "Volatility", "liquidity_regime": "Liquidity", "sentiment_regime": "Sentiment"}
+    rows = []
+    for row in (chosen.get("payload") or {}).get("rows") or []:
+        feature = str(row.get("regime_feature") or "regime")
+        bucket = str(row.get("bucket") or "")
+        rows.append({
+            "id": f"{feature}_{bucket}",
+            "trend": bucket if feature == "trend_regime" else "recorded",
+            "volatility": bucket if feature == "vol_regime" else "recorded",
+            "label": f"{names.get(feature, feature)}: {bucket}, mean net return per decision on the train split",
+            "net_return": float(row["mean_net_return"]),
+            "trades": int(row.get("n_trades") or 0),
+            "confidence_low": float(row["ci_low"]),
+            "confidence_high": float(row["ci_high"]),
+            "evidence_id": "recorded_health",
+        })
+    return rows
+
+
+def _train_always_on(report: dict[str, Any]) -> dict[str, Any] | None:
+    for item in report.get("evidence") or []:
+        if item.get("tool") != "cost_attribution" or (item.get("args") or {}).get("split") != "train":
+            continue
+        for baseline in (item.get("payload") or {}).get("baselines") or []:
+            if baseline.get("policy") != "always_on" or baseline.get("split") != "train":
+                continue
+            metrics = baseline.get("metrics") or {}
+            if metrics.get("net_return") is None:
+                return None
+            holding = metrics.get("avg_holding_bars")
+            drawdown = metrics.get("max_drawdown")
+            return {
+                "id": "always_on_train",
+                "name": "Always on, train",
+                "net_return": float(metrics["net_return"]),
+                "sharpe": metrics.get("sharpe"),
+                "max_drawdown": None if drawdown is None else -abs(float(drawdown)),
+                "exposure": metrics.get("exposure"),
+                "turnover": metrics.get("turnover"),
+                "trades": None,
+                "sortino": metrics.get("sortino"),
+                "cvar_05": metrics.get("cvar_05"),
+                "avg_holding_bars": holding,
+                "holding_hours": holding,
+            }
+    return None
+
+
+def _metric_row(row_id: str, name: str, metrics: dict[str, Any]) -> dict[str, Any]:
+    holding = metrics.get("avg_holding_bars")
+    drawdown = metrics.get("max_drawdown")
+    return {
+        "id": row_id,
+        "name": name,
+        "net_return": float(metrics["net_return"]),
+        "sharpe": metrics.get("sharpe"),
+        "max_drawdown": None if drawdown is None else -abs(float(drawdown)),
+        "exposure": metrics.get("exposure"),
+        "turnover": metrics.get("turnover"),
+        "trades": None,
+        "sortino": metrics.get("sortino"),
+        "cvar_05": metrics.get("cvar_05"),
+        "avg_holding_bars": holding,
+        "holding_hours": holding,
+    }
+
+
+def _sealed_rows(relative: str | None) -> list[dict[str, Any]]:
+    if not relative:
+        return []
+    path = ROOT / relative
+    if not path.exists():
+        return []
+    evaluation = json.loads(path.read_text()).get("evaluation") or {}
+    rows = []
+    if (evaluation.get("always_on") or {}).get("net_return") is not None:
+        rows.append(_metric_row("sealed_always_on", "Always on, sealed test", evaluation["always_on"]))
+    if (evaluation.get("metrics") or {}).get("net_return") is not None:
+        rows.append(_metric_row("sealed_gate", "Accepted gate, sealed test", evaluation["metrics"]))
+    return rows
+
+
+def _recorded_experiment(report: dict[str, Any], sealed_verdict: str, sealed_reason: str, frozen_relative: str | None) -> dict[str, Any]:
+    """Workspace row for one saved Argon investigation.
+
+    The curve is the validation blocks already in that file. The verdict line is
+    the sealed arbiter. Train metrics and regime rows are copied from that
+    report and are not a new sealed test.
+    """
+    health = report.get("strategy_health") or {}
+    blocks = health.get("validation_blocks") or []
+    always = report.get("validation_always_on") or {}
+    net = always.get("net_return")
+    cash = float(report.get("validation_cash_net_return") or 0.0)
+    level = 100.0
+    equity: list[dict[str, Any]] = []
+    for block in blocks:
+        level *= 1 + float(block["net_return"])
+        equity.append({"date": block["start"], "base": round(level, 4), "rule": round(level, 4), "proposed": round(level, 4), "cash": 100.0})
+    hypotheses = []
+    for index, item in enumerate((report.get("diagnostic") or {}).get("hypotheses") or [], start=1):
+        if index > 3:
+            break
+        statement = str(item.get("statement") or "")
+        hypotheses.append({
+            "id": item.get("hypothesis_id") or f"hyp_{index:02d}",
+            "title": statement[:160],
+            "status": "supported" if item.get("confidence") == "high" else "inconclusive",
+            "finding": statement,
+            "evidence_ids": [],
+        })
+    summary = str(health.get("summary") or "Not proven.")
+    message = (
+        f"2018-02-01 through 2026-10-31. Sealed decision: {sealed_reason} "
+        f"Validation health on this book: {summary}"
+    )
+    train_row = _train_always_on(report)
+    baselines = [
+        {"id": "always_on", "name": "Always on, validation", "net_return": float(net or 0.0), "sharpe": None, "max_drawdown": None, "exposure": None, "turnover": None, "trades": None},
+        {"id": "cash", "name": "Cash", "net_return": cash, "sharpe": 0.0, "max_drawdown": 0.0, "exposure": 0.0, "turnover": 0.0, "trades": 0},
+    ]
+    if train_row:
+        baselines.insert(1, train_row)
+    baselines.extend(_sealed_rows(frozen_relative))
+    return {
+        "experiment_id": report["experiment_id"],
+        "strategy_id": report["strategy_id"],
+        "status": "completed",
+        "mode": "measured",
+        "progress": 100,
+        "message": message,
+        "created_at": report.get("generated_at") or iso(utc_now()),
+        "policy_id": report.get("champion_policy_id") or "always_on",
+        "dataset_hash": "recorded-investigation",
+        "windows": {
+            "train": "2018-02-08 through 2023-05-07. Regime rows are per decision on train.",
+            "validation": "2023-05-07 through 2025-02-02",
+            "test": "2025-02-02 through 2026-10-31, opened once.",
+        },
+        "metrics": [
+            {"label": "Always-on net return", "value": net, "format": "percent", "description": "Validation window of the recorded investigation, after costs."},
+            {"label": "Cash", "value": cash, "format": "percent", "description": "Cash on the same validation window."},
+        ],
+        "baselines": baselines,
+        "equity": equity,
+        "regimes": _regime_rows(report),
+        "evidence": [{
+            "id": "recorded_health",
+            "title": "Unlucky or broken",
+            "kind": "strategy_health",
+            "summary": summary,
+            "source": "recorded Argon investigation",
+            "window": "validation 14-day blocks",
+            "facts": [
+                {"label": "Status", "value": str(health.get("status") or "")},
+                {"label": "Train range", "value": _range_label(health.get("train_range"))},
+                {"label": "90% interval", "value": _ci_label(always.get("ci_net_return") or [])},
+            ],
+        }],
+        "steps": [],
+        "hypotheses": hypotheses,
+        "verdict": sealed_verdict,
+        "recommendation": message,
+        "limitations": [
+            "The verdict line is the sealed arbiter on the 2018-02-01 through 2026-10-31 book. The blocks are that book's validation window, not a second look at the sealed test.",
+            sealed_reason,
+            "Sortino, 5% CVaR, drawdown, and holding on the train row come from that report's train cost attribution. The validation row only has its net return. Neither row is the sealed test.",
+            "No live orders.",
+        ],
+        "policy": {
+            "description": "No agent gate was accepted. The recorded comparison is the unchanged strategy against cash.",
+            "conditions": ["costs stay 10 bp plus 1 bp", "24/72 and 48 stay fixed", "paper only"],
+            "holdout_frozen": True,
+            "test_evaluated": False,
+        },
+    }
+
+
+RECORDED_INVESTIGATIONS = (
+    (
+        "btc-trend-24-72-demo",
+        "BTC trend 24/72",
+        "experiments/investigation_argon_lane_a.json",
+        None,
+        "INCONCLUSIVE",
+        "not proven. The sealed-test intervals still contain zero, and the critic vetoed every proposed gate.",
+    ),
+    (
+        "btc-meanrev-48-demo",
+        "BTC mean reversion 48",
+        "experiments/investigation_argon_meanrev.json",
+        "experiments/frozen_look_btc-meanrev-48-demo.json",
+        "KILL",
+        "kill on the always-on book. Drawdown 60.4% is past the 40% cap, and that net interval is entirely below zero. The one sealed look of the accepted gate beat always-on by 27.3% (90% CI 15.3% to 36.2%) and cut drawdown to 36.2%. The gated book still lost 28.9%.",
+    ),
+)
+
+
+def _seed_recorded_investigations() -> None:
+    for strategy_id, name, relative, frozen_relative, sealed_verdict, sealed_reason in RECORDED_INVESTIGATIONS:
+        # The judge-facing native adapter owns these exact report identities.
+        # Keep them virtual and read-only whenever the trusted source artifact
+        # is available; otherwise the fallback projector below would claim the
+        # same IDs in SQLite and make /api/examples/native-report disappear.
+        # If an artifact is temporarily unavailable, retain the measured
+        # projector as a degraded local fallback so the engine still exposes a
+        # truthful recorded result rather than silently dropping the strategy.
+        if strategy_id in NATIVE_REPORT_STRATEGY_IDS and build_virtual_bundle(strategy_id=strategy_id):
+            continue
+        path = ROOT / relative
+        if not path.exists():
+            continue
+        report = json.loads(path.read_text())
+        if report.get("strategy_id") != strategy_id or not (report.get("strategy_health") or {}).get("validation_blocks"):
+            continue
+        experiment = _recorded_experiment(report, sealed_verdict, sealed_reason, frozen_relative)
+        strategy = strategy_payload(
+            strategy_id=strategy_id,
+            name=name,
+            symbol="BTCUSDT",
+            timeframe="1h",
+            version="recorded-argon",
+            source="recorded_investigation",
+            kind="positions",
+            status="diagnosis_only",
+            row_count=len(experiment["equity"]),
+            date_start="2024-11-01T00:00:00Z",
+            date_end="2026-10-31T23:00:00Z",
+            dataset_hash="recorded-investigation",
+            timezone_name="UTC",
+            fee_bps=10,
+            slippage_bps=1,
+            description=experiment["message"],
+        )
+        db_insert("strategies", strategy["strategy_id"], strategy)
+        db_insert("experiments", experiment["experiment_id"], experiment)
+
+
 def seed_demo_data() -> None:
+    _seed_recorded_investigations()
     existing = db_get("strategies", "strategy_id", "demo_btc_trend_v1")
     if existing and existing.get("strategy_version") == "fixture-v2":
         return

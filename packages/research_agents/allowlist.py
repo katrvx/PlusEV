@@ -14,7 +14,8 @@ OPS = ("<=", ">")
 
 # Lagged, point-in-time features Lane A's feature store provides (spec section 7).
 # fear_greed / news_sentiment are only allowed where coverage is reported >= MIN_COVERAGE.
-GATE_FEATURES = ("momentum_24h", "realized_vol_7d", "volume_zscore", "fear_greed", "news_sentiment")
+GATE_FEATURES = ("momentum_24h", "momentum_7d", "realized_vol_7d", "atr_14", "price_drawdown", "volume_zscore",
+                 "fear_greed", "news_sentiment")   # a feature the loader does not cover is refused (coverage 0)
 MIN_COVERAGE = 0.9
 
 # Thresholds must be quantiles of the feature's TRAINING distribution, from this grid.

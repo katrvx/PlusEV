@@ -425,7 +425,7 @@
 .cmp-detail-heading .kk-secondary:hover { border-color: #ff681b; background: #ff681b; }
 .cmp-detail-empty { margin: 0 0 22px; padding: 16px 0; border-top: 1px solid #d7c9be; border-bottom: 1px solid #d7c9be; color: #6d5f6d; font-size: 14px; line-height: 1.5; }
 .cmp-table-wrap { overflow-x: auto; border-top: 1px solid #d7c9be; border-bottom: 1px solid #d7c9be; }
-.cmp-table { width: 100%; min-width: 760px; border-collapse: collapse; color: #241626; font: 14px/1.5 var(--kk-sans, Inter, sans-serif); }
+.cmp-table { width: 100%; min-width: 1080px; border-collapse: collapse; color: #241626; font: 14px/1.5 var(--kk-sans, Inter, sans-serif); }
 .cmp-table th, .cmp-table td { padding: 15px 12px; border-bottom: 1px solid #e6dbd2; text-align: right; white-space: nowrap; }
 .cmp-table tr:last-child th, .cmp-table tr:last-child td { border-bottom: 0; }
 .cmp-table thead th { color: #6d5f6d; font-size: 12px; font-weight: 600; }

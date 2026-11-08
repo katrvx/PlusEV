@@ -343,5 +343,693 @@ def test_llm_failure_falls_back_and_is_disclosed():
     def broken(messages, info):
         return ModelResponse(parts=[ToolCallPart("regime_performance", {"split": 42})])
     r = investigate("fixture", loader=fixture_loader, model=FunctionModel(broken))
-    assert r.agent_failures and r.agent_mode in ("deterministic_fallback", "llm_with_fallback")
+    assert r.agent_failures and r.agent_mode == "llm_with_fallback"
     assert r.verdict in ("candidate_for_frozen_test", "INCONCLUSIVE")
+
+
+# ------------------------------------------------------------------ second adversarial review regressions
+
+import math  # noqa: E402
+import time as _time  # noqa: E402
+
+from packages.research_agents.verify import unsupported_numbers, verify_critiques, verify_proposals  # noqa: E402
+from packages.research_agents.tools import spec_hash  # noqa: E402
+
+
+EV = [{"rows": [{"n_decisions": 2040, "n_trades": 128, "mean_net_return": -0.000203077441542493, "ci_low": -0.000456010541493941,
+                 "ci_high": -1.05342030540653e-05, "hit_rate": 0.516003879728419, "total_cost": 0.2034}],
+       "mix": {"0.0": 0.6875, "1.0": 0.3125}, "net": -0.4906}]
+
+
+@pytest.mark.parametrize("text", ["made 9999 trades", "lost 87 bp per day", "Sharpe 4.2", "drawdown 0.07", "-0.4363", "3.5x",
+                                  "forty percent", "15bp", "95% CI", "+0.4906"])
+def test_verifier_flags_fabrications(text):
+    assert unsupported_numbers(text, EV)
+
+
+@pytest.mark.parametrize("text", ["mean -0.000203 over 128 trades (2040 decisions), 90% CI [-0.000456, -1.05e-05]",
+                                  "hit rate 51.6%, off 68.75% of the time", "loses 49.06%", "net -0.4906", "2.03 bp",
+                                  "on 2024-01-01T00:00:00 the q50 momentum_24h gate", "ev_arbiter_eval_1a557f5202"])
+def test_verifier_accepts_copied_numbers(text):
+    assert not unsupported_numbers(text, EV)
+
+
+def test_verifier_random_numbers_rarely_match():
+    rng = np.random.default_rng(0)
+    hits = sum(not unsupported_numbers(f"{x:.3f}", EV) for x in rng.uniform(-1, 1, 500))
+    assert hits / 500 < 0.05
+
+
+def test_all_proposal_text_is_checked():
+    ctx = make_ctx()
+    ev = ctx.test_gate_train(gate(ctx, pid="agent::P1"))
+    p = GateProposal(proposal_id="P1", based_on=["H1"], conditions=[ThresholdCondition(**gate(ctx)["conditions"][0])],
+                     allocation_when_true=0.0, allocation_when_false=1.0, rationale="r", evidence_ids=[ev["evidence_id"]],
+                     falsification_test="reject if the 95% CI of the validation delta includes zero")
+    assert any("95%" in x for x in verify_proposals(ctx, ProposalSet(proposals=[p]), {"H1"}))
+
+
+def test_cost_attribution_and_baselines_use_one_convention():
+    ctx = make_ctx()
+    costs = ctx.cost_attribution("train")
+    ao = next(b for b in costs["baselines"] if b["policy"] == "always_on")
+    assert costs["costs"][0]["net_return"] == pytest.approx(ao["metrics"]["net_return"], rel=1e-9)
+
+
+class _Wrap:
+    """Gate runner wrapper used to force edge cases."""
+    def __init__(self, inner, edit):
+        self.inner, self.edit = inner, edit
+
+    def evaluate(self, spec, split):
+        return self.edit(spec, self.inner.evaluate(spec, split))
+
+
+def _loader_with(edit, quantile_keys_as_str=False):
+    def loader(_):
+        exp, runner, tq, _df, lgbm = _built()
+        if quantile_keys_as_str:
+            tq = {f: {str(q): v for q, v in qs.items()} for f, qs in tq.items()}
+        return exp, _Wrap(runner, edit), tq, None, lgbm
+    return loader
+
+
+def _loader_forcing_vol_hypothesis(edit):
+    """Force a clear train effect in vol_regime=high so the fallback proposes a gate (tests the arbiter, not the fixture)."""
+    def loader(_):
+        exp, runner, tq, _df, lgbm = _built()
+        rows = [RegimeRow(**{**r.model_dump(), "ci_high": -abs(r.mean_net_return) / 4}) if (r.split == "train" and r.bucket == "high")
+                else r for r in exp.per_regime]
+        return exp.model_copy(update={"per_regime": rows}), _Wrap(runner, edit), tq, None, lgbm
+    return loader
+
+
+def test_champion_must_beat_cash():
+    def edit(spec, ev):
+        if spec.get("policy_id", "").startswith("agent::"):
+            return ev.model_copy(update={"metrics": ev.metrics.model_copy(update={"net_return": -0.01})})
+        return ev
+    r = investigate("x", loader=_loader_forcing_vol_hypothesis(edit), force_fallback=True)
+    assert any(c.source == "agent" for c in r.candidates)
+    assert r.champion_policy_id is None
+    assert any("does not beat cash" in reason for c in r.candidates if c.source == "agent" for reason in c.reasons)
+
+
+def test_strategy_losing_to_cash_is_flagged_for_lane_a():
+    def edit(spec, ev):
+        ao = ev.always_on.model_copy(update={"net_return": -0.3, "ci_net_return": (-0.5, -0.1)})
+        ev = ev.model_copy(update={"always_on": ao})
+        if spec.get("policy_id", "").startswith("agent::"):
+            ev = ev.model_copy(update={"delta_net_return_vs_always_on": -0.05})
+        return ev
+    r = investigate("x", loader=_loader_forcing_vol_hypothesis(edit), force_fallback=True)
+    assert r.verdict == "INCONCLUSIVE" and r.champion_policy_id is None
+    assert any("loses to cash" in b for b in r.verdict_basis)
+
+
+def test_nan_validation_delta_is_never_champion():
+    def edit(spec, ev):
+        if spec.get("policy_id", "").startswith("agent::"):
+            return ev.model_copy(update={"delta_net_return_vs_always_on": float("nan")})
+        return ev
+    r = investigate("x", loader=_loader_forcing_vol_hypothesis(edit), force_fallback=True)
+    assert any(c.source == "agent" for c in r.candidates)
+    assert r.champion_policy_id is None and r.model_dump_json()
+
+
+def test_quantile_keys_from_json_strings_work():
+    r = investigate("x", loader=_loader_with(lambda s, e: e, quantile_keys_as_str=True), force_fallback=True)
+    assert r.candidates
+
+
+def test_critic_approve_with_blocking_fragility_is_contradictory():
+    from packages.research_agents.models import Critique, CritiqueSet
+    ctx = make_ctx()
+    spec = gate(ctx, pid="agent::P1")
+    ev = ctx.arbiter_evaluate(spec, "validation")
+    props = ProposalSet(proposals=[GateProposal(proposal_id="P1", based_on=["H1"], conditions=[ThresholdCondition(**spec["conditions"][0])],
+                                                allocation_when_true=0.0, allocation_when_false=1.0, rationale="r",
+                                                evidence_ids=[ev["evidence_id"]], falsification_test="f")])
+    bad = CritiqueSet(critiques=[Critique(proposal_id="P1", verdict="approve_for_frozen_test", fragile_samples=["thin"],
+                                          evidence_ids=[ev["evidence_id"]])])
+    assert any("contradictory" in x for x in agents.verify_critiques(ctx, bad, props))
+
+
+def test_agent_news_capped_at_train_end():
+    ctx = make_ctx()
+    val = next(w for w in ctx.experiment.windows if w.split == "validation")
+    s, e = (val.start + timedelta(days=1)).isoformat(), (val.start + timedelta(days=2)).isoformat()
+    with pytest.raises(ValueError):
+        ctx.news_context(s, e, agent=True)
+    assert "evidence_id" in ctx.news_context(s, e)          # the arbiter may read validation news
+
+
+def test_equivalent_gates_share_a_hash_and_ci():
+    ctx = make_ctx()
+    q = ctx.train_quantiles["realized_vol_7d"][0.5]
+    a = {"policy_id": "a", "family": "threshold_gate", "conditions": [{"feature": "realized_vol_7d", "op": "<=", "threshold": q}],
+         "allocation_when_true": 1, "allocation_when_false": 0.0}
+    b = {"policy_id": "b", "family": "threshold_gate", "conditions": [{"feature": "realized_vol_7d", "op": ">", "threshold": q}],
+         "allocation_when_true": 0.0, "allocation_when_false": 1.0}
+    assert spec_hash(a) == spec_hash(b)
+    c1 = ctx.arbiter_evaluate({**a, "policy_id": "name1"}, "validation")["evaluation"]["ci_delta"]
+    c2 = ctx.arbiter_evaluate({**a, "policy_id": "name2"}, "validation")["evaluation"]["ci_delta"]
+    assert c1 == c2
+
+
+def test_allocation_mix_counts_in_position_bars_only():
+    ctx = make_ctx()
+    g = gate(ctx, feature="momentum_24h", op="<=", q=0.5, a_t=0.0, a_f=1.0, pid="agent::mom")
+    mix = ctx.arbiter_evaluate(g, "validation")["evaluation"]["allocation_mix"]
+    assert max(mix.values()) >= 0.95          # the strategy is flat when momentum is low: this gate barely touches it
+
+
+@needs_lgbm
+def test_lgbm_spec_is_reproducible():
+    spec = _built()[4].spec()
+    assert spec["seed"] is not None and spec["model_sha256_16"]
+
+
+def test_late_tool_calls_after_timeout_are_logged_as_abandoned(monkeypatch):
+    monkeypatch.setattr(agents, "STAGE_TIMEOUT_S", 1.0)
+
+    def edit(spec, ev):
+        if spec.get("policy_id", "").startswith("agent::") and ev.split == "train":
+            _time.sleep(2.0)
+        return ev
+
+    def fn(messages, info):
+        parts = [p for msg in messages for p in getattr(msg, "parts", [])]
+        if not any(isinstance(p, ToolReturnPart) for p in parts):
+            return ModelResponse(parts=[ToolCallPart("regime_performance", {})])
+        rets = [p for p in parts if isinstance(p, ToolReturnPart) and isinstance(p.content, dict) and "evidence_id" in p.content]
+        if info.output_tools[0].name and any(t.name == "test_gate_train" for t in info.function_tools):
+            q = _built()[2]["realized_vol_7d"][0.5]
+            return ModelResponse(parts=[ToolCallPart("test_gate_train", {"conditions": [{"feature": "realized_vol_7d", "op": ">", "threshold": q}],
+                                                                       "allocation_when_true": 0.0, "allocation_when_false": 1.0,
+                                                                       "policy_id": "slow"})])
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, _hyp(rets[-1].content["evidence_id"]))])
+
+    r = investigate("x", loader=_loader_with(edit), model=FunctionModel(fn))
+    assert any(t.note.startswith("abandoned") for t in r.trial_log)
+    assert any("abandoned" in lim for lim in r.limitations)
+
+
+# ------------------------------------------------------------------ real-data Argon run (Lane A loader), round 3
+
+def _proposal_with_text(ctx, rationale):
+    ev = ctx.test_gate_train(gate(ctx, pid="agent::P1"))
+    p = GateProposal(proposal_id="P1", based_on=["H1"], conditions=[ThresholdCondition(**gate(ctx)["conditions"][0])],
+                     allocation_when_true=0.0, allocation_when_false=1.0, rationale=rationale, evidence_ids=[ev["evidence_id"]],
+                     falsification_test="reject if the 90% CI of the validation delta includes zero")
+    return verify_proposals(ctx, ProposalSet(proposals=[p]), {"H1"})
+
+
+def test_numbers_the_agent_was_given_are_not_fabrications():
+    ctx = make_ctx()      # fixture strategy id: btc-momentum-24h-demo
+    assert not _proposal_with_text(ctx, "the 24h momentum strategy; buckets with fewer than 20 trades are weak")
+    assert _proposal_with_text(ctx, "the 73h momentum strategy")
+
+
+@pytest.mark.parametrize("text,ok", [("gross 0.3043", True), ("mean -3.54e-05", True), ("30.43%", True),
+                                     ("gross 0.3044", False), ("mean -3.55e-05", False)])
+def test_rounding_to_significant_digits_is_allowed_but_changing_digits_is_not(text, ok):
+    ev = [{"gross_return": 0.304327785348499, "mean_net_return": -3.54385266639645e-05}]
+    assert (not unsupported_numbers(text, ev)) is ok
+
+
+def test_new_lane_a_features_are_allowlisted_only_where_covered():
+    from packages.research_agents.allowlist import check_gate
+    tq = {"atr_14": {0.5: 0.0042}}
+    cond = [{"feature": "atr_14", "op": "<=", "threshold": 0.0042}]
+    assert not check_gate(cond, 1.0, 0.5, {"atr_14": 1.0}, tq)
+    assert check_gate(cond, 1.0, 0.5, {}, tq)          # loader without the feature -> refused
+
+
+def test_default_timeouts_fit_a_strong_model():
+    assert agents.REQUEST_TIMEOUT_S >= 180 and agents.STAGE_TIMEOUT_S >= 400
+
+
+@pytest.mark.parametrize("text", ["over 73h", "a 5d window of 41 bars"])
+def test_durations_glued_to_units_are_checked(text):
+    assert unsupported_numbers(text, EV)
+
+
+def test_small_durations_are_trivial_like_small_integers():
+    assert not unsupported_numbers("a 7d window", EV) and unsupported_numbers("a 17d window", EV)
+
+
+def test_lane_a_regime_filter_is_a_competitor_and_a_reference_for_agent_gates():
+    exp, runner, tq, _df, lgbm = _built()
+
+    class WithRegime:
+        def __init__(self, inner):
+            self._inner = inner
+            self.regime_spec = {"policy_id": "rule::regime_filter", "family": "threshold_gate",
+                                "conditions": [{"feature": "realized_vol_7d", "op": ">", "threshold": tq["realized_vol_7d"][0.67]}],
+                                "allocation_when_true": 0.0, "allocation_when_false": 1.0, "summary": "flat in the top vol tercile"}
+
+        def __getattr__(self, name):
+            return getattr(self._inner, name)
+
+    rep = investigate("x", model=None, loader=lambda _: (exp, WithRegime(runner), tq, None, lgbm))
+    comp = next(c for c in rep.candidates if c.policy_id == "rule::regime_filter")
+    assert comp.role == "competitor" and comp.status == "competitor"
+    assert any("Lane A: flat in the top vol tercile" in r for r in comp.reasons)
+    assert any("regime filter" in b for b in rep.verdict_basis)
+    assert any(t.policy_id == "rule::regime_filter" and t.split == "validation" for t in rep.trial_log)
+
+
+# ------------------------------------------------------------------ walk-forward folds (Lane A GateRunner.evaluate_folds)
+
+class _WithFolds:
+    """Stand-in runner plus evaluate_folds; fold deltas are scripted so stability can be tested."""
+
+    def __init__(self, inner, deltas=(0.01, -0.02, -0.03)):
+        self._inner, self.deltas, self.calls = inner, deltas, []
+
+    def evaluate_folds(self, spec):
+        self.calls.append(spec["policy_id"])
+        base = self._inner.evaluate(spec, "train")
+        return [base.model_copy(update={"fold": k, "delta_net_return_vs_always_on": d}) for k, d in enumerate(self.deltas, 1)]
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+
+def test_folds_are_logged_as_train_evidence_and_reported_without_touching_the_holdout():
+    from packages.research_agents.tools import is_fold
+    exp, runner, tq, _df, lgbm = _built()
+    wf = _WithFolds(runner)
+    rep = investigate("x", model=None, loader=lambda _: (exp, wf, tq, None, lgbm))
+    folds = [t for t in rep.trial_log if is_fold(t)]
+    assert folds and all(t.split == "train" and t.source != "agent" and t.evidence_id for t in folds)
+    assert "meta::lgbm_gate_v1" not in wf.calls          # fitted on all of train -> folds would be in-sample
+    rule = next(c for c in rep.candidates if c.source == "rule_baseline")
+    assert any("beats always-on on 1/3" in r for r in rule.reasons)
+    assert any(l.startswith("Walk-forward: every agent gate") for l in rep.limitations)
+    assert not rep.holdout_accessed
+
+
+def test_fallback_critic_flags_gates_that_are_unstable_across_folds_and_ignores_folds_as_the_train_run():
+    from packages.research_agents import fallback
+    ctx = make_ctx()
+    ctx.gate_runner = _WithFolds(ctx.gate_runner, deltas=(-0.01, -0.02, 0.03))
+    spec = gate(ctx, pid="agent::P1")
+    p = GateProposal(proposal_id="P1", based_on=["H1"], conditions=[ThresholdCondition(**spec["conditions"][0])],
+                     allocation_when_true=0.0, allocation_when_false=1.0, rationale="r",
+                     evidence_ids=[ctx.feature_grid()["evidence_id"]],
+                     falsification_test="reject if the validation delta is not positive")
+    ps = ProposalSet(proposals=[p])
+    ctx.arbiter_folds(p.to_policy_spec())                  # folds first: must not be mistaken for the train run
+    ctx.arbiter_evaluate(p.to_policy_spec(), "validation")
+    c = fallback.critique(ctx, ps).critiques[0]
+    assert any("1 of 3 walk-forward train folds" in r for r in c.overfit_risks)
+    assert not [x for x in verify_critiques(ctx, fallback.critique(ctx, ps), ps) if "not copied" in x]
+
+
+def test_runner_without_folds_is_disclosed():
+    rep = investigate("x", model=None, loader=fixture_loader)
+    assert any("no GateRunner.evaluate_folds" in l for l in rep.limitations)
+
+
+# ------------------------------------------------------------------ bad luck vs broken (health.py)
+
+def _health_exp(val_bar, shift=False, n_train=3360, n_val=1680):
+    from types import SimpleNamespace as NS
+    t0 = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    rng = np.random.default_rng(1)
+    eq = [NS(split="train", decision_time=t0 + timedelta(hours=i), net_return=float(rng.normal(0, 0.003)), exposure=1.0)
+          for i in range(n_train)]
+    eq += [NS(split="validation", decision_time=t0 + timedelta(hours=n_train + i), net_return=val_bar(i, rng), exposure=1.0)
+           for i in range(n_val)]
+    m = lambda turn: NS(exposure=0.5, turnover=turn)  # noqa: E731
+    regimes = [NS(regime_feature="sentiment_regime", split="train", bucket="fear", n_decisions=50),
+               NS(regime_feature="sentiment_regime", split="train", bucket="greed", n_decisions=50),
+               NS(regime_feature="sentiment_regime", split="validation", bucket="fear", n_decisions=99 if shift else 50),
+               NS(regime_feature="sentiment_regime", split="validation", bucket="greed", n_decisions=1 if shift else 50)]
+    return NS(train_predictive_range=NS(low=-0.09, high=0.10, horizon_bars=336), equity=eq,
+              baselines=[NS(policy="always_on", split="train", metrics=m(60.0)), NS(policy="always_on", split="validation", metrics=m(30.0))],
+              costs=[], per_regime=regimes)
+
+
+def test_ordinary_losses_inside_the_training_range_are_not_called_a_breakdown():
+    from packages.research_agents.health import strategy_health
+    h = strategy_health(_health_exp(lambda i, r: 0.003 * (-1) ** i - 0.00002, shift=True))
+    assert h["status"] == "within_training_range" and h["n_blocks"] == 5
+    assert h["changed_assumptions"] == ["sentiment_regime_shares"] and "does not show the strategy broke" in h["summary"]
+
+
+def test_many_blocks_below_the_range_are_flagged_as_outside():
+    from packages.research_agents.health import strategy_health
+    h = strategy_health(_health_exp(lambda i, r: -0.0005))
+    assert h["status"] == "outside_training_range" and h["n_below"] == 5 and h["p_below"] < 0.05
+
+
+def test_health_is_skipped_and_disclosed_without_a_train_range():
+    from packages.research_agents.health import strategy_health
+    assert strategy_health(build()[0]) is None
+    rep = investigate("x", model=None, loader=fixture_loader)
+    assert rep.strategy_health is None and any(l.startswith("Bad luck vs broken: not run") for l in rep.limitations)
+
+
+def test_only_the_critic_can_read_strategy_health():
+    tools = lambda a: set(a._function_toolset.tools)  # noqa: E731
+    assert "strategy_health" in tools(agents._critic_agent("test", ProposalSet(proposals=[])))
+    assert "strategy_health" not in tools(agents._diagnostic_agent("test")) | tools(agents._proposer_agent("test", set()))
+
+
+def test_fallback_critic_says_when_the_gate_feature_regime_shifted():
+    from packages.research_agents import fallback
+    from packages.research_agents.health import strategy_health
+    ctx = make_ctx()
+    h = strategy_health(_health_exp(lambda i, r: float(r.normal(0, 0.003)), shift=True))
+    ctx.health = {**h, "evidence_id": ctx.store.add("strategy_health", {}, h)}
+    spec = gate(ctx, feature="fear_greed", op=">", q=0.5, a_t=1.0, a_f=0.0, pid="agent::P1")
+    p = GateProposal(proposal_id="P1", based_on=["H1"], conditions=[ThresholdCondition(**spec["conditions"][0])],
+                     allocation_when_true=1.0, allocation_when_false=0.0, rationale="r",
+                     evidence_ids=[ctx.feature_grid()["evidence_id"]], falsification_test="reject if the validation delta is not positive")
+    ps = ProposalSet(proposals=[p])
+    ctx.arbiter_evaluate(p.to_policy_spec(), "validation")
+    c = fallback.critique(ctx, ps).critiques[0]
+    assert any("sentiment_regime_shares" in o for o in c.observations) and ctx.health["evidence_id"] in c.evidence_ids
+    assert not verify_critiques(ctx, fallback.critique(ctx, ps), ps)
+
+
+def test_redact_also_strips_test_equity_rows():
+    from types import SimpleNamespace as NS
+    from packages.research_agents.tools import redact
+    exp = build()[0]
+    leaky = exp.model_copy(update={"equity": [NS(split="validation"), NS(split="test")]})
+    assert [r.split for r in redact(leaky).equity] == ["validation"]
+
+
+# ------------------------------------------------------------------ adversarial review round 3 regressions
+
+def test_degenerate_rule_applies_without_walk_forward_folds(monkeypatch):
+    """R3-F1: rule (c) was nested under the fold line, so a runner without evaluate_folds skipped it."""
+    from packages.research_agents import fallback
+    from packages.research_agents.models import Critique, CritiqueSet
+
+    def edit(spec, ev):
+        if spec.get("policy_id", "").startswith("agent::") and ev.split == "validation":
+            return ev.model_copy(update={"allocation_mix": {"0.0": 0.02, "0.5": 0.0, "1.0": 0.98},
+                                         "delta_net_return_vs_always_on": 0.01, "ci_delta": (0.001, 0.02),
+                                         "metrics": ev.metrics.model_copy(update={"net_return": 0.05})})
+        return ev
+
+    def approve(ctx, props):
+        out = []
+        for p in props.proposals:
+            h = spec_hash(p.to_policy_spec())
+            t = next(t for t in ctx.trials if t.spec_hash == h and t.split == "validation")
+            out.append(Critique(proposal_id=p.proposal_id, verdict="approve_for_frozen_test", evidence_ids=[t.evidence_id]))
+        return CritiqueSet(critiques=out)
+
+    monkeypatch.setattr(fallback, "critique", approve)
+    r = investigate("x", loader=_loader_forcing_vol_hypothesis(edit), force_fallback=True)
+    agent = [c for c in r.candidates if c.source == "agent"]
+    assert agent and r.champion_policy_id is None
+    assert any("degenerate" in reason for reason in agent[0].reasons)
+
+
+R3_EV = [{"hit_rate": 0.251, "n_trades": 151, "n_decisions": 5001, "delta": 0.0012, "mean": 0.9875}]
+
+
+@pytest.mark.parametrize("text", ["mean .9876 per bar", "ci .5-.7", "delta −0.0012", "delta –0.0012",
+                                  "hit rate 0.3", "2e2 trades", "1e4 decisions", "only 20 trades in high vol",
+                                  "improvement 0.0%", "delta -0.0"])
+def test_round3_verifier_leaks_are_closed(text):
+    """R3-F4/F5/F7/F8/F9: leading dot, Unicode minus, loose rounding, e-notation integers, bare 20, zeros."""
+    assert unsupported_numbers(text, R3_EV)
+
+
+@pytest.mark.parametrize("text", ["hit rate 0.251 (25.1%)", "151 trades in 5001 decisions", "delta +0.0012, 0.12%",
+                                  "buckets with fewer than 20 trades are weak", "sideways is fragile (<20 trades)",
+                                  "mean 0.9875"])
+def test_round3_verifier_still_accepts_honest_copies(text):
+    assert not unsupported_numbers(text, R3_EV)
+
+
+def test_uploaded_strategy_ids_do_not_hand_out_free_numbers():
+    """R3-F6: digits inside an id/hash are not 'given' numbers; whole tokens of a demo id are."""
+    from types import SimpleNamespace as NS
+    from packages.research_agents.verify import context_numbers
+    up = context_numbers(NS(experiment=NS(strategy_id="strat_3a2f1094c7e8", strategy_version="imported-positions")))
+    demo = context_numbers(NS(experiment=NS(strategy_id="btc-trend-24-72-demo", strategy_version="v1")))
+    assert up["strategy_label_numbers"] == [] and demo["strategy_label_numbers"] == [24.0, 72.0]
+
+
+def test_empty_regime_filter_is_reported_as_always_on_not_a_competitor():
+    """R3-F12: a filter that selected no buckets is always-on; it must not pose as a separate reference."""
+    exp, runner, tq, _df, lgbm = _built()
+
+    class EmptyRegime:
+        regime_spec = {"policy_id": "rule::regime_filter", "family": "regime_gate", "flat_buckets": [], "full_buckets": [],
+                       "allocation_flat": 0.0, "allocation_full": 1.0, "allocation_else": 1.0, "selected_on": "train",
+                       "summary": "No train regime had an interval entirely off zero."}
+
+        def __getattr__(self, name):
+            return getattr(runner, name)
+
+    rep = investigate("x", model=None, loader=lambda _: (exp, EmptyRegime(), tq, None, lgbm))
+    assert not any(c.policy_id == "rule::regime_filter" for c in rep.candidates)
+    assert any("equals always-on" in b for b in rep.verdict_basis)
+
+
+def test_failed_folds_are_disclosed_as_failed_not_missing():
+    """R3-F10."""
+    exp, runner, tq, _df, lgbm = _built()
+
+    class Raising:
+        def evaluate_folds(self, spec):
+            raise RuntimeError("boom")
+
+        def __getattr__(self, name):
+            return getattr(runner, name)
+
+    rep = investigate("x", model=None, loader=lambda _: (exp, Raising(), tq, None, lgbm))
+    assert any("evaluate_folds failed" in l for l in rep.limitations)
+    assert any(t.status == "error" and "walk-forward folds failed" in t.note for t in rep.trial_log)
+
+
+def test_fold_trials_carry_a_structured_fold_field():
+    """R3-F11: folds are identified by TrialRecord.fold, not only by note text."""
+    exp, runner, tq, _df, lgbm = _built()
+    rep = investigate("x", model=None, loader=lambda _: (exp, _WithFolds(runner), tq, None, lgbm))
+    folds = [t for t in rep.trial_log if t.fold is not None]
+    assert folds and {t.fold for t in folds} == {1, 2, 3}
+    assert all(t.fold is None for t in rep.trial_log if not t.note.startswith("walk-forward"))
+
+
+def test_redact_drops_lane_a_notes_that_quote_the_sealed_verdict():
+    """R3-F2: Lane A now drops this sentence in agent_view. redact still clears every note before a tool call."""
+    from packages.research_agents.tools import redact
+    exp = build()[0]
+    leaky = exp.model_copy(update={"notes": ["Verdict KEEP comes from the deterministic arbiter"]})
+    assert redact(leaky).notes == []
+
+
+def test_quantile_levels_from_the_feature_grid_are_citable():
+    """Argon 8 Nov: 'fear_greed <= 43 (the 0.33 quantile)' was rejected because quantile levels are dict keys."""
+    ctx = make_ctx()
+    g = ctx.feature_grid()
+    assert not unsupported_numbers("threshold at the 0.33 quantile (q=0.33) of realized_vol_7d", [g])
+    assert unsupported_numbers("threshold at the 0.35 quantile", [g])
+
+
+@pytest.mark.parametrize("text", ["below the 20-trade threshold", "a minimum of 20 trades", "under the threshold of 20 trades",
+                                  "the 20 trade minimum"])
+def test_min_trades_threshold_phrasings_from_argon_are_allowed(text):
+    assert not unsupported_numbers(text, R3_EV)
+
+
+def test_health_evidence_states_the_block_length_in_days():
+    """Argon 8 Nov: the critic wrote '14-day blocks'; the evidence only had 336 bars."""
+    from packages.research_agents.health import strategy_health
+    h = strategy_health(_health_exp(lambda i, r: 0.003 * (-1) ** i - 0.00002))
+    assert h["train_range"]["horizon_days"] == 14 and not unsupported_numbers("each 14-day block", [h])
+
+
+# ------------------------------------------------------------------ agent 4: context (sentiment around best/worst weeks)
+
+def _context_ctx(planted=True):
+    """Stand-in ctx plus a train Fear & Greed series and per-bar equity. With planted=True, four greed-to-fear
+    flips are each followed by a losing week, so the tally must find 4/4 against a small base rate."""
+    from types import SimpleNamespace as NS
+    exp, runner, tq, _df, _lgbm = build()
+    t0 = datetime(2024, 1, 9, 8, tzinfo=timezone.utc)   # the stand-in's train window starts here
+    n = 3000
+    fg = [62.0] * n
+    rets = [0.0004 * (-1) ** i for i in range(n)]
+    for k, start in enumerate((300, 900, 1500, 2100)):
+        for i in range(start, start + 200):
+            fg[i] = 30.0                                  # flip to fear at `start`, back to greed later
+        if planted:
+            for i in range(start + 1, start + 1 + 168):
+                rets[i] = -0.001                          # the worst weeks start right after each flip
+    times = [t0 + timedelta(hours=i) for i in range(n)]
+    eq = [NS(split="train", decision_time=t, net_return=r, exposure=1.0) for t, r in zip(times, rets)]
+    eq += [NS(split="validation", decision_time=t0 + timedelta(hours=n + i), net_return=-0.5, exposure=1.0) for i in range(500)]
+
+    class R:
+        def __init__(self):
+            self.splits = []
+
+        def feature_series(self, name, split="train"):
+            self.splits.append(split)
+            assert name == "fear_greed"
+            return list(zip(times, fg))
+
+        def __getattr__(self, name):
+            return getattr(runner, name)
+
+    ctx = ToolContext(experiment=exp.model_copy(update={"equity": eq}), gate_runner=R(), news=None, train_quantiles=tq)
+    return ctx
+
+
+def test_sentiment_episodes_find_a_planted_pattern_and_read_train_only():
+    ctx = _context_ctx(planted=True)
+    out = ctx.sentiment_context()
+    t = out["worst_weeks_after_greed_to_fear_flip"]
+    assert t["n_with_flip"] == 4 and t["n_weeks"] == 4 and t["binomial_p_value"] < 0.01
+    assert ctx.gate_runner.splits == ["train"]
+    assert all(e["net_return"] > -0.5 for e in out["worst_weeks"])          # validation bars never enter
+
+
+def test_fallback_context_passes_its_own_verifier_and_says_moderate_only_when_earned():
+    from packages.research_agents import fallback
+    from packages.research_agents.verify import verify_context
+    for planted, strength in ((True, "moderate"), (False, None)):
+        ctx = _context_ctx(planted)
+        rep = fallback.context(ctx)
+        assert not verify_context(ctx, rep)
+        c1 = next(f for f in rep.findings if f.finding_id == "C1")
+        assert (c1.strength == "moderate") is (strength == "moderate")
+
+
+@pytest.mark.parametrize("statement,strength,episodes,fragment", [
+    ("Losing weeks happened because sentiment flipped to fear.", "weak", [], "causal"),
+    ("The flip base rate is 0.731.", "weak", [], "not copied"),
+    ("Worst weeks often follow a flip.", "moderate", [], None),        # 'moderate' allowed only on the planted ctx
+    ("Worst weeks often follow a flip.", "weak", ["worst_week_9"], "episode_ids"),
+])
+def test_context_verifier_rejects_causal_claims_invented_numbers_and_fake_episodes(statement, strength, episodes, fragment):
+    from packages.research_agents.models import ContextFinding, ContextReport
+    from packages.research_agents.verify import verify_context
+    ctx = _context_ctx(planted=False)
+    eid = ctx.sentiment_context()["evidence_id"]
+    rep = ContextReport(summary="Context.", findings=[ContextFinding(finding_id="C1", statement=statement, strength=strength,
+                                                                       episode_ids=episodes, evidence_ids=[eid])])
+    problems = verify_context(ctx, rep)
+    if fragment is None:
+        assert any("'moderate' needs" in p for p in problems)
+    else:
+        assert any(fragment in p for p in problems)
+
+
+def test_llm_context_agent_is_made_to_retry_a_causal_claim():
+    from packages.research_agents.models import ContextReport
+
+    def build_output(returns, cheat):
+        eid = returns[-1].content["evidence_id"]
+        stmt = "Worst weeks were caused by greed-to-fear flips." if cheat else "Worst weeks started right after greed-to-fear flips."
+        return {"summary": "Flips line up with the worst weeks on train.",
+                "findings": [{"finding_id": "C1", "statement": stmt, "strength": "moderate", "evidence_ids": [eid],
+                              "episode_ids": ["worst_week_1"], "tally": "worst_weeks_after_greed_to_fear_flip"}]}
+
+    model, state = _script(build_output, first_call=("sentiment_episodes", {}), cheat_first=True)
+    out = agents.run_context(_context_ctx(planted=True), model)
+    assert isinstance(out, ContextReport) and "caused" not in out.findings[0].statement and state["calls"] >= 3
+
+
+def test_context_agent_has_one_train_only_tool_and_feeds_the_proposer():
+    tools = set(agents._context_agent("test")._function_toolset.tools)
+    assert tools == {"sentiment_episodes"}
+
+
+def test_context_is_skipped_and_disclosed_without_a_sentiment_series():
+    rep = investigate("x", model=None, loader=fixture_loader)
+    assert rep.context is None and any(l.startswith("Context agent skipped") for l in rep.limitations)
+
+
+# ------------------------------------------------------------------ adversarial review round 4 regressions
+
+@pytest.mark.parametrize("text", ["max drawdown was held to a floor of 20%", "costs ran at a minimum of 20 bps",
+                                  "only 20 trades in high vol"])
+def test_r4_threshold_phrases_do_not_hide_other_numbers(text):
+    """R4-F7: '... of 20' is free only when it is the trade-count threshold."""
+    assert unsupported_numbers(text, R3_EV)
+
+
+def test_r4_quantile_levels_are_free_only_when_named_as_such():
+    """R4-F8: '0.33' from feature_grid's keys is citable as a quantile, not as a Sharpe or a turnover."""
+    g = {"train_quantiles": {"realized_vol_7d": {"0.33": 0.0074, "0.67": 0.0114}}}
+    assert not unsupported_numbers("the 0.33 quantile of realized_vol_7d", [g])
+    assert unsupported_numbers("a 0.33 Sharpe", [g]) and unsupported_numbers("turnover fell by 0.67", [g])
+
+
+def test_r4_moderate_needs_a_primary_tally_below_the_corrected_threshold_and_real_flagged_weeks():
+    """R4-F5/F6: 'moderate' only for a primary tally at p < 0.05; named weeks must actually have the flip."""
+    from packages.research_agents.models import ContextFinding, ContextReport
+    from packages.research_agents.verify import verify_context
+    ctx = _context_ctx(planted=True)
+    eid = ctx.sentiment_context()["evidence_id"]
+    mk = lambda **kw: ContextReport(summary="Context.", findings=[ContextFinding(  # noqa: E731
+        finding_id="C1", statement="Worst weeks started right after flips.", evidence_ids=[eid], **kw)])
+    assert not verify_context(ctx, mk(strength="moderate", tally="worst_weeks_after_greed_to_fear_flip", episode_ids=["worst_week_1"]))
+    assert verify_context(ctx, mk(strength="moderate"))                                            # no tally named
+    assert verify_context(ctx, mk(strength="moderate", tally="best_weeks_after_greed_to_fear_flip"))  # not primary
+    assert verify_context(ctx, mk(strength="weak", tally="best_weeks_after_fear_to_greed_flip", episode_ids=["best_week_1"]))
+
+
+@pytest.mark.parametrize("text,bad", [("Flips sparked the losing weeks.", True), ("Flips were responsible for losses.", True),
+                                      ("Losses were a consequence of flips.", True),
+                                      ("This is co-occurrence, not evidence of causation.", False),
+                                      ("No causal link is claimed.", False)])
+def test_r4_causal_filter_catches_synonyms_and_allows_negated_caveats(text, bad):
+    from packages.research_agents.verify import _causal
+    assert bool(_causal(text)) is bad
+
+
+def test_r4_bad_loader_data_does_not_crash_the_context_stage():
+    """R4-F12: naive timestamps, None returns or a raising series are disclosed, not fatal."""
+    from types import SimpleNamespace as NS
+    from packages.research_agents.context import sentiment_episodes
+    t0 = datetime(2024, 1, 9, 8)                                   # naive on purpose
+    eq = [NS(split="train", decision_time=t0 + timedelta(hours=i), net_return=0.001, exposure=1.0) for i in range(400)]
+    runner = NS(feature_series=lambda n, s: [(t0 + timedelta(hours=i), 60.0) for i in range(400)])
+    assert "error" not in sentiment_episodes(NS(equity=eq), runner, train_end=datetime(2024, 6, 1, tzinfo=timezone.utc))
+    eq[5] = NS(split="train", decision_time=t0, net_return=float("nan"), exposure=1.0)
+    assert "error" in sentiment_episodes(NS(equity=eq), runner)
+    assert "error" in sentiment_episodes(NS(equity=eq), NS(feature_series=lambda n, s: None))
+
+
+def test_r4_best_and_worst_weeks_never_overlap():
+    """R4-F13."""
+    from types import SimpleNamespace as NS
+    from packages.research_agents.context import WEEK, sentiment_episodes
+    t0 = datetime(2024, 1, 9, 8, tzinfo=timezone.utc)
+    rets = [0.002 * ((-1) ** (i // 37)) for i in range(600)]
+    eq = [NS(split="train", decision_time=t0 + timedelta(hours=i), net_return=r, exposure=1.0) for i, r in enumerate(rets)]
+    out = sentiment_episodes(NS(equity=eq), NS(feature_series=lambda n, s: [(p.decision_time, 55.0) for p in eq]))
+    starts = lambda key: [datetime.fromisoformat(e["start"]) for e in out[key]]  # noqa: E731
+    assert all(abs((a - b).total_seconds()) >= WEEK * 3600 for a in starts("worst_weeks") for b in starts("best_weeks"))
+
+
+def test_r4_ledger_refuses_a_second_look_by_spec_hash(tmp_path):
+    """R4-F4: one sealed look per policy body, whatever its name or process."""
+    from packages.research_agents import frozen
+    led = tmp_path / "ledger.json"
+    frozen.record({"spec_hash": "abc", "experiment_id": "e", "policy_id": "agent::x", "looked_at": "t", "artifact": "a"}, led)
+    with pytest.raises(frozen.AlreadyLooked):
+        frozen.record({"spec_hash": "abc", "experiment_id": "e", "policy_id": "agent::x_v2", "looked_at": "t2", "artifact": "b"}, led)
+    frozen.check("def", led)
+
+
+def test_r4_the_committed_sealed_look_is_in_the_ledger():
+    import json
+    from packages.research_agents import frozen
+    look = json.load(open("experiments/frozen_look_btc-meanrev-48-demo.json"))
+    with pytest.raises(frozen.AlreadyLooked):
+        frozen.check(look["champion_spec_hash"])

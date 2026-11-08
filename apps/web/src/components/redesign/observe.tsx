@@ -23,8 +23,9 @@ export default function ObserveView({ plans, strategies, onReview }: { plans: Pa
         const assumptions = snapshot?.assumptions;
         const conditions = policy?.conditions ?? [];
         return <article className="ob-plan" key={plan.paper_test_id}>
-          <div className="ob-plan-main"><h2>{strategy?.name || (snapshot ? "Frozen strategy" : "Saved plan")}</h2><p>{strategy?.symbol || (snapshot?.strategy_id ? `Strategy ${snapshot.strategy_id}` : "Frozen strategy identity unavailable")} · {plan.mode === "demo" ? "Illustrative example" : "Paper plan"}</p></div>
-          <dl className="ob-plan-facts"><div><dt>Rules</dt><dd>Frozen</dd></div><div><dt>Duration</dt><dd>{plan.duration_days} days</dd></div><div><dt>Approved</dt><dd>{new Date(plan.approved_at).toLocaleDateString("en-GB", { dateStyle: "medium", timeZone: "UTC" })}</dd></div><div><dt>Status</dt><dd>Planned · not started</dd></div></dl>
+          <div className="ob-plan-main"><h2>{strategy?.name || (snapshot ? "Frozen strategy" : "Saved plan")}</h2><p>{strategy?.symbol || (snapshot?.strategy_id ? `Strategy ${snapshot.strategy_id}` : "Frozen strategy identity unavailable")} · {plan.mode === "demo" ? "Illustrative example" : "Measured plan"}</p></div>
+          <dl className="ob-plan-facts"><div><dt>Rules</dt><dd>Frozen</dd></div><div><dt>Duration</dt><dd>{plan.duration_days} days</dd></div><div><dt>Approved</dt><dd>{new Date(plan.approved_at).toLocaleDateString("en-GB", { dateStyle: "medium", timeZone: "UTC" })}</dd></div><div><dt>Status</dt><dd>{plan.shadow ? `${plan.shadow.fills_recorded} of ${plan.shadow.horizon_bars} hours logged` : plan.status === "planned" ? "Planned · not started" : plan.status}</dd></div></dl>
+          {plan.shadow?.message ? <p className="ob-snapshot-muted">{plan.shadow.message}</p> : plan.message ? <p className="ob-snapshot-muted">{plan.message}</p> : null}
           <details className="ob-plan-detail"><summary><FileText size={14} />Show frozen plan</summary><div className="ob-plan-detail-body">
             <p>Plan <code>{plan.paper_test_id}</code> · Experiment <code>{plan.experiment_id}</code> · Policy <code>{plan.policy_id}</code></p>
             {snapshot ? <>

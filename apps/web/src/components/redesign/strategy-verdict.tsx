@@ -4,11 +4,11 @@ import { ArrowUpRight, CircleHelp, ShieldCheck } from "lucide-react";
 import type { Experiment, Strategy } from "./types";
 import "./strategy-verdict.css";
 
-export type StrategyVerdictKey = "keep" | "restrict" | "monitor" | "kill" | "not_proven";
+export type StrategyVerdictKey = "keep" | "conditional" | "modify" | "reduce" | "combine" | "restrict" | "monitor" | "kill" | "not_proven";
 
 export type StrategyVerdict = {
   key: StrategyVerdictKey;
-  label: "Keep" | "Restrict" | "Monitor" | "Kill" | "Not proven";
+  label: "Keep" | "Conditional" | "Modify" | "Reduce" | "Combine" | "Restrict" | "Monitor" | "Kill" | "Not proven";
   reason: string;
   source: string;
   example: boolean;
@@ -16,7 +16,7 @@ export type StrategyVerdict = {
 };
 
 const sourceLabel = (strategy: Strategy) => {
-  if (strategy.source === "native_report") return "Recorded research";
+  if (strategy.source === "native_report" || strategy.source === "native_report_example") return "Recorded research";
   if (strategy.status === "demo") return "Example data";
   if (strategy.source === "strategy_definition" || strategy.definition) return "Rule definition";
   if (strategy.kind === "positions") return "Position history";
@@ -39,7 +39,7 @@ const pendingReason = (strategy: Strategy, experiment: Experiment | null) => {
   }
   if (experiment.status === "queued") return "The request is saved, but the evaluator has not started it yet.";
   if (experiment.status === "running") return "The evaluator is still working; a verdict will wait for the completed evidence.";
-  if (experiment.status === "awaiting_engine") return "The strategy is saved, but the research evaluator is not connected yet.";
+  if (experiment.status === "awaiting_engine") return sentence(experiment.message) || "The evaluator is waiting to provide a completed result.";
   if (experiment.status === "failed") return "The evaluator stopped before it produced a complete, reviewable result.";
   return "The supplied evidence does not prove a keep-or-kill decision yet.";
 };
@@ -76,14 +76,34 @@ export function getStrategyVerdict(strategy: Strategy | null, experiment: Experi
   const verdict = experiment.verdict;
   const mapped: Record<Exclude<Experiment["verdict"], "INCONCLUSIVE">, { key: StrategyVerdictKey; label: StrategyVerdict["label"]; reason: string }> = {
     CONDITIONAL: {
-      key: "restrict",
-      label: "Restrict",
+      key: "conditional",
+      label: "Conditional",
       reason: "The recorded research supports use only under the conditions described in the evidence.",
     },
     KEEP: {
       key: "keep",
       label: "Keep",
       reason: "The recorded research supports keeping this strategy for human review.",
+    },
+    MODIFY: {
+      key: "modify",
+      label: "Modify",
+      reason: "The recorded research supports a proposed change that still needs human review.",
+    },
+    REDUCE: {
+      key: "reduce",
+      label: "Reduce",
+      reason: "The recorded research supports a smaller or narrower use of this strategy.",
+    },
+    COMBINE: {
+      key: "combine",
+      label: "Combine",
+      reason: "The recorded research supports reviewing this strategy alongside a paired approach.",
+    },
+    RESTRICT: {
+      key: "restrict",
+      label: "Restrict",
+      reason: "The recorded research supports use only under the conditions described in the evidence.",
     },
     MONITOR: {
       key: "monitor",

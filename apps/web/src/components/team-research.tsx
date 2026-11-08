@@ -64,7 +64,10 @@ type NativeWrapperWithFrozen = InvestigationWrapper & {
 function frozenLook(wrapper: InvestigationWrapper | null): FrozenEvaluation | null {
   if (!wrapper) return null;
   const value = wrapper as NativeWrapperWithFrozen;
-  return value.frozen_evaluation || value.integration_audit?.frozen_evaluation || value.report.frozen_evaluation || value.report.integration_audit?.frozen_evaluation || null;
+  const look = value.frozen_evaluation || value.integration_audit?.frozen_evaluation || value.report.frozen_evaluation || value.report.integration_audit?.frozen_evaluation || null;
+  return look && look.strategy_id === value.report.strategy_id
+    && look.experiment_id === value.report.experiment_id
+    && look.evaluation.policy_id === value.report.champion_policy_id ? look : null;
 }
 
 function SealedLook({ evaluation }: { evaluation: FrozenEvaluation }) {

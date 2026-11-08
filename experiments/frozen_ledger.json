@@ -1,0 +1,11 @@
+[
+  {
+    "spec_hash": "spec_dbd7812c913a",
+    "experiment_id": "exp_a79497cf70ec",
+    "policy_id": "agent::vol_median_05_1",
+    "looked_at": "2026-11-08T11:27:16.184157+00:00",
+    "artifact": "experiments/frozen_look_btc-meanrev-48-demo.json",
+    "recorded_at": "2026-11-08T12:10:00+00:00",
+    "note": "taken before the ledger existed (inline score_frozen call); backfilled"
+  }
+]

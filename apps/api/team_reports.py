@@ -151,6 +151,23 @@ def _summary(wrapper: dict[str, Any]) -> dict[str, Any]:
         "trial_count": len(report.get("trial_log") or []),
         "evidence_count": len(report.get("evidence") or []),
         "n_policies_tried": report.get("n_policies_tried", 0),
+        "strategy_health": _health_summary(report.get("strategy_health")),
+    }
+
+
+def _health_summary(health: Any) -> dict[str, Any] | None:
+    if not isinstance(health, dict):
+        return None
+    blocks = health.get("validation_blocks") or []
+    if not isinstance(blocks, list):
+        blocks = []
+    return {
+        "status": health.get("status"),
+        "summary": health.get("summary"),
+        "n_blocks": len(blocks),
+        "n_below": sum(1 for block in blocks if isinstance(block, dict) and block.get("position") == "below"),
+        "n_above": sum(1 for block in blocks if isinstance(block, dict) and block.get("position") == "above"),
+        "n_inside": sum(1 for block in blocks if isinstance(block, dict) and block.get("position") == "inside"),
     }
 
 

@@ -1,0 +1,22 @@
+{
+  "id": "binance-spot-btcusdt-1h-201802-202610",
+  "symbol": "BTCUSDT",
+  "venue": "binance_spot",
+  "interval": "1h",
+  "start": "2018-02-01T00:00:00+00:00",
+  "end_exclusive": "2026-11-01T00:00:00+00:00",
+  "n_bars": 76559,
+  "n_gaps_over_1h": 26,
+  "market_hash": "641f597f04113c65",
+  "first_open": 10285.1,
+  "last_close": 77582.02,
+  "fear_greed_rows": 3191,
+  "sources": {
+    "ohlcv": "https://api.binance.com/api/v3/klines",
+    "fear_greed": "https://api.alternative.me/fng/"
+  },
+  "fear_greed_attribution": "Alternative.me Crypto Fear & Greed Index",
+  "fear_greed_availability": "index timestamp plus 24 hours; historical publication time is not documented",
+  "news": "omitted",
+  "fetched_at": "2026-11-08T10:37:30.782547+00:00"
+}

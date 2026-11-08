@@ -96,7 +96,7 @@ export type TeamReport = {
   verdict?: "candidate_for_frozen_test" | "INCONCLUSIVE";
   champion_policy_id?: string | null;
   verdict_basis?: string[];
-  strategy_health?: NativeStrategyHealth;
+  strategy_health?: NativeStrategyHealth | null;
   validation_always_on?: Pick<NativeMetrics, "net_return" | "ci_net_return">;
   validation_cash_net_return?: number;
   context?: { summary: string; findings: unknown[]; limitations: string[] };

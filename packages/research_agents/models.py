@@ -49,6 +49,33 @@ class DiagnosticReport(BaseModel):
         return self
 
 
+class ContextFinding(BaseModel):
+    finding_id: str
+    statement: str = Field(description="what co-occurred in time; never a causal claim")
+    episode_ids: list[str] = Field(default_factory=list, description="worst_week_n / best_week_n from sentiment_episodes")
+    evidence_ids: list[str] = Field(min_length=1)
+    tally: Literal["worst_weeks_after_greed_to_fear_flip", "best_weeks_after_fear_to_greed_flip",
+                   "worst_weeks_after_fear_to_greed_flip", "best_weeks_after_greed_to_fear_flip"] | None = Field(
+        default=None, description="the sentiment_episodes tally this finding reports, if any")
+    strength: Literal["none", "weak", "moderate"] = Field(
+        description="'moderate' only for a PRIMARY tally whose binomial_p_value is below 0.05; usually 'weak' or 'none'")
+    caveats: list[str] = Field(default_factory=list)
+
+
+class ContextReport(BaseModel):
+    """Agent 4 (context): market sentiment around the strategy's best and worst TRAIN weeks. Co-occurrence only."""
+    summary: str = Field(max_length=800)
+    findings: list[ContextFinding] = Field(default_factory=list, max_length=6)
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique(self):
+        ids = [f.finding_id for f in self.findings]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"duplicate finding_id in {ids}")
+        return self
+
+
 class ThresholdCondition(BaseModel):
     feature: str
     op: Literal["<=", ">"]
@@ -94,8 +121,10 @@ class Critique(BaseModel):
     verdict: Literal["approve_for_frozen_test", "reject", "needs_change"]
     leakage_concerns: list[str] = Field(default_factory=list)
     overfit_risks: list[str] = Field(default_factory=list)
-    fragile_samples: list[str] = Field(default_factory=list)
+    fragile_samples: list[str] = Field(default_factory=list, description="BLOCKING sample-size/fragility issues only; "
+                                                                         "the arbiter treats any entry as disqualifying")
     counterexamples: list[str] = Field(default_factory=list)
+    observations: list[str] = Field(default_factory=list, description="non-blocking remarks")
     evidence_ids: list[str] = Field(min_length=1, description="must include the gate's own evaluation evidence")
 
 
@@ -121,10 +150,12 @@ class TrialRecord(BaseModel):
     split: Literal["train", "validation", "test"]
     delta_net_return_vs_always_on: float | None
     ci_delta: tuple[float, float] | None
+    net_return: float | None = None              # the policy's own compounded net return (= delta vs cash)
     allocation_mix: dict[str, float] = Field(default_factory=dict)
     evidence_id: str | None
-    status: Literal["evaluated", "refused", "error"]
+    status: Literal["evaluated", "refused", "error"]   # late results after a stage timeout: "error" with note "abandoned: ..."
     note: str = ""
+    fold: int | None = None                      # walk-forward train fold (arbiter only); None for every other trial
 
 
 class PolicyCandidate(BaseModel):
@@ -137,8 +168,9 @@ class PolicyCandidate(BaseModel):
     validation_delta_vs_always_on: float | None = None
     validation_ci: tuple[float, float] | None = None
     validation_delta_vs_simple_rule: float | None = None
-    allocation_mix: dict[str, float] = Field(default_factory=dict)
-    reasons: list[str]
+    validation_delta_vs_cash: float | None = None
+    allocation_mix: dict[str, float] = Field(default_factory=dict, description="share of IN-POSITION decisions at each multiplier")
+    reasons: list[str] = Field(description="arbiter reasons; text quoted from the critic is prefixed 'critic:'")
     evidence_ids: list[str]
 
 
@@ -146,11 +178,15 @@ class InvestigationReport(BaseModel):
     experiment_id: str
     strategy_id: str
     generated_at: datetime
-    agent_mode: Literal["llm", "deterministic_fallback", "llm_with_fallback"]
+    agent_mode: Literal["llm", "llm_with_fallback", "deterministic_fallback"]   # Lane C / API contract
     model_id: str | None
     agent_failures: list[str] = Field(default_factory=list)
-    verdict: Literal["candidate_for_frozen_test", "INCONCLUSIVE"]
+    verdict: Literal["candidate_for_frozen_test", "INCONCLUSIVE"]   # did an agent gate earn one sealed look?
+    # (the strategy-level KEEP / ACTIVATE / KILL decision belongs to Lane A's arbiter: docs/INTEGRATION_DECISIONS.md)
+    verdict_basis: list[str] = Field(default_factory=list)
     champion_policy_id: str | None
+    validation_always_on: dict = Field(default_factory=dict)   # net return + CI of the unchanged strategy on validation
+    validation_cash_net_return: float = 0.0
     diagnostic: DiagnosticReport
     proposals: list[GateProposal]
     critiques: list[Critique]
@@ -162,10 +198,12 @@ class InvestigationReport(BaseModel):
     n_distinct_agent_policies: int
     n_policies_tried: int
     holdout_accessed: bool = False
+    strategy_health: dict | None = None   # bad luck vs broken (spec section 8); code-computed, see health.py
+    context: ContextReport | None = None  # agent 4: sentiment around the best/worst train weeks (context.py)
 
 
 __all__ = [
     "ALLOCATIONS", "GATE_FAMILIES", "GATE_FEATURES",
-    "Evidence", "Hypothesis", "DiagnosticReport", "ThresholdCondition", "GateProposal", "ProposalSet",
+    "Evidence", "Hypothesis", "DiagnosticReport", "ContextFinding", "ContextReport", "ThresholdCondition", "GateProposal", "ProposalSet",
     "Critique", "CritiqueSet", "TrialRecord", "PolicyCandidate", "InvestigationReport",
 ]

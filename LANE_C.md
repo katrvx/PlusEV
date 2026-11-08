@@ -22,17 +22,17 @@ The real 2018–2026 reports are in this branch. Read [`docs/LANE_A_NOTE_FOR_C.m
 ### Five-minute wiring path
 
 1. Put a real Lane B `InvestigationReport` at `experiments/investigation_<name>.json`. Reload `GET /api/investigations`; real artifacts take precedence over the bundled fixture.
-2. Connect Lane A’s evaluator and Lane B’s `investigate(..., loader=...)` in the **non-demo branch of `create_experiment()`** in `apps/api/main.py`, which currently writes `awaiting_engine`. Add a background worker for imported strategies and persist its progress/result with `db_insert("experiments", experiment_id, payload)`. `run_demo_experiment()` demonstrates job-state persistence only; keep that worker restricted to seeded demos. Adapt completed output into the Part C `Experiment` presentation type at this boundary.
+2. The non-demo branch of `create_experiment()` in `apps/api/main.py` queues `apps/api/engine.py` for BTCUSDT 1h positions. That worker calls Lane A and `investigate(..., loader=...)`, writes `experiments/investigation_<id>.json`, and persists the presentation with `db_insert`. `run_demo_experiment()` stays restricted to seeded demos.
 3. For an imported strategy, read the immutable paths already stored by `import_strategy()`: `data/local/uploads/<upload_id>_<filename>` (`raw_path`) and `data/local/canonical/<strategy_id>.json` (`canonical_data_path`). Use the stored `raw_data_hash`, `canonical_data_hash`, `dataset_hash`, `strategy_id`, and execution assumptions when creating the Lane A snapshot.
 4. Return measured metrics and research findings only after Lane A and Lane B have run. Keep the browser as a formatter; it must not calculate returns, Sharpe, drawdown, or costs.
-5. Check `GET /api/health`: the current response is `{ "status": "ok", "research_engine": false, "version": "0.1.0-part-c" }`. Change that flag only when the deterministic research engine is actually connected.
+5. `GET /api/health` returns `{ "status": "ok", "research_engine": true, "version": "0.1.0-part-c" }` because the BTCUSDT hourly path above is the deterministic engine. Other imports are still refused.
 
 The web proxy uses `API_URL` from [`apps/web/.env.example`](apps/web/.env.example), defaulting to `http://127.0.0.1:8000`. The API’s verified local constants are `ROOT = Path(__file__).resolve().parents[2]`, `DATA_DIR = ROOT / "data" / "local"`, `UPLOAD_DIR = DATA_DIR / "uploads"`, `DB_PATH = DATA_DIR / "keep_or_kill.sqlite3"`, `MAX_UPLOAD_BYTES = 10 * 1024 * 1024`, and `MAX_IMPORT_ROWS = 250_000`.
 
 ### Current status flags are deliberate
 
 - Seeded demo strategies may use `mode: "demo"` and replay the checked-in illustrative fixture.
-- Imported user strategies use `status: "awaiting_engine"`, `mode: "pending"`, empty metrics/baselines/equity/evidence/steps, and `verdict: "INCONCLUSIVE"` until the evaluator is connected.
+- Trade logs and imports other than BTCUSDT 1h stay `status: "awaiting_engine"`, `mode: "pending"`, with empty metrics and `verdict: "INCONCLUSIVE"`. A BTCUSDT hourly position file is scored and stored as `mode: "measured"`.
 - A pending user upload must never receive demo metrics or agent findings. Do not flip it to `demo` to make the UI look complete.
 - Native Lane B reports preserve `agent_mode: "llm" | "llm_with_fallback" | "deterministic_fallback"`; the UI labels fallback reports as scripted research and does not imply a live model call.
 
@@ -122,9 +122,9 @@ Write native `InvestigationReport` JSON to `experiments/investigation_<name>.jso
 
 The viewer preserves `evidence_id` and displays `agent_mode`, `model_id`, `holdout_accessed`, `diagnostic.hypotheses`, `trial_log`, `candidates`, `test_requests`, `limitations`, and raw tool evidence. It does not rename Lane B's Pydantic contracts or require merging the rest of that branch.
 
-### Lane A and live research execution (not connected yet)
+### Lane A and live research execution
 
-`POST /api/experiments` creates `awaiting_engine` records for user imports. They contain no financial metrics or agent findings. Replace the clearly marked orchestration seam in `apps/api/main.py` with a background call to Lane A's evaluator and Lane B's `investigate(..., loader=...)` when the shared dataset loader is ready.
+`POST /api/experiments` scores a BTCUSDT hourly position import in the background: Lane A aligns the targets to the Binance spot snapshot, then Lane B's `investigate(..., loader=...)` reads the development view. The investigation JSON is written under `experiments/`. Trade logs and other markets stay `awaiting_engine` and never receive demo metrics. `research_engine` on `GET /api/health` is true for this path.
 
 For imported inputs, the strategy record retains `canonical_data_path`, `canonical_data_hash`, `raw_path`, `raw_data_hash`, `source_mapping`, and execution assumptions. Use those immutable inputs to construct Lane A's dataset snapshot. Canonical position rows contain decision time, symbol, and target position; attach strategy ID/version from the parent record.
 

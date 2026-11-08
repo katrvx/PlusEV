@@ -18,7 +18,8 @@ class EvidenceStore:
         self._items: dict[str, Evidence] = {}
 
     def add(self, tool: str, args: dict, payload: dict) -> str:
-        blob = json.dumps({"tool": tool, "args": args, "payload": payload}, sort_keys=True, default=str)
+        from .tools import canonical   # floats rounded -> ids identical across machines
+        blob = json.dumps(canonical({"tool": tool, "args": args, "payload": payload}), sort_keys=True, default=str)
         eid = f"ev_{tool[:12]}_{hashlib.sha256(blob.encode()).hexdigest()[:10]}"
         if eid not in self._items:
             self._items[eid] = Evidence(evidence_id=eid, tool=tool, args=args, payload=payload,

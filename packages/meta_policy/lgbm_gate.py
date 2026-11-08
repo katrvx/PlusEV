@@ -25,6 +25,7 @@ CALIBRATION_SHARE = 0.25  # last 25% of train (chronological) is used for calibr
 class LGBMGate:
     def __init__(self, features=DEFAULT_FEATURES, seed: int = 7):
         self.features = list(features)
+        self.seed = seed
         self.model = lgb.LGBMClassifier(
             n_estimators=200, learning_rate=0.03, num_leaves=8, min_child_samples=80,
             subsample=0.8, subsample_freq=1, colsample_bytree=0.8, reg_lambda=1.0,
@@ -69,5 +70,8 @@ class LGBMGate:
         return {f: float(v) / total for f, v in zip(self.features, imp)}
 
     def spec(self) -> dict:
-        return {"policy_id": "meta::lgbm_gate_v1", "family": "lgbm_gate", "features": self.features,
-                "band": [self.low, self.high], "base_rate": self.base_rate, "fitted_on": self.fitted_on}
+        import hashlib
+        model_hash = hashlib.sha256(self.model.booster_.model_to_string().encode()).hexdigest()[:16] if self.fitted_on else None
+        return {"policy_id": "meta::lgbm_gate_v1", "family": "lgbm_gate", "features": self.features, "seed": self.seed,
+                "model_sha256_16": model_hash, "band": [self.low, self.high], "base_rate": self.base_rate,
+                "fitted_on": self.fitted_on, "calibration": "isotonic on late train (spec says validation; deviation keeps validation out-of-sample)"}

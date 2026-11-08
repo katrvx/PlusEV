@@ -16,7 +16,7 @@ For a quick connection, write a real Lane B report to `experiments/investigation
 
 The current proxy key is `API_URL` in [`apps/web/.env.example`](../apps/web/.env.example), defaulting to `http://127.0.0.1:8000`. Current API storage constants are `ROOT = Path(__file__).resolve().parents[2]`, `DATA_DIR = ROOT / "data" / "local"`, `UPLOAD_DIR = DATA_DIR / "uploads"`, `DB_PATH = DATA_DIR / "keep_or_kill.sqlite3"`, `MAX_UPLOAD_BYTES = 10 * 1024 * 1024`, and `MAX_IMPORT_ROWS = 250_000`.
 
-The accepted UI modes are intentionally limited: `demo` for seeded illustrative fixtures, `pending` for imported strategies awaiting the evaluator, and `measured` only for evaluator-produced results. Do not attach dummy user results to a pending upload. The health flag remains `research_engine: false` until the deterministic engine is wired.
+The accepted UI modes are intentionally limited: `demo` for seeded illustrative fixtures, `pending` for imports the evaluator cannot score, and `measured` only for evaluator-produced results. Do not attach dummy user results to a pending upload. `GET /api/health` reports `research_engine: true`. That flag means a BTCUSDT hourly position import is scored by Lane A and Lane B. Trade logs and any other symbol or timeframe stay `awaiting_engine` with empty metrics.
 
 For a concrete completed demo response, see [`docs/examples/experiment.demo.json`](examples/experiment.demo.json). It is an explicit fixture export and must not be reused for imported user data.
 
@@ -31,7 +31,7 @@ UI types: `packages/contracts/types.ts`. The API validates and persists imported
 - GET /api/templates/positions.csv -> downloadable canonical target-position example
 - GET /api/templates/trades.csv -> downloadable generic trade-log example
 - GET /api/experiments?strategy_id=... -> Experiment[] (newest first)
-- POST /api/experiments {strategy_id} -> Experiment, async job; demo fixtures replay stored research, user uploads return awaiting_engine until Parts A/B are connected
+- POST /api/experiments {strategy_id} -> Experiment, async job; demo fixtures replay stored research, BTCUSDT 1h position imports run Lane A and Lane B, other uploads return awaiting_engine
 - GET /api/experiments/{id} -> Experiment
 - GET /api/experiments/{id}/report -> downloadable Experiment JSON
 - POST /api/paper-tests {experiment_id, duration_days:14, approved:true} -> PaperPlan; persist immutable planned record, no trading started

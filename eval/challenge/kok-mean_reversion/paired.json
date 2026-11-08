@@ -1,0 +1,281 @@
+{
+  "pack": "markets",
+  "strategy": "mean_reversion",
+  "strategy_id": "btc-meanrev-48-demo",
+  "rule": "gated target = raw x (0.5 if 7-bar realized vol <= expanding median of earlier bars else 1.0); kit executes all-in long only when target = 1.0 (0.5 rounds down to flat)",
+  "vol_window_bars": 7,
+  "revealed_seed": 4041460934254655326,
+  "paths_paired": 300,
+  "same_cases_check": "raw replay rebuilt from the revealed seed; all case ids, families and benchmarks match",
+  "primary_kit_gated_vs_raw": {
+    "paths_paired": 300,
+    "gated_better": 53,
+    "raw_better": 12,
+    "identical": 235,
+    "sign_test_p_two_sided": 2.786234342464335e-07,
+    "return_diff_all_paths": {
+      "mean": 0.009274198079297328,
+      "median": 0.0,
+      "ci90_mean": [
+        0.005826232686380371,
+        0.012853884975046201
+      ]
+    },
+    "return_diff_non_identical": {
+      "n": 65,
+      "mean": 0.042803991135218426,
+      "median": 0.029002522394010365
+    },
+    "max_drawdown_diff_all_paths": {
+      "mean": -0.011465,
+      "median": 0.0,
+      "ci90_mean": [
+        -0.014538599999999999,
+        -0.00848195
+      ]
+    },
+    "max_drawdown_diff_non_identical": {
+      "mean": -0.05291538461538463,
+      "median": -0.038
+    }
+  },
+  "kit_market_verdict_gated_challenge": {
+    "paths": 300,
+    "wins_vs_buy_and_hold": 189,
+    "losses_vs_buy_and_hold": 111,
+    "ties": 0,
+    "beat_cash": 8,
+    "median_excess_vs_buy_and_hold_bps_of_capital": 71,
+    "mean_max_drawdown_bps": 155,
+    "sign_test_p_value": 7.846196405532836e-06,
+    "verdict": "Beat buy-and-hold more often than chance would explain on these paths."
+  },
+  "kit_market_verdict_raw_replay (run, not challenge)": {
+    "paths": 300,
+    "wins_vs_buy_and_hold": 185,
+    "losses_vs_buy_and_hold": 115,
+    "ties": 0,
+    "beat_cash": 9,
+    "median_excess_vs_buy_and_hold_bps_of_capital": 60,
+    "mean_max_drawdown_bps": 270,
+    "sign_test_p_value": 6.321025684535788e-05,
+    "verdict": "Beat buy-and-hold more often than chance would explain on these paths."
+  },
+  "exposure": {
+    "definition": "fraction of equity held in the asset after each decision's fill, averaged over all decision bars of all paths (offline kit-identical replay)",
+    "raw": {
+      "mean_over_all_decision_bars": 0.07773519585293626,
+      "paths_with_any_exposure": 71
+    },
+    "gated": {
+      "mean_over_all_decision_bars": 0.038895334521462314,
+      "paths_with_any_exposure": 64
+    },
+    "gated_over_raw_ratio": 0.5003568087105185,
+    "gated_over_raw_ratio_on_paths_where_raw_trades": 0.5012392431182201,
+    "paths_where_raw_trades": 71
+  },
+  "offline_crosscheck_vs_kit": "offline kit-mode replay equals kit final cash on every path",
+  "exposure_only_baselines": {
+    "in_kit_half_size_note": "half-size raw rounds to always-flat in the all-in kit, i.e. the cash baseline",
+    "kit_gated_vs_cash": {
+      "paths_paired": 300,
+      "gated_better": 8,
+      "cash_better": 56,
+      "identical": 236,
+      "sign_test_p_two_sided": 5.562672242319724e-10,
+      "return_diff_all_paths": {
+        "mean": -0.009060499840669022,
+        "median": 0.0,
+        "ci90_mean": [
+          -0.013495646666122426,
+          -0.004603397535238193
+        ]
+      },
+      "return_diff_non_identical": {
+        "n": 64,
+        "mean": -0.04247109300313605,
+        "median": -0.04022837363375363
+      },
+      "max_drawdown_diff_all_paths": {
+        "mean": 0.015571666666666666,
+        "median": 0.0,
+        "ci90_mean": [
+          0.011833866666666666,
+          0.019702433333333335
+        ]
+      },
+      "max_drawdown_diff_non_identical": {
+        "mean": 0.0729921875,
+        "median": 0.06045
+      }
+    },
+    "kit_raw_vs_cash": {
+      "paths_paired": 300,
+      "raw_better": 9,
+      "cash_better": 62,
+      "identical": 229,
+      "sign_test_p_two_sided": 7.335319390745429e-11,
+      "return_diff_all_paths": {
+        "mean": -0.018334697919966347,
+        "median": 0.0,
+        "ci90_mean": [
+          -0.02437783844482051,
+          -0.012478631010800378
+        ]
+      },
+      "return_diff_non_identical": {
+        "n": 71,
+        "mean": -0.07747055459140711,
+        "median": -0.0753353168756357
+      },
+      "max_drawdown_diff_all_paths": {
+        "mean": 0.027036666666666667,
+        "median": 0.0,
+        "ci90_mean": [
+          0.021115866666666667,
+          0.03326755
+        ]
+      },
+      "max_drawdown_diff_non_identical": {
+        "mean": 0.11423943661971832,
+        "median": 0.1145
+      }
+    },
+    "fractional_simulator_NOT_KIT": {
+      "note": "our own integer-share simulator with the kit's fee/slippage/next-bar rules; 0.5 targets hold ~half",
+      "gated_exact_vs_raw": {
+        "paths_paired": 300,
+        "gated_better": 53,
+        "raw_better": 12,
+        "identical": 235,
+        "sign_test_p_two_sided": 2.786234342464335e-07,
+        "return_diff_all_paths": {
+          "mean": 0.004528363012883015,
+          "median": 0.0,
+          "ci90_mean": [
+            0.002807581546178912,
+            0.006297178512395981
+          ]
+        },
+        "return_diff_non_identical": {
+          "n": 65,
+          "mean": 0.020900136982536992,
+          "median": 0.014363212228074062
+        },
+        "max_drawdown_diff_all_paths": {
+          "mean": -0.006011333333333333,
+          "median": 0.0,
+          "ci90_mean": [
+            -0.007640833333333334,
+            -0.004447883333333334
+          ]
+        },
+        "max_drawdown_diff_non_identical": {
+          "mean": -0.027744615384615385,
+          "median": -0.019
+        }
+      },
+      "gated_exact_vs_half_size_raw": {
+        "paths_paired": 300,
+        "gated_better": 8,
+        "half_better": 56,
+        "identical": 236,
+        "sign_test_p_two_sided": 5.562672242319724e-10,
+        "return_diff_all_paths": {
+          "mean": -0.004654567315856912,
+          "median": 0.0,
+          "ci90_mean": [
+            -0.006892071658222774,
+            -0.0023919802156876593
+          ]
+        },
+        "return_diff_non_identical": {
+          "n": 64,
+          "mean": -0.021818284293079276,
+          "median": -0.02009376128120334
+        },
+        "max_drawdown_diff_all_paths": {
+          "mean": 0.0074273333333333335,
+          "median": 0.0,
+          "ci90_mean": [
+            0.005576566666666667,
+            0.00944558333333333
+          ]
+        },
+        "max_drawdown_diff_non_identical": {
+          "mean": 0.034815625,
+          "median": 0.02795
+        }
+      },
+      "half_size_raw_vs_raw": {
+        "paths_paired": 300,
+        "half_better": 62,
+        "raw_better": 9,
+        "identical": 229,
+        "sign_test_p_two_sided": 7.335319390745429e-11,
+        "return_diff_all_paths": {
+          "mean": 0.009182930328739927,
+          "median": 0.0,
+          "ci90_mean": [
+            0.006241612240244692,
+            0.01221915882383505
+          ]
+        },
+        "return_diff_non_identical": {
+          "n": 71,
+          "mean": 0.03880111406509828,
+          "median": 0.03784446620215021
+        },
+        "max_drawdown_diff_all_paths": {
+          "mean": -0.013438666666666666,
+          "median": 0.0,
+          "ci90_mean": [
+            -0.01653671666666667,
+            -0.01051625
+          ]
+        },
+        "max_drawdown_diff_non_identical": {
+          "mean": -0.056783098591549286,
+          "median": -0.0576
+        }
+      },
+      "mean_exposure": {
+        "raw_frac": 0.07773519585293626,
+        "gated_frac": 0.05797173055486219,
+        "half_frac": 0.037475924042169755
+      }
+    }
+  },
+  "challenge_commitment": "351b6261d83ba998bd20238388aaa0490b0fe3064ec10b8b495b5d13b9dc51fc",
+  "challenge_kit_fingerprint": "5c90bf815848f4edd85bb2446e00382a24f003d936b3bad72f297a3b7885dad9",
+  "provenance_warnings": [
+    {
+      "file": ".claude/worktrees/agent-afb2b6510fdfbe4e7/A/kok_a/binance.py",
+      "reason": "downloads Binance history; fine for features, but check it is not used to look up hidden historical paths"
+    },
+    {
+      "file": ".claude/worktrees/agent-afb2b6510fdfbe4e7/A/kok_a/snapshot.py",
+      "reason": "downloads Binance history; fine for features, but check it is not used to look up hidden historical paths"
+    },
+    {
+      "file": "A/kok_a/binance.py",
+      "reason": "downloads Binance history; fine for features, but check it is not used to look up hidden historical paths"
+    },
+    {
+      "file": "A/kok_a/snapshot.py",
+      "reason": "downloads Binance history; fine for features, but check it is not used to look up hidden historical paths"
+    }
+  ],
+  "kit_errors": {
+    "gated": 0,
+    "gated_not_run": 0,
+    "raw": 0,
+    "raw_not_run": 0
+  },
+  "adapter_source_sha256": {
+    "packages/kit_adapter/kok.py": "32c01a9de957757614ccaafa726963cbfbfbdb2ec9e83fd11c5f9e88508d80bd",
+    "packages/kit_adapter/rule.py": "c2443901e203a08f3c2e156442acf2ae1a412c8ce43540111a615f597b437808",
+    "A/kok_a/strategies.py": "89360c484109ba249ce7965cbeba0f79bc840f0f58cd9a8f7d88450a093ebe28"
+  }
+}
