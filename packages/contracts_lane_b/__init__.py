@@ -66,6 +66,8 @@ class Metrics(BaseModel):
     n_switches: int
     exposure: float
     ci_net_return: tuple[float, float] | None = None
+    cvar_05: float | None = None          # Lane A: mean of the worst 5% of bar returns
+    avg_holding_bars: float | None = None  # Lane A: average consecutive bars in the market
 
 
 class BaselineRow(BaseModel):
