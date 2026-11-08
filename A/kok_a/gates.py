@@ -70,6 +70,9 @@ def allocation(spec: dict, context: pd.DataFrame, lgbm=None) -> pd.Series:
         return pd.Series(1.0, index=context.index)
     if family == "cash":
         return pd.Series(0.0, index=context.index)
+    if family == "constant":
+        # Benchmark only. A matched exposure need not be 0, 0.5, or 1.
+        return pd.Series(float(spec["allocation"]), index=context.index)
     if family == "threshold_gate":
         return threshold_gate_allocation(spec, context)
     if family == "regime_gate":
@@ -89,6 +92,26 @@ def _bucket_mask(context: pd.DataFrame, buckets: list) -> pd.Series:
             continue
         mask |= context[column] == item["bucket"]
     return mask
+
+
+def exposure_matched_spec(frame: pd.DataFrame, multiplier: pd.Series, split: str = "train") -> dict:
+    """Constant size with the same average exposure as `multiplier` on `split`.
+
+    The constant is frozen on that split and then applied forward. It is the
+    benchmark for "this gate only won by taking less risk."
+    """
+
+    mask = frame["split"] == split
+    target = frame.loc[mask, "target_position"].astype(float)
+    held = target.mean()
+    matched = float((multiplier.loc[mask].astype(float) * target).mean() / held) if held else 0.0
+    matched = float(min(1.0, max(0.0, matched)))
+    return {
+        "policy_id": "benchmark::exposure_matched",
+        "family": "constant",
+        "allocation": matched,
+        "matched_on": split,
+    }
 
 
 def _check_multiplier(value: float) -> None:
