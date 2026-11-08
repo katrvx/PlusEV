@@ -184,7 +184,8 @@ def test_report_without_frozen_look_keeps_its_shape(monkeypatch: pytest.MonkeyPa
     copy_fixture(tmp_path, fixture)
     configure(monkeypatch, tmp_path, fixture)
     experiment_id = team_reports.list_investigations()[0]["experiment_id"]
-    assert set(team_reports.get_investigation(experiment_id)) == {"source", "synthetic", "source_path", "report"}
+    # ``presentation`` is the optional plain-language view; it is None when it cannot be built.
+    assert set(team_reports.get_investigation(experiment_id)) == {"source", "synthetic", "source_path", "report", "presentation"}
 
 
 def test_checked_in_meanrev_report_carries_its_frozen_look() -> None:
@@ -192,3 +193,62 @@ def test_checked_in_meanrev_report_carries_its_frozen_look() -> None:
     assert result["report"]["strategy_id"] == "btc-meanrev-48-demo"
     assert result["frozen_look"]["evaluation"]["split"] == "test"
     assert "frozen_look" not in team_reports.get_investigation("exp_dea9445d0576")
+
+
+def test_meanrev_report_has_a_readable_presentation() -> None:
+    result = team_reports.get_investigation("exp_a79497cf70ec")
+    presentation = result["presentation"]
+    assert presentation is not None
+    headline = presentation["headline"]
+    assert headline["verdict_label"] == "Kill"
+    assert "+27.3 pp" in headline["meaning"]
+    assert "-28.9%" in headline["meaning"]
+    assert [stage["stage"] for stage in presentation["stages"]] == ["Training", "Validation", "Held-out test"]
+    assert all("pass" not in item["outcome_label"].lower() for item in presentation["filters"])
+    # The report itself is served unchanged next to its presentation.
+    assert "presentation" not in result["report"]
+
+
+def test_trend_report_presentation_is_not_proven() -> None:
+    presentation = team_reports.get_investigation("exp_dea9445d0576")["presentation"]
+    assert presentation["headline"]["verdict_label"] == "Not proven"
+    assert all("pass" not in item["outcome_label"].lower() for item in presentation["filters"])
+
+
+def test_list_summary_carries_headline_and_filter_counts() -> None:
+    items = {item["experiment_id"]: item for item in team_reports.list_investigations()}
+    meanrev = items["exp_a79497cf70ec"]
+    assert meanrev["headline"]["verdict_label"] == "Kill"
+    assert meanrev["filter_counts"]["selected_for_further_testing"] == 1
+    assert {"experiment_id", "strategy_id", "evidence_count", "strategy_health"} <= set(meanrev)
+
+
+def test_presentation_failure_yields_none_not_an_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    fixture = tmp_path / "apps" / "api" / "fixtures" / "lane_b_investigation.json"
+    copy_fixture(tmp_path, fixture)
+    configure(monkeypatch, tmp_path, fixture)
+
+    def broken(report: dict, report_path: str | None = None) -> None:
+        raise RuntimeError("presentation exploded")
+
+    monkeypatch.setattr(team_reports, "_present_report", broken)
+    experiment_id = team_reports.list_investigations()[0]["experiment_id"]
+    result = team_reports.get_investigation(experiment_id)
+    assert result["presentation"] is None
+    assert result["report"]["evidence"]
+    assert team_reports.list_investigations()[0]["headline"] is None
+
+
+def test_recorded_presentation_in_report_is_served_as_is(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    artifact = tmp_path / "experiments" / "investigation_with_view.json"
+    artifact.parent.mkdir(parents=True)
+    report = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    report["presentation"] = {"headline": {"finding": "Recorded finding.", "verdict_label": "Not proven"}, "filter_counts": {"rejected": 1}}
+    artifact.write_text(json.dumps(report), encoding="utf-8")
+    configure(monkeypatch, tmp_path, tmp_path / "missing_bundled.json")
+
+    result = team_reports.get_investigation(report["experiment_id"])
+    assert result["presentation"] == report["presentation"]
+    summary = team_reports.list_investigations()[0]
+    assert summary["headline"] == {"finding": "Recorded finding.", "verdict_label": "Not proven"}
+    assert summary["filter_counts"] == {"rejected": 1}

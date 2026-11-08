@@ -75,6 +75,25 @@ def test_health_and_demo_seed_are_explicit() -> None:
     assert any(item["id"] == "sealed_gate" and item["net_return"] < 0 for item in meanrev[0]["baselines"])
 
 
+def test_recorded_runs_describe_the_selected_filter_honestly() -> None:
+    meanrev = api.experiments(strategy_id="btc-meanrev-48-demo")[0]
+    assert meanrev["verdict"] == "KILL"
+    assert meanrev["recommendation"].startswith("Kill the original strategy.")
+    assert "not running" in meanrev["recommendation"]
+    # A filter WAS selected for the held-out test; it is described, and it is not approved.
+    assert "half size" in meanrev["policy"]["description"]
+    assert "not approved" in meanrev["policy"]["description"]
+    assert "No agent gate was accepted" not in meanrev["policy"]["description"]
+    assert meanrev["policy"]["test_evaluated"] is False
+    assert meanrev["steps"] and all(step["evidence_ids"] == [] for step in meanrev["steps"])
+    assert meanrev["steps"][-1]["title"] == "Strategy verdict: KILL"
+
+    trend = api.experiments(strategy_id="btc-trend-24-72-demo")[0]
+    assert trend["verdict"] == "INCONCLUSIVE"
+    assert trend["policy"]["description"] == "No filter was selected. The original strategy is unchanged."
+    assert trend["recommendation"].startswith("Not proven.")
+
+
 def test_positions_preview_suggests_industry_standard_mapping() -> None:
     body = b"timestamp,ticker,position\n2024-01-01T00:00:00Z,BTCUSDT,0.5\n"
     payload = preview(upload("positions.csv", body))

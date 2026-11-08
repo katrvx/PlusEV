@@ -778,13 +778,58 @@ def _sealed_rows(relative: str | None) -> list[dict[str, Any]]:
     return rows
 
 
-def _recorded_experiment(report: dict[str, Any], sealed_verdict: str, sealed_reason: str, frozen_relative: str | None) -> dict[str, Any]:
+def _recorded_presentation(report: dict[str, Any], report_relative: str | None) -> dict[str, Any] | None:
+    """The plain-language view of a recorded report (packages/research_agents/recorded.py), or None."""
+    try:
+        from packages.research_agents.recorded import present_report
+
+        return present_report(json.loads(json.dumps(report)), report_relative).model_dump(mode="json")
+    except Exception:
+        return None
+
+
+def _presentation_steps(presentation: dict[str, Any] | None, timestamp: str) -> list[dict[str, Any]]:
+    """One workspace step per presentation trace item.
+
+    Report evidence ids are a different namespace from workspace evidence ids,
+    so the steps carry none; the agent report links them.
+    """
+    steps = []
+    for item in (presentation or {}).get("trace") or []:
+        steps.append({
+            "id": f"trace_{item.get('step')}",
+            "role": str(item.get("actor") or ""),
+            "action": str(item.get("action") or ""),
+            "title": str(item.get("title") or ""),
+            "body": str(item.get("summary") or ""),
+            "status": "complete",
+            "tool": str(item.get("actor_kind") or ""),
+            "evidence_ids": [],
+            "timestamp": timestamp,
+        })
+    return steps
+
+
+def _policy_description(presentation: dict[str, Any] | None) -> str:
+    selected = ((presentation or {}).get("takeaway") or {}).get("selected_filter")
+    if isinstance(selected, dict) and selected.get("plain_rule"):
+        return f"{selected['plain_rule']} ({selected.get('status') or 'not approved'})"
+    return "No filter was selected. The original strategy is unchanged."
+
+
+def _recorded_experiment(report: dict[str, Any], sealed_verdict: str, sealed_reason: str, frozen_relative: str | None,
+                         report_relative: str | None = None) -> dict[str, Any]:
     """Workspace row for one saved Argon investigation.
 
     The curve is the validation blocks already in that file. The verdict line is
     the sealed arbiter. Train metrics and regime rows are copied from that
-    report and are not a new sealed test.
+    report and are not a new sealed test. The recommendation, filter
+    description and steps come from the plain-language presentation of the
+    same report, so the workspace and the agent report say the same thing.
     """
+    presentation = _recorded_presentation(report, report_relative)
+    headline = (presentation or {}).get("headline") or {}
+    created_at = report.get("generated_at") or iso(utc_now())
     health = report.get("strategy_health") or {}
     blocks = health.get("validation_blocks") or []
     always = report.get("validation_always_on") or {}
@@ -827,7 +872,7 @@ def _recorded_experiment(report: dict[str, Any], sealed_verdict: str, sealed_rea
         "mode": "measured",
         "progress": 100,
         "message": message,
-        "created_at": report.get("generated_at") or iso(utc_now()),
+        "created_at": created_at,
         "policy_id": report.get("champion_policy_id") or "always_on",
         "dataset_hash": "recorded-investigation",
         "windows": {
@@ -855,10 +900,10 @@ def _recorded_experiment(report: dict[str, Any], sealed_verdict: str, sealed_rea
                 {"label": "90% interval", "value": _ci_label(always.get("ci_net_return") or [])},
             ],
         }],
-        "steps": [],
+        "steps": _presentation_steps(presentation, created_at),
         "hypotheses": hypotheses,
         "verdict": sealed_verdict,
-        "recommendation": message,
+        "recommendation": f"{headline['finding']} {headline['next_action']}" if headline.get("finding") and headline.get("next_action") else message,
         "limitations": [
             "The verdict line is the sealed arbiter on the 2018-02-01 through 2026-10-31 book. The blocks are that book's validation window, not a second look at the sealed test.",
             sealed_reason,
@@ -866,7 +911,7 @@ def _recorded_experiment(report: dict[str, Any], sealed_verdict: str, sealed_rea
             "No live orders.",
         ],
         "policy": {
-            "description": "No agent gate was accepted. The recorded comparison is the unchanged strategy against cash.",
+            "description": _policy_description(presentation) if presentation else "No filter was selected. The original strategy is unchanged.",
             "conditions": ["costs stay 10 bp plus 1 bp", "24/72 and 48 stay fixed", "paper only"],
             "holdout_frozen": True,
             "test_evaluated": False,
@@ -902,7 +947,7 @@ def _seed_recorded_investigations() -> None:
         report = json.loads(path.read_text())
         if report.get("strategy_id") != strategy_id or not (report.get("strategy_health") or {}).get("validation_blocks"):
             continue
-        experiment = _recorded_experiment(report, sealed_verdict, sealed_reason, frozen_relative)
+        experiment = _recorded_experiment(report, sealed_verdict, sealed_reason, frozen_relative, relative)
         strategy = strategy_payload(
             strategy_id=strategy_id,
             name=name,

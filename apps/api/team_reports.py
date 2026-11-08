@@ -14,6 +14,11 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
+try:  # The presentation layer is optional: a missing or broken one must never break report serving.
+    from packages.research_agents.recorded import present_report as _present_report
+except Exception:  # pragma: no cover - import failure only in a stripped-down checkout
+    _present_report = None
+
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "lane_b_investigation.json"
@@ -134,6 +139,24 @@ def _frozen_look(report: dict[str, Any]) -> dict[str, Any] | None:
     return look
 
 
+def _presentation(report: dict[str, Any], source_path: str) -> dict[str, Any] | None:
+    """Plain-language view of one report, or None. Never raises.
+
+    A report that already carries ``presentation`` is served as recorded. Otherwise
+    the view is computed by code from the report (and, for the two recorded runs,
+    the published verdict and the one held-out look). It adds no numbers.
+    """
+    recorded = report.get("presentation")
+    if isinstance(recorded, dict):
+        return recorded
+    if _present_report is None:
+        return None
+    try:
+        return _present_report(json.loads(json.dumps(report)), source_path).model_dump(mode="json")
+    except Exception:
+        return None
+
+
 def _load_wrapper(path: Path, synthetic: bool, source: str) -> dict[str, Any]:
     try:
         report = json.loads(path.read_text(encoding="utf-8"))
@@ -156,6 +179,7 @@ def _load_wrapper(path: Path, synthetic: bool, source: str) -> dict[str, Any]:
     frozen_look = _frozen_look(validated)
     if frozen_look is not None:
         wrapper["frozen_look"] = frozen_look
+    wrapper["presentation"] = _presentation(validated, wrapper["source_path"])
     return wrapper
 
 
@@ -183,6 +207,19 @@ def _summary(wrapper: dict[str, Any]) -> dict[str, Any]:
         "evidence_count": len(report.get("evidence") or []),
         "n_policies_tried": report.get("n_policies_tried", 0),
         "strategy_health": _health_summary(report.get("strategy_health")),
+        **_presentation_summary(wrapper.get("presentation")),
+    }
+
+
+def _presentation_summary(presentation: Any) -> dict[str, Any]:
+    """Optional list fields: the plain-language finding and the filter counts."""
+    if not isinstance(presentation, dict):
+        return {"headline": None, "filter_counts": None}
+    headline = presentation.get("headline") if isinstance(presentation.get("headline"), dict) else {}
+    counts = presentation.get("filter_counts")
+    return {
+        "headline": {"finding": headline.get("finding"), "verdict_label": headline.get("verdict_label")} if headline else None,
+        "filter_counts": counts if isinstance(counts, dict) else None,
     }
 
 
