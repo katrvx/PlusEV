@@ -83,3 +83,10 @@ will be identical (both flat) and power will be low, especially for trend.
 ## Log
 
 - 2026-11-08T12:25Z: pre-registration written. No challenge run yet.
+- Practice (protocol debugging only, outputs in a scratch folder outside the repo): kit
+  `generate` + `run` on 25 practice cases (seed 12345, mean_reversion raw and gated) and
+  `scripts/kok_challenge.py practice` on 40 practice cases (seed 777, mean_reversion). Protocol
+  worked, zero kit errors, offline kit-mode replay matched kit final cash on every path. No
+  rule or parameter changed.
+- Lead committed this file, packages/kit_adapter/*.py and scripts/kok_challenge.py as 2327e45
+  before any challenge run.
