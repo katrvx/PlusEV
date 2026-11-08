@@ -828,3 +828,11 @@ def test_redact_drops_lane_a_notes_that_quote_the_sealed_verdict():
     exp = build()[0]
     leaky = exp.model_copy(update={"notes": ["Verdict KEEP comes from the deterministic arbiter"]})
     assert redact(leaky).notes == []
+
+
+def test_quantile_levels_from_the_feature_grid_are_citable():
+    """Argon 8 Nov: 'fear_greed <= 43 (the 0.33 quantile)' was rejected because quantile levels are dict keys."""
+    ctx = make_ctx()
+    g = ctx.feature_grid()
+    assert not unsupported_numbers("threshold at the 0.33 quantile (q=0.33) of realized_vol_7d", [g])
+    assert unsupported_numbers("threshold at the 0.35 quantile", [g])

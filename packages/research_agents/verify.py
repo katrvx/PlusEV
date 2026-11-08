@@ -33,6 +33,7 @@ DASHES = str.maketrans({"\u2212": "-", "\u2013": "-", "\u2014": "-", "\u2012": "
 # the instruction threshold may be quoted as a threshold ("fewer than 20 trades", "<20 trades"), not as a measurement
 THRESHOLD_RE = re.compile(r"(?:\b(?:fewer than|less than|under|below|at least|minimum of|min\.?)\s*|[<>]=?\s*|\u2265\s*|\u2264\s*)"
                           rf"{MIN_TRADES}(?![\d.])(?=\s*(?:trades?\b|$|[).,;]))", re.I)
+NUM_KEY_RE = re.compile(r"[-+]?\d+(?:\.\d+)?")
 REL_TOL = 0.01           # a copied number may differ from the evidence by print rounding AND by at most 1% of its size
 WORD_NUM_RE = re.compile(r"\b(eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|"
                          r"fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|percent)\b", re.I)
@@ -53,7 +54,11 @@ def _collect(obj, floats: list[float], ints: set[int], zero: list[bool]) -> None
             if obj == int(obj):
                 ints.add(abs(int(obj)))
     elif isinstance(obj, dict):
-        for v in obj.values():
+        for k, v in obj.items():
+            if isinstance(k, str) and NUM_KEY_RE.fullmatch(k):   # quantile levels / allocation keys ('0.33', '0.5') are tool output too
+                _collect(float(k), floats, ints, zero)
+            elif isinstance(k, (int, float)) and not isinstance(k, bool):
+                _collect(k, floats, ints, zero)
             _collect(v, floats, ints, zero)
     elif isinstance(obj, (list, tuple)):
         for v in obj:
