@@ -206,7 +206,9 @@ def investigate(experiment_id: str, loader: Loader = _fixture_loader, model=None
                 if net <= 0:
                     eligible = False
                     reasons.append("does not beat cash on validation (net return <= 0)")
-                if ci[0] <= 0:
+                if ci[1] < 0:
+                    reasons.append("validation CI is entirely below zero: worse than always-on")
+                elif ci[0] <= 0:
                     reasons.append("validation CI includes zero; the frozen test decides")
                 if _finite(regime_delta):
                     reasons.append(f"vs Lane A regime filter on validation: {d - regime_delta:+.4f} (reference, not a veto)")
