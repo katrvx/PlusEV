@@ -1,0 +1,546 @@
+{
+ "what": "timing vs taking less risk, Validation only, identical costs (10 bp fee + 1 bp slippage, next-bar fills)",
+ "report": "experiments/investigation_argon_lane_a.json",
+ "experiment_id": "exp_dea9445d0576",
+ "strategy_id": "btc-trend-24-72-demo",
+ "computed_at": "2026-11-08T13:30:40.084814+00:00",
+ "split": "validation",
+ "held_out_test_read": false,
+ "note": "Diagnostic. The selection rule fixed before the run is unchanged; a timing requirement would be a new acceptance criterion and needs fresh unseen data (after 2026-10-31). Net returns are compounded, after costs.",
+ "benchmarks": [
+  {
+   "name": "Original strategy (always on)",
+   "role": "benchmark",
+   "policy_id": "always_on",
+   "spec_hash": "spec_3ca2c047d735",
+   "spec": {
+    "policy_id": "always_on",
+    "family": "always_on"
+   },
+   "net_return": 1.3440417367595385,
+   "ci_net_return": [
+    0.09522385029941789,
+    4.063483163241476
+   ],
+   "max_drawdown": 0.2894654499659355,
+   "exposure": 0.5531483178426495,
+   "sharpe": 1.6017799883758566,
+   "turnover": 250.0,
+   "delta_vs_always_on": 0.0,
+   "ci_delta_vs_always_on": [
+    0.0,
+    0.0
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 0.0,
+    "1.0": 1.0
+   },
+   "audit_id": "audit_5bff2aacbd67"
+  },
+  {
+   "name": "Cash",
+   "role": "benchmark",
+   "policy_id": "cash",
+   "spec_hash": "spec_098793ea7cd6",
+   "spec": {
+    "policy_id": "cash",
+    "family": "cash"
+   },
+   "net_return": 0.0,
+   "ci_net_return": [
+    0.0,
+    0.0
+   ],
+   "max_drawdown": 0.0,
+   "exposure": 0.0,
+   "sharpe": null,
+   "turnover": 0.0,
+   "delta_vs_always_on": -1.3440417367595385,
+   "ci_delta_vs_always_on": [
+    -4.13423787436039,
+    -0.10893650655730852
+   ],
+   "allocation_mix": {
+    "0.0": 1.0,
+    "0.5": 0.0,
+    "1.0": 0.0
+   },
+   "audit_id": "audit_44d7c3da343a"
+  },
+  {
+   "name": "Constant half size",
+   "role": "benchmark",
+   "policy_id": "benchmark::half_size",
+   "spec_hash": "spec_4624fcab1d3d",
+   "spec": {
+    "policy_id": "benchmark::half_size",
+    "family": "constant",
+    "allocation": 0.5
+   },
+   "net_return": 0.5703151919023774,
+   "ci_net_return": [
+    0.07375752204731183,
+    1.3198421870274943
+   ],
+   "max_drawdown": 0.1539555365999823,
+   "exposure": 0.27657415892132475,
+   "sharpe": 1.6017799883758566,
+   "turnover": 125.0,
+   "delta_vs_always_on": -0.7737265448571611,
+   "ci_delta_vs_always_on": [
+    -2.807158808136617,
+    -0.031332889013778426
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 1.0,
+    "1.0": 0.0
+   },
+   "audit_id": "audit_c349d0e09c12"
+  },
+  {
+   "name": "Simple rule",
+   "role": "reference",
+   "policy_id": "rule::trend_up_and_vol_below_train_median",
+   "spec_hash": "spec_2ca7c5381c93",
+   "spec": {
+    "policy_id": "rule::trend_up_and_vol_below_train_median",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "momentum_24h",
+      "op": ">",
+      "threshold": 0.0
+     },
+     {
+      "feature": "realized_vol_7d",
+      "op": "<=",
+      "threshold": 0.006409240155854531
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "net_return": -0.25562024676637396,
+   "ci_net_return": [
+    -0.5962086920895326,
+    0.3604454361626855
+   ],
+   "max_drawdown": 0.4052391178861209,
+   "exposure": 0.30946458960596934,
+   "sharpe": -0.5463690634183286,
+   "turnover": 850.0,
+   "delta_vs_always_on": -1.5996619835259125,
+   "ci_delta_vs_always_on": [
+    -3.997387352553339,
+    -0.5842638606949537
+   ],
+   "allocation_mix": {
+    "0.0": 0.44053958111466096,
+    "0.5": 0.0,
+    "1.0": 0.559460418885339
+   },
+   "audit_id": "audit_63319f4c7cf3"
+  },
+  {
+   "name": "Lane A regime filter (current)",
+   "role": "reference",
+   "policy_id": "rule::regime_filter",
+   "spec_hash": "spec_4ada216715cd",
+   "spec": {
+    "policy_id": "rule::regime_filter",
+    "family": "regime_gate",
+    "flat_buckets": [],
+    "full_buckets": [
+     {
+      "axis": "trend_regime",
+      "bucket": "bull"
+     },
+     {
+      "axis": "trend_7d_regime",
+      "bucket": "bull"
+     },
+     {
+      "axis": "vol_regime",
+      "bucket": "low"
+     },
+     {
+      "axis": "liquidity_regime",
+      "bucket": "deep"
+     },
+     {
+      "axis": "sentiment_regime",
+      "bucket": "greed"
+     }
+    ],
+    "allocation_flat": 0.0,
+    "allocation_full": 1.0,
+    "allocation_else": 0.0,
+    "selected_on": "train",
+    "summary": "Train intervals only: full size in trend_regime=bull, trend_7d_regime=bull, vol_regime=low, liquidity_regime=deep, sentiment_regime=greed; allocation 0 in the remaining regimes."
+   },
+   "net_return": 1.1409978509398928,
+   "ci_net_return": [
+    0.025402957769578377,
+    3.455781871618695
+   ],
+   "max_drawdown": 0.34726018059845265,
+   "exposure": 0.5468647728760309,
+   "sharpe": 1.4593481811763442,
+   "turnover": 266.0,
+   "delta_vs_always_on": -0.20304388581964572,
+   "ci_delta_vs_always_on": [
+    -0.712496016465856,
+    0.03273404395288812
+   ],
+   "allocation_mix": {
+    "0.0": 0.011359602413915513,
+    "0.5": 0.0,
+    "1.0": 0.9886403975860845
+   },
+   "audit_id": "audit_c4c6a0e1beae"
+  }
+ ],
+ "gates": [
+  {
+   "name": "agent::gate_fg_q33_zero",
+   "role": "agent gate",
+   "policy_id": "agent::gate_fg_q33_zero",
+   "spec_hash": "spec_d67c257ff9e7",
+   "spec": {
+    "policy_id": "agent::gate_fg_q33_zero",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "fear_greed",
+      "op": ">",
+      "threshold": 28.0
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.0,
+    "thresholds_selected_on": "train"
+   },
+   "net_return": 1.6645107890555084,
+   "ci_net_return": [
+    0.2681808114701119,
+    4.649874853531619
+   ],
+   "max_drawdown": 0.2550705788650891,
+   "exposure": 0.5342322293493913,
+   "sharpe": 1.8459137929751936,
+   "turnover": 254.0,
+   "delta_vs_always_on": 0.3204690522959699,
+   "ci_delta_vs_always_on": [
+    -0.020050196430847458,
+    0.8678062529029135
+   ],
+   "allocation_mix": {
+    "0.0": 0.03419713643355816,
+    "0.5": 0.0,
+    "1.0": 0.9658028635664418
+   },
+   "audit_id": "audit_abb7e256db19",
+   "validation_average_size": 0.965802863566442,
+   "vs_validation_size": 0.38014019546810784,
+   "status_in_report": "rejected",
+   "train_average_size": 0.6962242802665214,
+   "vs_half_size": 1.094195597153131,
+   "vs_matched_exposure": 0.8157285748821486,
+   "vs_cash": 1.6645107890555084,
+   "timing_read": "beats half size and constants at both its Training and its Validation average size: evidence of timing on Validation (not proof; Validation was also used to select)",
+   "size_shift_note": "average size moved from 0.70x on Training to 0.97x on Validation: the condition's frequency changed, so the Training-matched constant is a loose comparison"
+  },
+  {
+   "name": "Constant 0.696x (same average Training size as agent::gate_fg_q33_zero)",
+   "role": "benchmark",
+   "policy_id": "benchmark::exposure_matched::agent::gate_fg_q33_zero",
+   "spec_hash": "spec_3f1adfd32e55",
+   "spec": {
+    "policy_id": "benchmark::exposure_matched::agent::gate_fg_q33_zero",
+    "family": "constant",
+    "allocation": 0.696224,
+    "matched_on": "train"
+   },
+   "net_return": 0.8487822141733599,
+   "ci_net_return": [
+    0.07111600414474284,
+    2.189015902891869
+   ],
+   "max_drawdown": 0.2092769295691449,
+   "exposure": 0.38511513444168083,
+   "sharpe": 1.6017799883758568,
+   "turnover": 174.05599999999998,
+   "delta_vs_always_on": -0.49525952258617867,
+   "ci_delta_vs_always_on": [
+    -1.844018449651664,
+    -0.016005573875533984
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 0.0,
+    "1.0": 0.0
+   },
+   "audit_id": "audit_9e2f4a28dbc5"
+  },
+  {
+   "name": "Constant 0.966x (the gate's actual Validation size; diagnostic, set on Validation)",
+   "role": "diagnostic",
+   "policy_id": "benchmark::validation_size::agent::gate_fg_q33_zero",
+   "spec_hash": "spec_31565183a552",
+   "spec": {
+    "policy_id": "benchmark::validation_size::agent::gate_fg_q33_zero",
+    "family": "constant",
+    "allocation": 0.965803,
+    "matched_on": "validation (diagnostic)"
+   },
+   "net_return": 1.2843705935874006,
+   "ci_net_return": [
+    0.09875633399089041,
+    3.7819136358348064
+   ],
+   "max_drawdown": 0.28076286434787945,
+   "exposure": 0.5342323048173844,
+   "sharpe": 1.6017799883758572,
+   "turnover": 241.45074999999997,
+   "delta_vs_always_on": -0.05967114317213795,
+   "ci_delta_vs_always_on": [
+    -0.24610577976544223,
+    -0.0003594781462984217
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 0.0,
+    "1.0": 0.0
+   },
+   "audit_id": "audit_2eafc1ece9d7"
+  },
+  {
+   "name": "agent::gate_fg_q33_half",
+   "role": "agent gate",
+   "policy_id": "agent::gate_fg_q33_half",
+   "spec_hash": "spec_edd35ab0dac4",
+   "spec": {
+    "policy_id": "agent::gate_fg_q33_half",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "fear_greed",
+      "op": ">",
+      "threshold": 28.0
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.5,
+    "thresholds_selected_on": "train"
+   },
+   "net_return": 1.5015515342632013,
+   "ci_net_return": [
+    0.1781452581210565,
+    4.382102207883016
+   ],
+   "max_drawdown": 0.2721355076080526,
+   "exposure": 0.5436902735960204,
+   "sharpe": 1.7309491501922651,
+   "turnover": 252.0,
+   "delta_vs_always_on": 0.15750979750366279,
+   "ci_delta_vs_always_on": [
+    -0.005730734534033876,
+    0.43106890604772974
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 0.03419713643355816,
+    "1.0": 0.9658028635664418
+   },
+   "audit_id": "audit_41bed694fde8",
+   "validation_average_size": 0.982901431783221,
+   "vs_validation_size": 0.18747012410577746,
+   "status_in_report": "rejected",
+   "train_average_size": 0.8481121401332608,
+   "vs_half_size": 0.9312363423608239,
+   "vs_matched_exposure": 0.41494914130128313,
+   "vs_cash": 1.5015515342632013,
+   "timing_read": "beats half size and constants at both its Training and its Validation average size: evidence of timing on Validation (not proof; Validation was also used to select)",
+   "size_shift_note": "average size moved from 0.85x on Training to 0.98x on Validation: the condition's frequency changed, so the Training-matched constant is a loose comparison"
+  },
+  {
+   "name": "Constant 0.848x (same average Training size as agent::gate_fg_q33_half)",
+   "role": "benchmark",
+   "policy_id": "benchmark::exposure_matched::agent::gate_fg_q33_half",
+   "spec_hash": "spec_9ff95d164817",
+   "spec": {
+    "policy_id": "benchmark::exposure_matched::agent::gate_fg_q33_half",
+    "family": "constant",
+    "allocation": 0.848112,
+    "matched_on": "train"
+   },
+   "net_return": 1.0866023929619182,
+   "ci_net_return": [
+    0.07943118617456939,
+    3.092521901441494
+   ],
+   "max_drawdown": 0.2501875010368043,
+   "exposure": 0.46913172614216536,
+   "sharpe": 1.6017799883758566,
+   "turnover": 212.028,
+   "delta_vs_always_on": -0.25743934379762035,
+   "ci_delta_vs_always_on": [
+    -1.008317243047571,
+    -0.002323241958928569
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 0.0,
+    "1.0": 0.0
+   },
+   "audit_id": "audit_82b206d9de67"
+  },
+  {
+   "name": "Constant 0.983x (the gate's actual Validation size; diagnostic, set on Validation)",
+   "role": "diagnostic",
+   "policy_id": "benchmark::validation_size::agent::gate_fg_q33_half",
+   "spec_hash": "spec_3bd309e69361",
+   "spec": {
+    "policy_id": "benchmark::validation_size::agent::gate_fg_q33_half",
+    "family": "constant",
+    "allocation": 0.982901,
+    "matched_on": "validation (diagnostic)"
+   },
+   "net_return": 1.3140814101574239,
+   "ci_net_return": [
+    0.07173139217400656,
+    3.905539577550992
+   ],
+   "max_drawdown": 0.2851241864765758,
+   "exposure": 0.5436900347558582,
+   "sharpe": 1.6017799883758572,
+   "turnover": 245.72525,
+   "delta_vs_always_on": -0.029960326602114673,
+   "ci_delta_vs_always_on": [
+    -0.13780031519205022,
+    -0.00027073328803368696
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 0.0,
+    "1.0": 0.0
+   },
+   "audit_id": "audit_2db03bca2f5c"
+  },
+  {
+   "name": "agent::gate_mom7d_q33_half",
+   "role": "agent gate",
+   "policy_id": "agent::gate_mom7d_q33_half",
+   "spec_hash": "spec_cd2377722e4b",
+   "spec": {
+    "policy_id": "agent::gate_mom7d_q33_half",
+    "family": "threshold_gate",
+    "conditions": [
+     {
+      "feature": "momentum_7d",
+      "op": ">",
+      "threshold": -0.0248157846952937
+     }
+    ],
+    "allocation_when_true": 1.0,
+    "allocation_when_false": 0.5,
+    "thresholds_selected_on": "train"
+   },
+   "net_return": 1.063882946978099,
+   "ci_net_return": [
+    -0.012956517796122566,
+    3.3577604092623075
+   ],
+   "max_drawdown": 0.2956918948851628,
+   "exposure": 0.5193742636470742,
+   "sharpe": 1.4367831488499123,
+   "turnover": 296.0,
+   "delta_vs_always_on": -0.2801587897814395,
+   "ci_delta_vs_always_on": [
+    -0.9376040648453194,
+    0.005308255880907505
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 0.12211572594959176,
+    "1.0": 0.8778842740504083
+   },
+   "audit_id": "audit_cba22ad6de1f",
+   "validation_average_size": 0.9389421370252041,
+   "vs_validation_size": -0.17431293622505661,
+   "status_in_report": "rejected",
+   "train_average_size": 0.9149520177680929,
+   "vs_half_size": 0.4935677550757216,
+   "vs_matched_exposure": -0.13359186700173087,
+   "vs_cash": 1.063882946978099,
+   "timing_read": "does not beat every constant of the same size: part or all of the gain is from holding less"
+  },
+  {
+   "name": "Constant 0.915x (same average Training size as agent::gate_mom7d_q33_half)",
+   "role": "benchmark",
+   "policy_id": "benchmark::exposure_matched::agent::gate_mom7d_q33_half",
+   "spec_hash": "spec_e26b6169de1a",
+   "spec": {
+    "policy_id": "benchmark::exposure_matched::agent::gate_mom7d_q33_half",
+    "family": "constant",
+    "allocation": 0.914952,
+    "matched_on": "train"
+   },
+   "net_return": 1.19747481397983,
+   "ci_net_return": [
+    0.09653584986413287,
+    3.431356388109464
+   ],
+   "max_drawdown": 0.2676713841828179,
+   "exposure": 0.5061041597067677,
+   "sharpe": 1.6017799883758568,
+   "turnover": 228.738,
+   "delta_vs_always_on": -0.14656692277970862,
+   "ci_delta_vs_always_on": [
+    -0.6293488605988723,
+    -0.0004890879887706821
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 0.0,
+    "1.0": 0.0
+   },
+   "audit_id": "audit_54cc1ce0e9ad"
+  },
+  {
+   "name": "Constant 0.939x (the gate's actual Validation size; diagnostic, set on Validation)",
+   "role": "diagnostic",
+   "policy_id": "benchmark::validation_size::agent::gate_mom7d_q33_half",
+   "spec_hash": "spec_546d0110a728",
+   "spec": {
+    "policy_id": "benchmark::validation_size::agent::gate_mom7d_q33_half",
+    "family": "constant",
+    "allocation": 0.938942,
+    "matched_on": "validation (diagnostic)"
+   },
+   "net_return": 1.2381958832031557,
+   "ci_net_return": [
+    0.11045555325257163,
+    3.5469523458546584
+   ],
+   "max_drawdown": 0.27387007892477655,
+   "exposure": 0.5193741878518131,
+   "sharpe": 1.6017799883758568,
+   "turnover": 234.73550000000003,
+   "delta_vs_always_on": -0.10584585355638287,
+   "ci_delta_vs_always_on": [
+    -0.4319095578731408,
+    0.0012833541976295679
+   ],
+   "allocation_mix": {
+    "0.0": 0.0,
+    "0.5": 0.0,
+    "1.0": 0.0
+   },
+   "audit_id": "audit_9112ab032277"
+  }
+ ]
+}

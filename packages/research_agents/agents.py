@@ -198,6 +198,12 @@ allocations in {list(ALLOCATIONS)}; thresholds MUST be values returned by featur
 test_gate_train (TRAIN only, limited budget, every attempt is logged and disclosed). Use unique proposal ids, base each
 proposal on the given hypotheses, cite evidence ids, and state a falsification test. Prefer fewer, simpler gates.
 Code, not you, will evaluate your proposals on validation and pick at most one for the frozen test.
+Take the direction from THIS strategy's evidence: do not assume an up-trend is good or high volatility is bad; a
+mean-reversion strategy can be the opposite of a trend strategy. Trend: momentum_24h (short) vs momentum_7d (longer).
+Volatility level: realized_vol_7d, atr_14; volatility change: vol_ratio_24h_7d (above 1 = recent volatility rising vs its
+7-day baseline). volume_zscore is a volume proxy, not liquidity (no spread or order-book data exists); say "volume".
+fear_greed is daily and usable the next day. A gate that wins only by holding less is not timing: code compares every
+proposal with constant half size and with a constant at the same average size.
 Numbers: copy them from the cited tool output and round to 3-4 significant digits (0.3043, -3.54e-05, 5.15%);
 rounding is fine, changing digits or computing new numbers is not."""
 

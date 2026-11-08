@@ -29,7 +29,8 @@ FEATURE_LABEL = {
     "realized_vol_7d": "7-day volatility",
     "atr_14": "14-bar average true range",
     "price_drawdown": "distance below the recent high",
-    "volume_zscore": "trading volume vs normal",
+    "volume_zscore": "trading volume vs its 7-day normal (a volume proxy, not liquidity)",
+    "vol_ratio_24h_7d": "24-hour volatility vs its 7-day baseline",
     "fear_greed": "Fear & Greed index",
     "news_sentiment": "news sentiment",
 }
@@ -66,6 +67,7 @@ GLOSSARY = [
     ("pp", "Percentage points: the difference between two returns, e.g. -29% vs -56% is +27 pp."),
     ("90% interval", "The range the result would likely fall in on similar data. If it contains zero, the effect is not proven."),
     ("Critic", "An AI agent whose job is to find reasons a filter will not hold up. It can reject a filter; it cannot approve one by itself."),
+    ("Same average size", "A constant position equal to the filter's average Training size. If the filter can't beat it, it only won by holding less."),
     ("Training folds", "Three slices of the Training data used as a stability check. Not unseen data."),
 ]
 
@@ -109,6 +111,18 @@ class HeldOutResult(BaseModel):
     source: str | None = None
 
 
+class TimingCheck(BaseModel):
+    """Did the filter choose WHEN, or just hold less? Validation, identical costs. Diagnostic, not the selection rule."""
+    vs_half_size_pp: float | None = None
+    vs_same_average_size_pp: float | None = None
+    same_average_size: float | None = None      # constant size equal to the filter's average Training size
+    vs_validation_size_pp: float | None = None  # vs a constant at the filter's actual Validation size (diagnostic)
+    validation_size: float | None = None
+    size_note: str | None = None                # when the condition's frequency changed between Training and Validation
+    read: str
+    source: str
+
+
 class CheckedFilter(BaseModel):
     policy_id: str
     label: str                                  # short human name
@@ -124,6 +138,7 @@ class CheckedFilter(BaseModel):
     validation_own_return: float | None = None  # its own net return on Validation (= vs cash)
     average_size_on_validation: float | None = None
     held_out: HeldOutResult | None = None
+    timing: TimingCheck | None = None
     details: list[str] = Field(default_factory=list)     # full arbiter/critic lines, secondary
     spec: dict | None = None                    # exact settings, secondary
     evidence_ids: list[str] = Field(default_factory=list)
@@ -292,7 +307,8 @@ def _blocking_reason(reasons: list[str]) -> str:
 
 def present(report: dict | BaseModel, *, held_out: dict | None = None, published: dict | None = None,
             definition: dict | None = None, windows: dict | None = None,
-            report_path: str | None = None, held_out_path: str | None = None) -> ReportPresentation:
+            report_path: str | None = None, held_out_path: str | None = None,
+            timing_check: dict | None = None) -> ReportPresentation:
     """Build the plain-language view of one report.
 
     held_out:   the one held-out look (frozen_look_*.json), if taken.
@@ -308,7 +324,8 @@ def present(report: dict | BaseModel, *, held_out: dict | None = None, published
     evaluation = (held_out or {}).get("evaluation") or {}
     look_policy = (held_out or {}).get("champion_policy_id")
 
-    filters = _filters(r, candidates, trials, evaluation if look_policy else {}, look_policy, held_out, held_out_path)
+    filters = _filters(r, candidates, trials, evaluation if look_policy else {}, look_policy, held_out, held_out_path,
+                       timing_check)
     counts = {k: sum(1 for f in filters if f.outcome == k) for k in OUTCOME_LABEL}
     headline = _headline(r, filters, published, evaluation if look_policy else {}, champion_id)
     stages = _stages(r, trials, windows, evaluation, published, held_out, look_policy)
@@ -345,7 +362,34 @@ def _train_specs(r) -> dict[str, dict]:
     return specs
 
 
-def _filters(r, candidates, trials, evaluation, look_policy, held_out, held_out_path) -> list[CheckedFilter]:
+def _timing(c: dict, timing_check: dict | None) -> TimingCheck | None:
+    half, same, size, src = (c.get("validation_delta_vs_half_size"), c.get("validation_delta_vs_matched_exposure"),
+                             c.get("matched_exposure"), "this report")
+    vsize = vdelta = note = None
+    g = next((g for g in (timing_check or {}).get("gates") or [] if g.get("policy_id") == c["policy_id"]
+              and g.get("role") == "agent gate"), None)
+    if g:
+        half, same, size = g.get("vs_half_size"), g.get("vs_matched_exposure"), g.get("train_average_size")
+        vsize, vdelta, note = g.get("validation_average_size"), g.get("vs_validation_size"), g.get("size_shift_note")
+        src = timing_check.get("_path") or "timing check (Validation)"
+    if half is None and same is None:
+        return None
+    checks = [x for x in (half, same, vdelta) if x is not None]
+    if same is not None and all(x > 0 for x in checks):
+        read = ("Beat constant half size and a constant of the same average size on Validation: some evidence of "
+                "timing, not proof (Validation was also used to select).")
+    elif same is not None:
+        read = "Did not beat a constant position of the same average size: the gain came from holding less, not timing."
+    else:
+        read = ("Beat constant half size on Validation." if half > 0 else
+                "Did not beat constant half size: the gain came from holding less, not timing.")
+    if note:
+        read += " Its average size changed between Training and Validation, so treat the comparison with care."
+    return TimingCheck(vs_half_size_pp=half, vs_same_average_size_pp=same, same_average_size=size,
+                       vs_validation_size_pp=vdelta, validation_size=vsize, size_note=note, read=read, source=src)
+
+
+def _filters(r, candidates, trials, evaluation, look_policy, held_out, held_out_path, timing_check=None) -> list[CheckedFilter]:
     out: list[CheckedFilter] = []
     train_specs = _train_specs(r)
     by_policy: dict[str, list[dict]] = {}
@@ -397,6 +441,7 @@ def _filters(r, candidates, trials, evaluation, look_policy, held_out, held_out_
             validation_vs_original_ci_pp=tuple(c["validation_ci"]) if c.get("validation_ci") else None,
             validation_own_return=c.get("validation_delta_vs_cash"),
             average_size_on_validation=_avg_size(c.get("allocation_mix") or {}), held_out=ho,
+            timing=_timing(c, timing_check) if c.get("source") == "agent" else None,
             details=list(c.get("reasons") or []), spec=spec or None, evidence_ids=list(c.get("evidence_ids") or [])))
     # agent filters tried on Training but never proposed: checked once, not taken further
     for pid, tl in by_policy.items():
@@ -451,7 +496,7 @@ def _headline(r, filters, published, evaluation, champion_id) -> Headline:
         why = (f"The critic rejected {'all of them' if by_critic == len(rejected) else by_critic}; "
                "the reasons are listed with each filter.") if by_critic else ""
         return Headline(
-            finding=f"Not proven. No filter passed, so the strategy stays unchanged.",
+            finding="Not proven. No filter earned the held-out test, so the strategy stays unchanged.",
             meaning=(f"{reason[:1].upper() + reason[1:] if reason else 'The held-out evidence does not settle it.'} "
                      f"The agents proposed {len(proposed)} filter{'s' if len(proposed) != 1 else ''}; "
                      f"{len(rejected)} {'was' if len(rejected) == 1 else 'were'} rejected. {why}").strip(),
@@ -630,7 +675,8 @@ def _trace(r, filters, trials, published, held_out) -> list[TraceStep]:
         summary=("The rule was fixed before the run: beat the original with an interval above zero, beat cash, "
                  "change something real, and not be rejected by the critic."),
         items=[f"Selected: {chosen.label}" if chosen else "Selected: none"]
-        + [b for b in r.get("verdict_basis") or [] if b.startswith(("champion", "no agent", "none"))][:2],
+        + [b.replace("passed the critic", "was not rejected by the critic")
+           for b in r.get("verdict_basis") or [] if b.startswith(("champion", "no agent", "none"))][:2],
         changed_conclusion=None)
 
     look = (held_out or {}).get("evaluation")

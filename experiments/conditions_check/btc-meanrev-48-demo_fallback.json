@@ -1,0 +1,4295 @@
+{
+  "experiment_id": "exp_a79497cf70ec",
+  "strategy_id": "btc-meanrev-48-demo",
+  "generated_at": "2026-11-08T13:22:38.688822Z",
+  "agent_mode": "deterministic_fallback",
+  "model_id": null,
+  "agent_failures": [],
+  "verdict": "candidate_for_frozen_test",
+  "verdict_basis": [
+    "always-on on validation: net -0.1948, 90% CI (-0.5593962926877796, 0.5113277536571594)",
+    "cash on validation: net 0.0000",
+    "constant half size on validation: delta vs always-on +0.1110, net -0.0838 (a gate that mostly halves exposure should beat this)",
+    "Lane A regime filter on validation: delta vs always-on +0.5826, net +0.3877",
+    "strategy health (within_training_range): 45 of 45 validation 14-day blocks fall inside the training range [-0.1623, +0.1235]: a loss alone does not show the strategy broke. Assumptions that changed: cost_per_bar, bar_volatility, sentiment_regime_shares, vol_regime_shares.",
+    "champion agent::P1 beats always-on and cash on validation and passed the critic"
+  ],
+  "champion_policy_id": "agent::P1",
+  "validation_always_on": {
+    "net_return": -0.19483542695663503,
+    "ci_net_return": [
+      -0.5593962926877796,
+      0.5113277536571594
+    ]
+  },
+  "validation_cash_net_return": 0.0,
+  "diagnostic": {
+    "summary": "Train net -0.896 (gross -0.562). 3 regime effect(s) with CI excluding zero on train; 11 bucket(s) rejected as weak.",
+    "hypotheses": [
+      {
+        "hypothesis_id": "H1",
+        "statement": "The unchanged strategy performs worse when vol_regime=low (train mean -9.32e-05 per interval after costs, n=22917).",
+        "direction": "works_worse",
+        "conditions": [
+          "vol_regime=low"
+        ],
+        "evidence_ids": [
+          "ev_regime_perfo_410156211c"
+        ],
+        "confidence": "medium",
+        "caveats": [
+          "train only; validation is reserved for the arbiter",
+          "regime label uses lagged features; descriptive, not yet a tested gate"
+        ],
+        "suggested_test": "A gate on vol_regime=low must improve validation net return vs always-on and vs the simple rule after costs."
+      },
+      {
+        "hypothesis_id": "H2",
+        "statement": "The unchanged strategy performs worse when trend_7d_regime=sideways (train mean -8.61e-05 per interval after costs, n=15277).",
+        "direction": "works_worse",
+        "conditions": [
+          "trend_7d_regime=sideways"
+        ],
+        "evidence_ids": [
+          "ev_regime_perfo_410156211c"
+        ],
+        "confidence": "medium",
+        "caveats": [
+          "train only; validation is reserved for the arbiter",
+          "regime label uses lagged features; descriptive, not yet a tested gate"
+        ],
+        "suggested_test": "A gate on trend_7d_regime=sideways must improve validation net return vs always-on and vs the simple rule after costs."
+      },
+      {
+        "hypothesis_id": "H3",
+        "statement": "The unchanged strategy performs worse when vol_change_regime=above_baseline (train mean -6.45e-05 per interval after costs, n=22916).",
+        "direction": "works_worse",
+        "conditions": [
+          "vol_change_regime=above_baseline"
+        ],
+        "evidence_ids": [
+          "ev_regime_perfo_410156211c"
+        ],
+        "confidence": "medium",
+        "caveats": [
+          "train only; validation is reserved for the arbiter",
+          "regime label uses lagged features; descriptive, not yet a tested gate"
+        ],
+        "suggested_test": "A gate on vol_change_regime=above_baseline must improve validation net return vs always-on and vs the simple rule after costs."
+      }
+    ],
+    "rejected_explanations": [
+      "trend_regime=bear: train CI spans zero",
+      "liquidity_regime=deep: train CI spans zero",
+      "sentiment_regime=fear: train CI spans zero",
+      "trend_regime=bull: only 2 trade entries on train; too few to say anything",
+      "sentiment_regime=greed: train CI spans zero",
+      "liquidity_regime=thin: train CI spans zero",
+      "trend_7d_regime=bear: train CI spans zero",
+      "vol_change_regime=below_baseline: train CI spans zero",
+      "trend_7d_regime=bull: train CI spans zero",
+      "trend_regime=sideways: train CI spans zero",
+      "vol_regime=high: train CI spans zero"
+    ],
+    "limitations": [
+      "deterministic fallback: no economic reasoning or news interpretation",
+      "single strategy, single asset",
+      "regime buckets are coarse (terciles / median)"
+    ]
+  },
+  "proposals": [
+    {
+      "proposal_id": "P1",
+      "family": "threshold_gate",
+      "based_on": [
+        "H1"
+      ],
+      "conditions": [
+        {
+          "feature": "realized_vol_7d",
+          "op": "<=",
+          "threshold": 0.006409240155854531
+        }
+      ],
+      "allocation_when_true": 0.0,
+      "allocation_when_false": 1.0,
+      "rationale": "Follows H1: switch off when vol_regime=low holds.",
+      "evidence_ids": [
+        "ev_feature_grid_85c593416f",
+        "ev_test_gate_tr_fe7647202c",
+        "ev_regime_perfo_410156211c"
+      ],
+      "falsification_test": "Reject if validation delta vs always-on is <= 0 after switching costs."
+    }
+  ],
+  "critiques": [
+    {
+      "proposal_id": "P1",
+      "verdict": "approve_for_frozen_test",
+      "leakage_concerns": [],
+      "overfit_risks": [],
+      "fragile_samples": [],
+      "counterexamples": [],
+      "observations": [
+        "validation improvement CI includes zero",
+        "the regime behind this gate's feature shifted between train and validation (vol_regime_shares): the validation result may reflect that shift, not a stable effect"
+      ],
+      "evidence_ids": [
+        "ev_test_gate_tr_fe7647202c",
+        "ev_arbiter_eval_dc0eb75ed6",
+        "ev_walk_forward_2c89ae0691",
+        "ev_strategy_hea_75c51802c2"
+      ]
+    }
+  ],
+  "trial_log": [
+    {
+      "policy_id": "agent::P1",
+      "spec_hash": "spec_a2e686fa5d51",
+      "source": "agent",
+      "split": "train",
+      "delta_net_return_vs_always_on": 0.8258214998400459,
+      "ci_delta": [
+        0.16844992016956992,
+        3.540692992421106
+      ],
+      "net_return": -0.07049224805052579,
+      "allocation_mix": {
+        "0.0": 0.511901347863493,
+        "0.5": 0.0,
+        "1.0": 0.48809865213650705
+      },
+      "evidence_id": "ev_test_gate_tr_fe7647202c",
+      "status": "evaluated",
+      "note": "",
+      "fold": null
+    },
+    {
+      "policy_id": "agent::P1",
+      "spec_hash": "spec_a2e686fa5d51",
+      "source": "arbiter",
+      "split": "validation",
+      "delta_net_return_vs_always_on": 0.5823376857336173,
+      "ci_delta": [
+        -0.01701083746775508,
+        0.9638548189900813
+      ],
+      "net_return": 0.3875022587769823,
+      "allocation_mix": {
+        "0.0": 0.8668280871670703,
+        "0.5": 0.0,
+        "1.0": 0.13317191283292978
+      },
+      "evidence_id": "ev_arbiter_eval_dc0eb75ed6",
+      "status": "evaluated",
+      "note": "",
+      "fold": null
+    },
+    {
+      "policy_id": "rule::trend_up_and_vol_below_train_median",
+      "spec_hash": "spec_2ca7c5381c93",
+      "source": "rule_baseline",
+      "split": "validation",
+      "delta_net_return_vs_always_on": -0.21233360187687134,
+      "ci_delta": [
+        -0.9633986830000766,
+        0.14185180117747712
+      ],
+      "net_return": -0.40716902883350636,
+      "allocation_mix": {
+        "0.0": 0.9050102439932949,
+        "0.5": 0.0,
+        "1.0": 0.09498975600670516
+      },
+      "evidence_id": "ev_arbiter_eval_aea4eac1d7",
+      "status": "evaluated",
+      "note": "",
+      "fold": null
+    },
+    {
+      "policy_id": "meta::lgbm_gate_v1",
+      "spec_hash": "spec_d54370102ede",
+      "source": "meta_model",
+      "split": "validation",
+      "delta_net_return_vs_always_on": -0.4129300614529534,
+      "ci_delta": [
+        -0.9952914504616893,
+        -0.14322315657757007
+      ],
+      "net_return": -0.6077654884095884,
+      "allocation_mix": {
+        "0.0": 0.2542372881355932,
+        "0.5": 0.5222574036133358,
+        "1.0": 0.22350530825107096
+      },
+      "evidence_id": "ev_arbiter_eval_5d0d9bebde",
+      "status": "evaluated",
+      "note": "",
+      "fold": null
+    },
+    {
+      "policy_id": "rule::regime_filter",
+      "spec_hash": "spec_f59b5404bfca",
+      "source": "rule_baseline",
+      "split": "validation",
+      "delta_net_return_vs_always_on": 0.5825776124942794,
+      "ci_delta": [
+        -0.030118091921518174,
+        0.9758201652653931
+      ],
+      "net_return": 0.3877421855376444,
+      "allocation_mix": {
+        "0.0": 0.9072452970758056,
+        "0.5": 0.0,
+        "1.0": 0.09275470292419445
+      },
+      "evidence_id": "ev_arbiter_eval_b3722d6179",
+      "status": "evaluated",
+      "note": "",
+      "fold": null
+    },
+    {
+      "policy_id": "rule::half_size_constant",
+      "spec_hash": "spec_356f807d2741",
+      "source": "rule_baseline",
+      "split": "validation",
+      "delta_net_return_vs_always_on": 0.11102349052186755,
+      "ci_delta": [
+        -0.2617774996018288,
+        0.23798417090083457
+      ],
+      "net_return": -0.08381193643476748,
+      "allocation_mix": {
+        "0.0": 0.0,
+        "0.5": 1.0,
+        "1.0": 0.0
+      },
+      "evidence_id": "ev_arbiter_eval_098320ca7a",
+      "status": "evaluated",
+      "note": "",
+      "fold": null
+    },
+    {
+      "policy_id": "agent::P1",
+      "spec_hash": "spec_a2e686fa5d51",
+      "source": "arbiter",
+      "split": "train",
+      "delta_net_return_vs_always_on": 0.8258214998400459,
+      "ci_delta": [
+        0.16817164650228894,
+        3.384614052969345
+      ],
+      "net_return": -0.07049224805052579,
+      "allocation_mix": {
+        "0.0": 0.511901347863493,
+        "0.5": 0.0,
+        "1.0": 0.48809865213650705
+      },
+      "evidence_id": "ev_test_gate_tr_a08bc3e8f3",
+      "status": "evaluated",
+      "note": "",
+      "fold": null
+    },
+    {
+      "policy_id": "benchmark::exposure_matched::P1",
+      "spec_hash": "spec_d728bc2ed453",
+      "source": "rule_baseline",
+      "split": "validation",
+      "delta_net_return_vs_always_on": 0.1133783745409479,
+      "ci_delta": [
+        -0.28258920457308045,
+        0.24284454673439473
+      ],
+      "net_return": -0.08145705241568713,
+      "allocation_mix": {
+        "0.0": 0.0,
+        "0.5": 0.0,
+        "1.0": 0.0
+      },
+      "evidence_id": "ev_arbiter_eval_a370762f54",
+      "status": "evaluated",
+      "note": "",
+      "fold": null
+    },
+    {
+      "policy_id": "agent::P1",
+      "spec_hash": "spec_a2e686fa5d51",
+      "source": "arbiter",
+      "split": "train",
+      "delta_net_return_vs_always_on": 0.6897766080919163,
+      "ci_delta": [
+        0.20156160638798315,
+        1.5434475043285174
+      ],
+      "net_return": 0.2273624297904917,
+      "allocation_mix": {
+        "0.0": 0.5984018264840183,
+        "0.5": 0.0,
+        "1.0": 0.40159817351598176
+      },
+      "evidence_id": "ev_walk_forward_9f70272bfb",
+      "status": "evaluated",
+      "note": "walk-forward fold 1 (train sub-period; stability check, not unseen data)",
+      "fold": 1
+    },
+    {
+      "policy_id": "agent::P1",
+      "spec_hash": "spec_a2e686fa5d51",
+      "source": "arbiter",
+      "split": "train",
+      "delta_net_return_vs_always_on": 0.10302721409637117,
+      "ci_delta": [
+        -0.2916257740301632,
+        0.5335208919058522
+      ],
+      "net_return": -0.01806666992694994,
+      "allocation_mix": {
+        "0.0": 0.33959002222771056,
+        "0.5": 0.0,
+        "1.0": 0.6604099777722895
+      },
+      "evidence_id": "ev_walk_forward_21e49fe81a",
+      "status": "evaluated",
+      "note": "walk-forward fold 2 (train sub-period; stability check, not unseen data)",
+      "fold": 2
+    },
+    {
+      "policy_id": "agent::P1",
+      "spec_hash": "spec_a2e686fa5d51",
+      "source": "arbiter",
+      "split": "train",
+      "delta_net_return_vs_always_on": 0.4077253378864938,
+      "ci_delta": [
+        0.10682289715152718,
+        0.8206841064734438
+      ],
+      "net_return": -0.11509950916709577,
+      "allocation_mix": {
+        "0.0": 0.6371494834492937,
+        "0.5": 0.0,
+        "1.0": 0.3628505165507063
+      },
+      "evidence_id": "ev_walk_forward_2c89ae0691",
+      "status": "evaluated",
+      "note": "walk-forward fold 3 (train sub-period; stability check, not unseen data)",
+      "fold": 3
+    },
+    {
+      "policy_id": "rule::trend_up_and_vol_below_train_median",
+      "spec_hash": "spec_2ca7c5381c93",
+      "source": "rule_baseline",
+      "split": "train",
+      "delta_net_return_vs_always_on": 0.22043123563573253,
+      "ci_delta": [
+        -0.7013682359817061,
+        0.5626294681285829
+      ],
+      "net_return": -0.2419829426656921,
+      "allocation_mix": {
+        "0.0": 0.9257990867579908,
+        "0.5": 0.0,
+        "1.0": 0.07420091324200913
+      },
+      "evidence_id": "ev_walk_forward_d3fd06897c",
+      "status": "evaluated",
+      "note": "walk-forward fold 1 (train sub-period; stability check, not unseen data)",
+      "fold": 1
+    },
+    {
+      "policy_id": "rule::trend_up_and_vol_below_train_median",
+      "spec_hash": "spec_2ca7c5381c93",
+      "source": "rule_baseline",
+      "split": "train",
+      "delta_net_return_vs_always_on": 0.0153538661444228,
+      "ci_delta": [
+        -1.2155990832375572,
+        0.5477328909539276
+      ],
+      "net_return": -0.10574001787889831,
+      "allocation_mix": {
+        "0.0": 0.9649296122499382,
+        "0.5": 0.0,
+        "1.0": 0.03507038775006174
+      },
+      "evidence_id": "ev_walk_forward_2f22bc5d80",
+      "status": "evaluated",
+      "note": "walk-forward fold 2 (train sub-period; stability check, not unseen data)",
+      "fold": 2
+    },
+    {
+      "policy_id": "rule::trend_up_and_vol_below_train_median",
+      "spec_hash": "spec_2ca7c5381c93",
+      "source": "rule_baseline",
+      "split": "train",
+      "delta_net_return_vs_always_on": 0.2455309779755892,
+      "ci_delta": [
+        -0.291233682470854,
+        0.5339648650637806
+      ],
+      "net_return": -0.27729386907800035,
+      "allocation_mix": {
+        "0.0": 0.9300021083702298,
+        "0.5": 0.0,
+        "1.0": 0.06999789162977019
+      },
+      "evidence_id": "ev_walk_forward_33d74e8bc3",
+      "status": "evaluated",
+      "note": "walk-forward fold 3 (train sub-period; stability check, not unseen data)",
+      "fold": 3
+    },
+    {
+      "policy_id": "rule::regime_filter",
+      "spec_hash": "spec_f59b5404bfca",
+      "source": "rule_baseline",
+      "split": "train",
+      "delta_net_return_vs_always_on": 0.9030874730743741,
+      "ci_delta": [
+        0.28805233559190463,
+        1.950118100877269
+      ],
+      "net_return": 0.4406732947729495,
+      "allocation_mix": {
+        "0.0": 0.7018264840182649,
+        "0.5": 0.0,
+        "1.0": 0.29817351598173514
+      },
+      "evidence_id": "ev_walk_forward_c821201fde",
+      "status": "evaluated",
+      "note": "walk-forward fold 1 (train sub-period; stability check, not unseen data)",
+      "fold": 1
+    },
+    {
+      "policy_id": "rule::regime_filter",
+      "spec_hash": "spec_f59b5404bfca",
+      "source": "rule_baseline",
+      "split": "train",
+      "delta_net_return_vs_always_on": 0.26052359522507906,
+      "ci_delta": [
+        -0.4615108651468785,
+        1.0367219956226372
+      ],
+      "net_return": 0.13942971120175796,
+      "allocation_mix": {
+        "0.0": 0.5413682390713757,
+        "0.5": 0.0,
+        "1.0": 0.45863176092862434
+      },
+      "evidence_id": "ev_walk_forward_9964e97e08",
+      "status": "evaluated",
+      "note": "walk-forward fold 2 (train sub-period; stability check, not unseen data)",
+      "fold": 2
+    },
+    {
+      "policy_id": "rule::regime_filter",
+      "spec_hash": "spec_f59b5404bfca",
+      "source": "rule_baseline",
+      "split": "train",
+      "delta_net_return_vs_always_on": 0.37971450837068355,
+      "ci_delta": [
+        0.06605652242745112,
+        0.768936434648422
+      ],
+      "net_return": -0.143110338682906,
+      "allocation_mix": {
+        "0.0": 0.7486822686063673,
+        "0.5": 0.0,
+        "1.0": 0.2513177313936327
+      },
+      "evidence_id": "ev_walk_forward_c4bc8657c5",
+      "status": "evaluated",
+      "note": "walk-forward fold 3 (train sub-period; stability check, not unseen data)",
+      "fold": 3
+    },
+    {
+      "policy_id": "rule::half_size_constant",
+      "spec_hash": "spec_356f807d2741",
+      "source": "rule_baseline",
+      "split": "train",
+      "delta_net_return_vs_always_on": 0.23587381035049704,
+      "ci_delta": [
+        -0.17245082279165763,
+        0.2856279524501108
+      ],
+      "net_return": -0.22654036795092758,
+      "allocation_mix": {
+        "0.0": 0.0,
+        "0.5": 1.0,
+        "1.0": 0.0
+      },
+      "evidence_id": "ev_walk_forward_fbdfbbd046",
+      "status": "evaluated",
+      "note": "walk-forward fold 1 (train sub-period; stability check, not unseen data)",
+      "fold": 1
+    },
+    {
+      "policy_id": "rule::half_size_constant",
+      "spec_hash": "spec_356f807d2741",
+      "source": "rule_baseline",
+      "split": "train",
+      "delta_net_return_vs_always_on": 0.10588521289570774,
+      "ci_delta": [
+        -0.5620315384680095,
+        0.2741909483056282
+      ],
+      "net_return": -0.015208671127613371,
+      "allocation_mix": {
+        "0.0": 0.0,
+        "0.5": 1.0,
+        "1.0": 0.0
+      },
+      "evidence_id": "ev_walk_forward_416ed22449",
+      "status": "evaluated",
+      "note": "walk-forward fold 2 (train sub-period; stability check, not unseen data)",
+      "fold": 2
+    },
+    {
+      "policy_id": "rule::half_size_constant",
+      "spec_hash": "spec_356f807d2741",
+      "source": "rule_baseline",
+      "split": "train",
+      "delta_net_return_vs_always_on": 0.2330630417287487,
+      "ci_delta": [
+        0.014355960478924349,
+        0.2650125415898307
+      ],
+      "net_return": -0.28976180532484086,
+      "allocation_mix": {
+        "0.0": 0.0,
+        "0.5": 1.0,
+        "1.0": 0.0
+      },
+      "evidence_id": "ev_walk_forward_5516cbac98",
+      "status": "evaluated",
+      "note": "walk-forward fold 3 (train sub-period; stability check, not unseen data)",
+      "fold": 3
+    }
+  ],
+  "candidates": [
+    {
+      "policy_id": "agent::P1",
+      "spec_hash": "spec_a2e686fa5d51",
+      "source": "agent",
+      "role": "agent_champion",
+      "policy_spec": {
+        "policy_id": "agent::P1",
+        "family": "threshold_gate",
+        "conditions": [
+          {
+            "feature": "realized_vol_7d",
+            "op": "<=",
+            "threshold": 0.006409240155854531
+          }
+        ],
+        "allocation_when_true": 0.0,
+        "allocation_when_false": 1.0,
+        "thresholds_selected_on": "train"
+      },
+      "status": "accepted_for_frozen_test",
+      "validation_delta_vs_always_on": 0.5823376857336173,
+      "validation_ci": [
+        -0.01701083746775508,
+        0.9638548189900813
+      ],
+      "validation_delta_vs_simple_rule": 0.7946712876104887,
+      "validation_delta_vs_cash": 0.3875022587769823,
+      "allocation_mix": {
+        "0.0": 0.8668280871670703,
+        "0.5": 0.0,
+        "1.0": 0.13317191283292978
+      },
+      "validation_delta_vs_half_size": 0.4713141952117498,
+      "validation_delta_vs_matched_exposure": 0.4689593111926694,
+      "matched_exposure": 0.488099,
+      "reasons": [
+        "validation: delta vs always-on +0.5823 (90% CI -0.0170..+0.9639), net return +0.3875 = delta vs cash",
+        "validation CI includes zero; the frozen test decides",
+        "vs Lane A regime filter on validation: -0.0002 (reference, not a veto)",
+        "vs constant half size on validation: +0.4713 (exposure-only baseline; reference, not a veto)",
+        "timing check vs a constant 0.488x size (this gate's average train size) on validation: +0.4690 (diagnostic, not part of the pre-registered rule)",
+        "walk-forward on train folds: beats always-on on 3/3 (+0.6898, +0.1030, +0.4077); stability check, not a veto"
+      ],
+      "evidence_ids": [
+        "ev_feature_grid_85c593416f",
+        "ev_test_gate_tr_fe7647202c",
+        "ev_regime_perfo_410156211c",
+        "ev_arbiter_eval_dc0eb75ed6",
+        "ev_test_gate_tr_fe7647202c",
+        "ev_arbiter_eval_dc0eb75ed6",
+        "ev_walk_forward_2c89ae0691",
+        "ev_strategy_hea_75c51802c2"
+      ]
+    },
+    {
+      "policy_id": "rule::trend_up_and_vol_below_train_median",
+      "spec_hash": "spec_2ca7c5381c93",
+      "source": "rule_baseline",
+      "role": "competitor",
+      "policy_spec": {
+        "policy_id": "rule::trend_up_and_vol_below_train_median",
+        "family": "threshold_gate",
+        "conditions": [
+          {
+            "feature": "momentum_24h",
+            "op": ">",
+            "threshold": 0.0
+          },
+          {
+            "feature": "realized_vol_7d",
+            "op": "<=",
+            "threshold": 0.006409240155854531
+          }
+        ],
+        "allocation_when_true": 1.0,
+        "allocation_when_false": 0.0,
+        "thresholds_selected_on": "train"
+      },
+      "status": "competitor",
+      "validation_delta_vs_always_on": -0.21233360187687134,
+      "validation_ci": [
+        -0.9633986830000766,
+        0.14185180117747712
+      ],
+      "validation_delta_vs_simple_rule": 0.0,
+      "validation_delta_vs_cash": -0.40716902883350636,
+      "allocation_mix": {
+        "0.0": 0.9050102439932949,
+        "0.5": 0.0,
+        "1.0": 0.09498975600670516
+      },
+      "validation_delta_vs_half_size": null,
+      "validation_delta_vs_matched_exposure": null,
+      "matched_exposure": null,
+      "reasons": [
+        "competitor: always carried to the frozen test for comparison",
+        "validation: delta vs always-on -0.2123, net return -0.4072 = delta vs cash",
+        "walk-forward on train folds: beats always-on on 3/3 (+0.2204, +0.0154, +0.2455); stability check, not a veto"
+      ],
+      "evidence_ids": [
+        "ev_arbiter_eval_aea4eac1d7"
+      ]
+    },
+    {
+      "policy_id": "meta::lgbm_gate_v1",
+      "spec_hash": "spec_d54370102ede",
+      "source": "meta_model",
+      "role": "competitor",
+      "policy_spec": {
+        "policy_id": "meta::lgbm_gate_v1",
+        "family": "lgbm_gate",
+        "features": [
+          "momentum_24h",
+          "momentum_7d",
+          "realized_vol_7d",
+          "atr_14",
+          "price_drawdown",
+          "volume_zscore",
+          "fear_greed"
+        ],
+        "thresholds": [
+          0.500761642578573,
+          0.5407616425785731
+        ],
+        "base_rate": 0.520761642578573,
+        "band": 0.02,
+        "fitted_on": "train",
+        "calibrated_on": "train_tail",
+        "seed": 7,
+        "model_hash": "73bf0568c647a0ef"
+      },
+      "status": "competitor",
+      "validation_delta_vs_always_on": -0.4129300614529534,
+      "validation_ci": [
+        -0.9952914504616893,
+        -0.14322315657757007
+      ],
+      "validation_delta_vs_simple_rule": -0.20059645957608208,
+      "validation_delta_vs_cash": -0.6077654884095884,
+      "allocation_mix": {
+        "0.0": 0.2542372881355932,
+        "0.5": 0.5222574036133358,
+        "1.0": 0.22350530825107096
+      },
+      "validation_delta_vs_half_size": null,
+      "validation_delta_vs_matched_exposure": null,
+      "matched_exposure": null,
+      "reasons": [
+        "competitor: always carried to the frozen test for comparison",
+        "validation: delta vs always-on -0.4129, net return -0.6078 = delta vs cash",
+        "Lane A refit walk-forward (model refit before each train fold): beats always-on on 2/3 (+0.0314, +0.0500, -0.1474); stability check, not a veto"
+      ],
+      "evidence_ids": [
+        "ev_arbiter_eval_5d0d9bebde"
+      ]
+    },
+    {
+      "policy_id": "rule::regime_filter",
+      "spec_hash": "spec_f59b5404bfca",
+      "source": "rule_baseline",
+      "role": "competitor",
+      "policy_spec": {
+        "policy_id": "rule::regime_filter",
+        "family": "regime_gate",
+        "flat_buckets": [
+          {
+            "axis": "trend_regime",
+            "bucket": "bull"
+          },
+          {
+            "axis": "trend_7d_regime",
+            "bucket": "sideways"
+          },
+          {
+            "axis": "vol_regime",
+            "bucket": "low"
+          }
+        ],
+        "full_buckets": [],
+        "allocation_flat": 0.0,
+        "allocation_full": 1.0,
+        "allocation_else": 1.0,
+        "selected_on": "train",
+        "summary": "Train intervals only: flat in trend_regime=bull, trend_7d_regime=sideways, vol_regime=low; allocation 1 in the remaining regimes."
+      },
+      "status": "competitor",
+      "validation_delta_vs_always_on": 0.5825776124942794,
+      "validation_ci": [
+        -0.030118091921518174,
+        0.9758201652653931
+      ],
+      "validation_delta_vs_simple_rule": 0.7949112143711508,
+      "validation_delta_vs_cash": 0.3877421855376444,
+      "allocation_mix": {
+        "0.0": 0.9072452970758056,
+        "0.5": 0.0,
+        "1.0": 0.09275470292419445
+      },
+      "validation_delta_vs_half_size": null,
+      "validation_delta_vs_matched_exposure": null,
+      "matched_exposure": null,
+      "reasons": [
+        "competitor: always carried to the frozen test for comparison",
+        "validation: delta vs always-on +0.5826, net return +0.3877 = delta vs cash",
+        "walk-forward on train folds: beats always-on on 3/3 (+0.9031, +0.2605, +0.3797); stability check, not a veto",
+        "Lane A: Train intervals only: flat in trend_regime=bull, trend_7d_regime=sideways, vol_regime=low; allocation 1 in the remaining regimes."
+      ],
+      "evidence_ids": [
+        "ev_arbiter_eval_b3722d6179"
+      ]
+    },
+    {
+      "policy_id": "rule::half_size_constant",
+      "spec_hash": "spec_356f807d2741",
+      "source": "rule_baseline",
+      "role": "competitor",
+      "policy_spec": {
+        "policy_id": "rule::half_size_constant",
+        "family": "threshold_gate",
+        "conditions": [
+          {
+            "feature": "realized_vol_7d",
+            "op": ">",
+            "threshold": -1.0
+          }
+        ],
+        "allocation_when_true": 0.5,
+        "allocation_when_false": 0.5,
+        "thresholds_selected_on": "none (constant)",
+        "summary": "Always half size: the exposure-only baseline."
+      },
+      "status": "competitor",
+      "validation_delta_vs_always_on": 0.11102349052186755,
+      "validation_ci": [
+        -0.2617774996018288,
+        0.23798417090083457
+      ],
+      "validation_delta_vs_simple_rule": 0.3233570923987389,
+      "validation_delta_vs_cash": -0.08381193643476748,
+      "allocation_mix": {
+        "0.0": 0.0,
+        "0.5": 1.0,
+        "1.0": 0.0
+      },
+      "validation_delta_vs_half_size": null,
+      "validation_delta_vs_matched_exposure": null,
+      "matched_exposure": null,
+      "reasons": [
+        "competitor: always carried to the frozen test for comparison",
+        "validation: delta vs always-on +0.1110, net return -0.0838 = delta vs cash",
+        "degenerate: one multiplier on 100% of in-position validation decisions",
+        "walk-forward on train folds: beats always-on on 3/3 (+0.2359, +0.1059, +0.2331); stability check, not a veto",
+        "Lane A: Always half size: the exposure-only baseline."
+      ],
+      "evidence_ids": [
+        "ev_arbiter_eval_098320ca7a"
+      ]
+    }
+  ],
+  "test_requests": [
+    "Lane A: run ONCE on the sealed test split with identical costs: always_on, cash, agent::P1, rule::trend_up_and_vol_below_train_median, meta::lgbm_gate_v1, rule::regime_filter, rule::half_size_constant. Report each vs always_on, vs cash and vs the simple rule, with CIs. Do not change any policy after seeing the result."
+  ],
+  "limitations": [
+    "fallback diagnostic verification issues: summary/rejected/limitations: numbers ['11'] are not copied from the cited evidence (copy digits from the cited tool output; rounding to 3-4 significant digits is fine; all CIs are 90%)",
+    "1 distinct agent gate specs attempted (1 agent train tests logged, refused ones included); 6 distinct policies evaluated in total. Multiple-comparison risk applies to train and validation results.",
+    "The critic can veto a proposal (part of the pre-registered rule); the critic sees validation results.",
+    "Bad luck vs broken: validation 14-day blocks of the unchanged strategy are compared with Lane A's train-only 14-day range, and exposure, turnover, costs, volatility and regime frequencies are compared train vs validation (pre-registered thresholds in health.py). Code computes it; only the critic sees it.",
+    "Walk-forward: every agent gate and competitor is also scored on Lane A's expanding train folds (same windows and 2-bar embargo as the LightGBM walk-forward). Thresholds come from quantiles of the whole train window, so the folds are a stability check across train sub-periods, not unseen data, and they do not change the pre-registered selection.",
+    "Regime effects are associations under lagged features, not causal.",
+    "Returns convention: compounded simple returns after costs everywhere (Lane A contract); deltas and CIs use the same convention.",
+    "The verdict only says whether an agent gate earned one sealed look; Lane A's arbiter makes the strategy decision.",
+    "Validation selected the single agent champion (max delta vs always-on among eligible); this selection biases its validation number upwards; only the frozen test is unbiased.",
+    "LightGBM competitor: single seed (7); its result can vary with the seed. Calibrated on late train instead of validation (spec deviation, keeps validation out-of-sample).",
+    "news_sentiment coverage 0%: not allowed in gates; market-only gating.",
+    "No news source configured: no news context, no market-only vs market+news ablation.",
+    "Agent mode 'deterministic_fallback': some or all agent stages ran as deterministic fallback."
+  ],
+  "evidence": [
+    {
+      "evidence_id": "ev_regime_perfo_410156211c",
+      "tool": "regime_performance",
+      "args": {
+        "split": "train",
+        "regime_feature": null
+      },
+      "payload": {
+        "split": "train",
+        "rows": [
+          {
+            "split": "train",
+            "regime_feature": "trend_regime",
+            "bucket": "bear",
+            "n_decisions": 15278,
+            "n_trades": 444,
+            "mean_net_return": -0.00006523682983612371,
+            "ci_low": -0.00016999410005784962,
+            "ci_high": 0.000036688831189925276,
+            "total_cost": 0.5478000000000001,
+            "hit_rate": 0.519169835234474
+          },
+          {
+            "split": "train",
+            "regime_feature": "trend_regime",
+            "bucket": "bull",
+            "n_decisions": 15278,
+            "n_trades": 2,
+            "mean_net_return": -0.00003928934568141682,
+            "ci_low": -0.00005987100357055804,
+            "ci_high": -0.000020315763408964232,
+            "total_cost": 0.21559999999999999,
+            "hit_rate": 0.42727272727272725
+          },
+          {
+            "split": "train",
+            "regime_feature": "trend_regime",
+            "bucket": "sideways",
+            "n_decisions": 15277,
+            "n_trades": 209,
+            "mean_net_return": 4.6258102775911603e-7,
+            "ci_low": -0.00003600510154440811,
+            "ci_high": 0.00003754647182867367,
+            "total_cost": 0.6765,
+            "hit_rate": 0.5160760384886177
+          },
+          {
+            "split": "train",
+            "regime_feature": "trend_7d_regime",
+            "bucket": "bear",
+            "n_decisions": 15278,
+            "n_trades": 244,
+            "mean_net_return": -0.00001402465139297438,
+            "ci_low": -0.00010764167950701474,
+            "ci_high": 0.00008064092569279226,
+            "total_cost": 0.5445,
+            "hit_rate": 0.5149625935162094
+          },
+          {
+            "split": "train",
+            "regime_feature": "trend_7d_regime",
+            "bucket": "bull",
+            "n_decisions": 15278,
+            "n_trades": 175,
+            "mean_net_return": -3.94271307078784e-6,
+            "ci_low": -0.00005175393709768523,
+            "ci_high": 0.00004465328003513709,
+            "total_cost": 0.3729,
+            "hit_rate": 0.5251141552511416
+          },
+          {
+            "split": "train",
+            "regime_feature": "trend_7d_regime",
+            "bucket": "sideways",
+            "n_decisions": 15277,
+            "n_trades": 236,
+            "mean_net_return": -0.00008610189598210048,
+            "ci_low": -0.0001373978262184761,
+            "ci_high": -0.00003527149934774701,
+            "total_cost": 0.5225,
+            "hit_rate": 0.511619840443982
+          },
+          {
+            "split": "train",
+            "regime_feature": "vol_regime",
+            "bucket": "high",
+            "n_decisions": 22916,
+            "n_trades": 317,
+            "mean_net_return": 0.000023870292502625145,
+            "ci_low": -0.00004150108831712686,
+            "ci_high": 0.00008776077465282794,
+            "total_cost": 0.7018,
+            "hit_rate": 0.5170387779083431
+          },
+          {
+            "split": "train",
+            "regime_feature": "vol_regime",
+            "bucket": "low",
+            "n_decisions": 22917,
+            "n_trades": 338,
+            "mean_net_return": -0.00009324500074992655,
+            "ci_low": -0.00012974536752057171,
+            "ci_high": -0.00005437886572027212,
+            "total_cost": 0.7381,
+            "hit_rate": 0.5140616246498599
+          },
+          {
+            "split": "train",
+            "regime_feature": "vol_change_regime",
+            "bucket": "above_baseline",
+            "n_decisions": 22916,
+            "n_trades": 280,
+            "mean_net_return": -0.0000645126422169884,
+            "ci_low": -0.00012657375683768857,
+            "ci_high": -2.8242344254646372e-6,
+            "total_cost": 0.6336,
+            "hit_rate": 0.5101540973568731
+          },
+          {
+            "split": "train",
+            "regime_feature": "vol_change_regime",
+            "bucket": "below_baseline",
+            "n_decisions": 22917,
+            "n_trades": 375,
+            "mean_net_return": -4.865922684094866e-6,
+            "ci_low": -0.00004813200576366557,
+            "ci_high": 0.000039919162006937374,
+            "total_cost": 0.8063,
+            "hit_rate": 0.5223939235201677
+          },
+          {
+            "split": "train",
+            "regime_feature": "liquidity_regime",
+            "bucket": "deep",
+            "n_decisions": 22916,
+            "n_trades": 224,
+            "mean_net_return": -0.000053192748394520673,
+            "ci_low": -0.00011980985223379682,
+            "ci_high": 0.000010213427434976536,
+            "total_cost": 0.5236,
+            "hit_rate": 0.5108638606066968
+          },
+          {
+            "split": "train",
+            "regime_feature": "liquidity_regime",
+            "bucket": "thin",
+            "n_decisions": 22917,
+            "n_trades": 431,
+            "mean_net_return": -0.000016185322554744197,
+            "ci_low": -0.00006186104096351166,
+            "ci_high": 0.000028502609938171878,
+            "total_cost": 0.9163,
+            "hit_rate": 0.5211178553363682
+          },
+          {
+            "split": "train",
+            "regime_feature": "sentiment_regime",
+            "bucket": "fear",
+            "n_decisions": 23157,
+            "n_trades": 333,
+            "mean_net_return": -0.000043229917038713625,
+            "ci_low": -0.00010720515110689193,
+            "ci_high": 0.000014742115316197923,
+            "total_cost": 0.7612000000000001,
+            "hit_rate": 0.5080950378469302
+          },
+          {
+            "split": "train",
+            "regime_feature": "sentiment_regime",
+            "bucket": "greed",
+            "n_decisions": 22676,
+            "n_trades": 322,
+            "mean_net_return": -0.000025966169973999683,
+            "ci_low": -0.00007470481964922698,
+            "ci_high": 0.000020846142839828202,
+            "total_cost": 0.6787000000000001,
+            "hit_rate": 0.5244225672093904
+          }
+        ],
+        "n_buckets_scanned": 14,
+        "note": "mean_net_return is per decision interval after costs; CI is Lane A's block bootstrap (90%). Buckets with n_trades < 20 are fragile. Several buckets are scanned at once: no multiple-comparison correction."
+      },
+      "created_at": "2026-11-08T13:19:43.265251Z"
+    },
+    {
+      "evidence_id": "ev_cost_attribu_3c98f0ceb4",
+      "tool": "cost_attribution",
+      "args": {
+        "split": "train"
+      },
+      "payload": {
+        "split": "train",
+        "costs": [
+          {
+            "split": "train",
+            "gross_return": -0.5620506155329956,
+            "fees": 0.3038755748705237,
+            "slippage": 0.030387557487052384,
+            "switching": 0.0,
+            "funding": 0.0,
+            "net_return": -0.8963137478905717,
+            "turnover": 1309.0
+          }
+        ],
+        "baselines": [
+          {
+            "split": "train",
+            "policy": "always_on",
+            "metrics": {
+              "net_return": -0.8963137478905717,
+              "sharpe": -0.5990519906904812,
+              "sortino": -0.446250582963822,
+              "max_drawdown": 0.9235131785856477,
+              "turnover": 1309.0,
+              "n_switches": 1309,
+              "exposure": 0.38040276656557503,
+              "ci_net_return": [
+                -0.9831151000723948,
+                -0.4089074385019792
+              ],
+              "cvar_05": -0.013493397851705575,
+              "avg_holding_bars": 26.61832061068702
+            }
+          },
+          {
+            "split": "train",
+            "policy": "cash",
+            "metrics": {
+              "net_return": 0.0,
+              "sharpe": null,
+              "sortino": null,
+              "max_drawdown": 0.0,
+              "turnover": 0.0,
+              "n_switches": 0,
+              "exposure": 0.0,
+              "ci_net_return": [
+                0.0,
+                0.0
+              ],
+              "cvar_05": 0.0,
+              "avg_holding_bars": 0.0
+            }
+          },
+          {
+            "split": "train",
+            "policy": "simple_rule",
+            "metrics": {
+              "net_return": -0.6037678856447144,
+              "sharpe": -2.852959237862657,
+              "sortino": -0.6783886641361078,
+              "max_drawdown": 0.6064398815425709,
+              "turnover": 737.0,
+              "n_switches": 737,
+              "exposure": 0.022036523901992015,
+              "ci_net_return": [
+                -0.6879551450095299,
+                -0.4986446467286017
+              ],
+              "cvar_05": -0.000045574736754094115,
+              "avg_holding_bars": 2.7371273712737128
+            }
+          },
+          {
+            "split": "train",
+            "policy": "regime_filter",
+            "metrics": {
+              "net_return": 0.07498909553086075,
+              "sharpe": 0.24246298777536476,
+              "sortino": 0.11753080927194386,
+              "max_drawdown": 0.5533259148147562,
+              "turnover": 1180.0,
+              "n_switches": 1180,
+              "exposure": 0.13747736347173434,
+              "ci_net_return": [
+                -0.7654008593115039,
+                3.3465972349802673
+              ],
+              "cvar_05": -0.0095586202789428,
+              "avg_holding_bars": 10.679661016949153
+            }
+          },
+          {
+            "split": "train",
+            "policy": "lgbm_gate",
+            "metrics": {
+              "net_return": 12.643206647728803,
+              "sharpe": 1.6815636562128295,
+              "sortino": 1.139164117362721,
+              "max_drawdown": 0.5461889981349537,
+              "turnover": 3431.0,
+              "n_switches": 6200,
+              "exposure": 0.15969934326795104,
+              "ci_net_return": [
+                3.6377132669841523,
+                38.11061568234702
+              ],
+              "cvar_05": -0.006738262130732338,
+              "avg_holding_bars": 5.386046511627907
+            }
+          }
+        ]
+      },
+      "created_at": "2026-11-08T13:19:43.265701Z"
+    },
+    {
+      "evidence_id": "ev_sentiment_ep_e3f199beba",
+      "tool": "sentiment_episodes",
+      "args": {
+        "split": "train"
+      },
+      "payload": {
+        "split": "train",
+        "definitions": {
+          "week_bars": 168,
+          "lookback_bars": 72,
+          "neutral": 50.0,
+          "extreme_fear_below": 25.0,
+          "extreme_greed_above": 75.0,
+          "weeks_per_side": 4
+        },
+        "worst_weeks": [
+          {
+            "episode_id": "worst_week_1",
+            "kind": "worst_week",
+            "start": "2018-11-13T16:00:00+00:00",
+            "end": "2018-11-20T22:00:00+00:00",
+            "net_return": -0.3029680091393967,
+            "fear_greed_at_start": 52.0,
+            "fear_greed_change_over_prior_7_days": 10.0,
+            "greed_to_fear_flip_in_prior_3_days": false,
+            "fear_to_greed_flip_in_prior_3_days": true,
+            "mean_fear_greed_in_week": 33.404761904761905,
+            "extreme_fear_share_in_week": 0.2857142857142857,
+            "extreme_greed_share_in_week": 0.0
+          },
+          {
+            "episode_id": "worst_week_2",
+            "kind": "worst_week",
+            "start": "2020-03-06T02:00:00+00:00",
+            "end": "2020-03-13T01:00:00+00:00",
+            "net_return": -0.5048378929161061,
+            "fear_greed_at_start": 41.0,
+            "fear_greed_change_over_prior_7_days": 2.0,
+            "greed_to_fear_flip_in_prior_3_days": false,
+            "fear_to_greed_flip_in_prior_3_days": false,
+            "mean_fear_greed_in_week": 28.392857142857142,
+            "extreme_fear_share_in_week": 0.44047619047619047,
+            "extreme_greed_share_in_week": 0.0
+          },
+          {
+            "episode_id": "worst_week_3",
+            "kind": "worst_week",
+            "start": "2021-05-12T13:00:00+00:00",
+            "end": "2021-05-19T12:00:00+00:00",
+            "net_return": -0.28219698334372084,
+            "fear_greed_at_start": 61.0,
+            "fear_greed_change_over_prior_7_days": -7.0,
+            "greed_to_fear_flip_in_prior_3_days": false,
+            "fear_to_greed_flip_in_prior_3_days": false,
+            "mean_fear_greed_in_week": 34.04761904761905,
+            "extreme_fear_share_in_week": 0.22023809523809523,
+            "extreme_greed_share_in_week": 0.0
+          },
+          {
+            "episode_id": "worst_week_4",
+            "kind": "worst_week",
+            "start": "2022-06-11T21:00:00+00:00",
+            "end": "2022-06-18T20:00:00+00:00",
+            "net_return": -0.3397176678947289,
+            "fear_greed_at_start": 13.0,
+            "fear_greed_change_over_prior_7_days": 3.0,
+            "greed_to_fear_flip_in_prior_3_days": false,
+            "fear_to_greed_flip_in_prior_3_days": false,
+            "mean_fear_greed_in_week": 9.785714285714286,
+            "extreme_fear_share_in_week": 1.0,
+            "extreme_greed_share_in_week": 0.0
+          }
+        ],
+        "best_weeks": [
+          {
+            "episode_id": "best_week_1",
+            "kind": "best_week",
+            "start": "2019-07-15T01:00:00+00:00",
+            "end": "2019-07-22T00:00:00+00:00",
+            "net_return": 0.20302237643632132,
+            "fear_greed_at_start": 61.0,
+            "fear_greed_change_over_prior_7_days": -6.0,
+            "greed_to_fear_flip_in_prior_3_days": true,
+            "fear_to_greed_flip_in_prior_3_days": true,
+            "mean_fear_greed_in_week": 35.029761904761905,
+            "extreme_fear_share_in_week": 0.2857142857142857,
+            "extreme_greed_share_in_week": 0.0
+          },
+          {
+            "episode_id": "best_week_2",
+            "kind": "best_week",
+            "start": "2020-03-13T02:00:00+00:00",
+            "end": "2020-03-20T01:00:00+00:00",
+            "net_return": 0.5808169395572378,
+            "fear_greed_at_start": 14.0,
+            "fear_greed_change_over_prior_7_days": -27.0,
+            "greed_to_fear_flip_in_prior_3_days": false,
+            "fear_to_greed_flip_in_prior_3_days": false,
+            "mean_fear_greed_in_week": 10.261904761904763,
+            "extreme_fear_share_in_week": 1.0,
+            "extreme_greed_share_in_week": 0.0
+          },
+          {
+            "episode_id": "best_week_3",
+            "kind": "best_week",
+            "start": "2021-01-11T16:00:00+00:00",
+            "end": "2021-01-18T15:00:00+00:00",
+            "net_return": 0.3640489456088384,
+            "fear_greed_at_start": 94.0,
+            "fear_greed_change_over_prior_7_days": 1.0,
+            "greed_to_fear_flip_in_prior_3_days": false,
+            "fear_to_greed_flip_in_prior_3_days": false,
+            "mean_fear_greed_in_week": 84.42857142857143,
+            "extreme_fear_share_in_week": 0.0,
+            "extreme_greed_share_in_week": 1.0
+          },
+          {
+            "episode_id": "best_week_4",
+            "kind": "best_week",
+            "start": "2021-01-22T01:00:00+00:00",
+            "end": "2021-01-29T00:00:00+00:00",
+            "net_return": 0.19243427396858087,
+            "fear_greed_at_start": 75.0,
+            "fear_greed_change_over_prior_7_days": -8.0,
+            "greed_to_fear_flip_in_prior_3_days": false,
+            "fear_to_greed_flip_in_prior_3_days": false,
+            "mean_fear_greed_in_week": 68.73809523809524,
+            "extreme_fear_share_in_week": 0.0,
+            "extreme_greed_share_in_week": 0.14285714285714285
+          }
+        ],
+        "train_base_rates": {
+          "share_bars_with_greed_to_fear_flip_in_prior_3_days": 0.09560723514211886,
+          "share_bars_with_fear_to_greed_flip_in_prior_3_days": 0.09300135768405378,
+          "share_bars_extreme_fear": 0.2571291427574019,
+          "share_bars_extreme_greed": 0.09648070167783039,
+          "mean_fear_greed": 42.777911112080815
+        },
+        "worst_weeks_after_greed_to_fear_flip": {
+          "n_weeks": 4,
+          "n_with_flip": 0,
+          "base_rate": 0.09560723514211886,
+          "binomial_p_value": 1.0
+        },
+        "best_weeks_after_fear_to_greed_flip": {
+          "n_weeks": 4,
+          "n_with_flip": 1,
+          "base_rate": 0.09300135768405378,
+          "binomial_p_value": 0.32325267489377457
+        },
+        "worst_weeks_after_fear_to_greed_flip": {
+          "n_weeks": 4,
+          "n_with_flip": 1,
+          "base_rate": 0.09300135768405378,
+          "binomial_p_value": 0.32325267489377457
+        },
+        "best_weeks_after_greed_to_fear_flip": {
+          "n_weeks": 4,
+          "n_with_flip": 1,
+          "base_rate": 0.09560723514211886,
+          "binomial_p_value": 0.33099661172811373
+        },
+        "primary_tallies": [
+          "worst_weeks_after_greed_to_fear_flip",
+          "best_weeks_after_fear_to_greed_flip"
+        ],
+        "moderate_p_threshold": 0.05,
+        "note": "co-occurrence in time, not causation; with 4 weeks per side even 4/4 is weak evidence; only the two primary tallies can support 'moderate', at p < 0.05 (Bonferroni over two); the base rate is train-wide"
+      },
+      "created_at": "2026-11-08T13:19:44.095746Z"
+    },
+    {
+      "evidence_id": "ev_feature_grid_85c593416f",
+      "tool": "feature_grid",
+      "args": {},
+      "payload": {
+        "train_quantiles": {
+          "momentum_24h": {
+            "0.2": -0.020878283069237825,
+            "0.33": -0.008562526024600031,
+            "0.5": 0.00083008587288802,
+            "0.67": 0.01080305170445634,
+            "0.8": 0.02349619589779621
+          },
+          "momentum_7d": {
+            "0.2": -0.061762679582024305,
+            "0.33": -0.024815784695293667,
+            "0.5": 0.004282405613405871,
+            "0.67": 0.036880969709200226,
+            "0.8": 0.07549927209878822
+          },
+          "realized_vol_7d": {
+            "0.2": 0.004437373963700894,
+            "0.33": 0.005349562856284358,
+            "0.5": 0.006409240155854531,
+            "0.67": 0.007529863904464324,
+            "0.8": 0.008931937193235722
+          },
+          "vol_ratio_24h_7d": {
+            "0.2": 0.6398983435284356,
+            "0.33": 0.740532030301314,
+            "0.5": 0.8694367647663491,
+            "0.67": 1.0208633161396474,
+            "0.8": 1.1789180178091634
+          },
+          "atr_14": {
+            "0.2": 0.005750670969981803,
+            "0.33": 0.007182842659208127,
+            "0.5": 0.0088758715619821,
+            "0.67": 0.010984972058296844,
+            "0.8": 0.0135611169522029
+          },
+          "price_drawdown": {
+            "0.2": -0.09369482025567286,
+            "0.33": -0.06468942723028095,
+            "0.5": -0.040677537747065506,
+            "0.67": -0.02261166673569485,
+            "0.8": -0.01258879020526256
+          },
+          "volume_zscore": {
+            "0.2": -0.38210807049538376,
+            "0.33": -0.241884982460844,
+            "0.5": -0.07708871753161312,
+            "0.67": 0.12146695877894659,
+            "0.8": 0.3485681904759456
+          },
+          "fear_greed": {
+            "0.2": 22.0,
+            "0.33": 28.0,
+            "0.5": 39.0,
+            "0.67": 52.0,
+            "0.8": 64.0
+          },
+          "news_sentiment": {}
+        },
+        "coverage": {
+          "momentum_24h": 1.0,
+          "momentum_7d": 1.0,
+          "realized_vol_7d": 1.0,
+          "vol_ratio_24h_7d": 1.0,
+          "atr_14": 1.0,
+          "price_drawdown": 1.0,
+          "volume_zscore": 1.0,
+          "fear_greed": 1.0,
+          "news_sentiment": 0.0
+        }
+      },
+      "created_at": "2026-11-08T13:19:44.659308Z"
+    },
+    {
+      "evidence_id": "ev_test_gate_tr_fe7647202c",
+      "tool": "test_gate_train",
+      "args": {
+        "spec_hash": "spec_a2e686fa5d51",
+        "split": "train"
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "agent::P1",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "realized_vol_7d",
+              "op": "<=",
+              "threshold": 0.006409240155854531
+            }
+          ],
+          "allocation_when_true": 0.0,
+          "allocation_when_false": 1.0
+        },
+        "spec_hash": "spec_a2e686fa5d51",
+        "evaluation": {
+          "policy_id": "agent::P1",
+          "split": "train",
+          "metrics": {
+            "net_return": -0.07049224805052579,
+            "sharpe": 0.19444777716742837,
+            "sortino": 0.1060819231305583,
+            "max_drawdown": 0.5668870333118484,
+            "turnover": 720.0,
+            "n_switches": 720,
+            "exposure": 0.1856740776296555,
+            "ci_net_return": [
+              -0.8149397311722011,
+              3.061898719224453
+            ],
+            "cvar_05": -0.011205518225846893,
+            "avg_holding_bars": 23.63888888888889
+          },
+          "always_on": {
+            "net_return": -0.8963137478905717,
+            "sharpe": -0.5990519906904812,
+            "sortino": -0.446250582963822,
+            "max_drawdown": 0.9235131785856477,
+            "turnover": 1309.0,
+            "n_switches": 1309,
+            "exposure": 0.38040276656557503,
+            "ci_net_return": [
+              -0.9839203145937133,
+              -0.3695988391314626
+            ],
+            "cvar_05": -0.013493397851705575,
+            "avg_holding_bars": 26.61832061068702
+          },
+          "delta_net_return_vs_always_on": 0.8258214998400459,
+          "ci_delta": [
+            0.16844992016956992,
+            3.540692992421106
+          ],
+          "allocation_mix": {
+            "0.0": 0.511901347863493,
+            "0.5": 0.0,
+            "1.0": 0.48809865213650705
+          },
+          "n_decisions": 45833,
+          "n_in_position": 17435,
+          "fold": null,
+          "audit_id": "audit_d664a4990d8c"
+        }
+      },
+      "created_at": "2026-11-08T13:20:05.713094Z"
+    },
+    {
+      "evidence_id": "ev_arbiter_eval_dc0eb75ed6",
+      "tool": "arbiter_evaluate",
+      "args": {
+        "spec_hash": "spec_a2e686fa5d51",
+        "split": "validation"
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "agent::P1",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "realized_vol_7d",
+              "op": "<=",
+              "threshold": 0.006409240155854531
+            }
+          ],
+          "allocation_when_true": 0.0,
+          "allocation_when_false": 1.0,
+          "thresholds_selected_on": "train"
+        },
+        "spec_hash": "spec_a2e686fa5d51",
+        "evaluation": {
+          "policy_id": "agent::P1",
+          "split": "validation",
+          "metrics": {
+            "net_return": 0.3875022587769823,
+            "sharpe": 1.2149191454030412,
+            "sortino": 0.40041118497817824,
+            "max_drawdown": 0.12796915578837442,
+            "turnover": 84.0,
+            "n_switches": 84,
+            "exposure": 0.046799319282628614,
+            "ci_net_return": [
+              0.02353215639566938,
+              0.9430859502803928
+            ],
+            "cvar_05": -0.00012528047376941348,
+            "avg_holding_bars": 17.023809523809526
+          },
+          "always_on": {
+            "net_return": -0.19483542695663503,
+            "sharpe": -0.24776777893853164,
+            "sortino": -0.18508994962690578,
+            "max_drawdown": 0.3122038074048794,
+            "turnover": 472.0,
+            "n_switches": 472,
+            "exposure": 0.35142034297682945,
+            "ci_net_return": [
+              -0.5593962926877796,
+              0.5113277536571594
+            ],
+            "cvar_05": -0.008606593520755417,
+            "avg_holding_bars": 22.654008438818565
+          },
+          "delta_net_return_vs_always_on": 0.5823376857336173,
+          "ci_delta": [
+            -0.01701083746775508,
+            0.9638548189900813
+          ],
+          "allocation_mix": {
+            "0.0": 0.8668280871670703,
+            "0.5": 0.0,
+            "1.0": 0.13317191283292978
+          },
+          "n_decisions": 15278,
+          "n_in_position": 5369,
+          "fold": null,
+          "audit_id": "audit_c8e662813653"
+        }
+      },
+      "created_at": "2026-11-08T13:20:12.141506Z"
+    },
+    {
+      "evidence_id": "ev_arbiter_eval_aea4eac1d7",
+      "tool": "arbiter_evaluate",
+      "args": {
+        "spec_hash": "spec_2ca7c5381c93",
+        "split": "validation"
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "rule::trend_up_and_vol_below_train_median",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "momentum_24h",
+              "op": ">",
+              "threshold": 0.0
+            },
+            {
+              "feature": "realized_vol_7d",
+              "op": "<=",
+              "threshold": 0.006409240155854531
+            }
+          ],
+          "allocation_when_true": 1.0,
+          "allocation_when_false": 0.0,
+          "thresholds_selected_on": "train"
+        },
+        "spec_hash": "spec_2ca7c5381c93",
+        "evaluation": {
+          "policy_id": "rule::trend_up_and_vol_below_train_median",
+          "split": "validation",
+          "metrics": {
+            "net_return": -0.40716902883350636,
+            "sharpe": -4.497684073617141,
+            "sortino": -1.2526790447765324,
+            "max_drawdown": 0.4117769231434384,
+            "turnover": 377.0,
+            "n_switches": 377,
+            "exposure": 0.03338133263516167,
+            "ci_net_return": [
+              -0.4927831828242254,
+              -0.30980026997075344
+            ],
+            "cvar_05": -0.00006382334772949403,
+            "avg_holding_bars": 2.7127659574468086
+          },
+          "always_on": {
+            "net_return": -0.19483542695663503,
+            "sharpe": -0.24776777893853164,
+            "sortino": -0.18508994962690578,
+            "max_drawdown": 0.3122038074048794,
+            "turnover": 472.0,
+            "n_switches": 472,
+            "exposure": 0.35142034297682945,
+            "ci_net_return": [
+              -0.5593962926877796,
+              0.5113277536571594
+            ],
+            "cvar_05": -0.008606593520755417,
+            "avg_holding_bars": 22.654008438818565
+          },
+          "delta_net_return_vs_always_on": -0.21233360187687134,
+          "ci_delta": [
+            -0.9633986830000766,
+            0.14185180117747712
+          ],
+          "allocation_mix": {
+            "0.0": 0.9050102439932949,
+            "0.5": 0.0,
+            "1.0": 0.09498975600670516
+          },
+          "n_decisions": 15278,
+          "n_in_position": 5369,
+          "fold": null,
+          "audit_id": "audit_63319f4c7cf3"
+        }
+      },
+      "created_at": "2026-11-08T13:20:19.860481Z"
+    },
+    {
+      "evidence_id": "ev_arbiter_eval_5d0d9bebde",
+      "tool": "arbiter_evaluate",
+      "args": {
+        "spec_hash": "spec_d54370102ede",
+        "split": "validation"
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "meta::lgbm_gate_v1",
+          "family": "lgbm_gate",
+          "features": [
+            "momentum_24h",
+            "momentum_7d",
+            "realized_vol_7d",
+            "atr_14",
+            "price_drawdown",
+            "volume_zscore",
+            "fear_greed"
+          ],
+          "thresholds": [
+            0.500761642578573,
+            0.5407616425785731
+          ],
+          "base_rate": 0.520761642578573,
+          "band": 0.02,
+          "fitted_on": "train",
+          "calibrated_on": "train_tail",
+          "seed": 7,
+          "model_hash": "73bf0568c647a0ef"
+        },
+        "spec_hash": "spec_d54370102ede",
+        "evaluation": {
+          "policy_id": "meta::lgbm_gate_v1",
+          "split": "validation",
+          "metrics": {
+            "net_return": -0.6077654884095884,
+            "sharpe": -2.737113656697871,
+            "sortino": -1.8368862608246008,
+            "max_drawdown": 0.6094723159164055,
+            "turnover": 1043.5,
+            "n_switches": 1862,
+            "exposure": 0.1703102500327268,
+            "ci_net_return": [
+              -0.7287683648477309,
+              -0.40420981939877715
+            ],
+            "cvar_05": -0.004937903472586195,
+            "avg_holding_bars": 6.821124361158433
+          },
+          "always_on": {
+            "net_return": -0.19483542695663503,
+            "sharpe": -0.24776777893853164,
+            "sortino": -0.18508994962690578,
+            "max_drawdown": 0.3122038074048794,
+            "turnover": 472.0,
+            "n_switches": 472,
+            "exposure": 0.35142034297682945,
+            "ci_net_return": [
+              -0.5593962926877796,
+              0.5113277536571594
+            ],
+            "cvar_05": -0.008606593520755417,
+            "avg_holding_bars": 22.654008438818565
+          },
+          "delta_net_return_vs_always_on": -0.4129300614529534,
+          "ci_delta": [
+            -0.9952914504616893,
+            -0.14322315657757007
+          ],
+          "allocation_mix": {
+            "0.0": 0.2542372881355932,
+            "0.5": 0.5222574036133358,
+            "1.0": 0.22350530825107096
+          },
+          "n_decisions": 15278,
+          "n_in_position": 5369,
+          "fold": null,
+          "audit_id": "audit_3c8bfe5f0ebb"
+        }
+      },
+      "created_at": "2026-11-08T13:20:30.278666Z"
+    },
+    {
+      "evidence_id": "ev_arbiter_eval_b3722d6179",
+      "tool": "arbiter_evaluate",
+      "args": {
+        "spec_hash": "spec_f59b5404bfca",
+        "split": "validation"
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "rule::regime_filter",
+          "family": "regime_gate",
+          "flat_buckets": [
+            {
+              "axis": "trend_regime",
+              "bucket": "bull"
+            },
+            {
+              "axis": "trend_7d_regime",
+              "bucket": "sideways"
+            },
+            {
+              "axis": "vol_regime",
+              "bucket": "low"
+            }
+          ],
+          "full_buckets": [],
+          "allocation_flat": 0.0,
+          "allocation_full": 1.0,
+          "allocation_else": 1.0,
+          "selected_on": "train",
+          "summary": "Train intervals only: flat in trend_regime=bull, trend_7d_regime=sideways, vol_regime=low; allocation 1 in the remaining regimes."
+        },
+        "spec_hash": "spec_f59b5404bfca",
+        "evaluation": {
+          "policy_id": "rule::regime_filter",
+          "split": "validation",
+          "metrics": {
+            "net_return": 0.3877421855376444,
+            "sharpe": 1.3531929315497502,
+            "sortino": 0.38815870410192155,
+            "max_drawdown": 0.12023602663734667,
+            "turnover": 102.0,
+            "n_switches": 102,
+            "exposure": 0.032595889514334335,
+            "ci_net_return": [
+              0.08185252621866529,
+              0.8085032641725712
+            ],
+            "cvar_05": -0.00008935285916716427,
+            "avg_holding_bars": 9.764705882352942
+          },
+          "always_on": {
+            "net_return": -0.19483542695663503,
+            "sharpe": -0.24776777893853164,
+            "sortino": -0.18508994962690578,
+            "max_drawdown": 0.3122038074048794,
+            "turnover": 472.0,
+            "n_switches": 472,
+            "exposure": 0.35142034297682945,
+            "ci_net_return": [
+              -0.5593962926877796,
+              0.5113277536571594
+            ],
+            "cvar_05": -0.008606593520755417,
+            "avg_holding_bars": 22.654008438818565
+          },
+          "delta_net_return_vs_always_on": 0.5825776124942794,
+          "ci_delta": [
+            -0.030118091921518174,
+            0.9758201652653931
+          ],
+          "allocation_mix": {
+            "0.0": 0.9072452970758056,
+            "0.5": 0.0,
+            "1.0": 0.09275470292419445
+          },
+          "n_decisions": 15278,
+          "n_in_position": 5369,
+          "fold": null,
+          "audit_id": "audit_318761002f19"
+        }
+      },
+      "created_at": "2026-11-08T13:20:37.065738Z"
+    },
+    {
+      "evidence_id": "ev_arbiter_eval_098320ca7a",
+      "tool": "arbiter_evaluate",
+      "args": {
+        "spec_hash": "spec_356f807d2741",
+        "split": "validation"
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "rule::half_size_constant",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "realized_vol_7d",
+              "op": ">",
+              "threshold": -1.0
+            }
+          ],
+          "allocation_when_true": 0.5,
+          "allocation_when_false": 0.5,
+          "thresholds_selected_on": "none (constant)",
+          "summary": "Always half size: the exposure-only baseline."
+        },
+        "spec_hash": "spec_356f807d2741",
+        "evaluation": {
+          "policy_id": "rule::half_size_constant",
+          "split": "validation",
+          "metrics": {
+            "net_return": -0.08381193643476748,
+            "sharpe": -0.24776777893853164,
+            "sortino": -0.18508994962690578,
+            "max_drawdown": 0.1621013898183178,
+            "turnover": 236.0,
+            "n_switches": 472,
+            "exposure": 0.17571017148841472,
+            "ci_net_return": [
+              -0.3190610705920889,
+              0.24536560998391377
+            ],
+            "cvar_05": -0.004303296760377709,
+            "avg_holding_bars": 22.654008438818565
+          },
+          "always_on": {
+            "net_return": -0.19483542695663503,
+            "sharpe": -0.24776777893853164,
+            "sortino": -0.18508994962690578,
+            "max_drawdown": 0.3122038074048794,
+            "turnover": 472.0,
+            "n_switches": 472,
+            "exposure": 0.35142034297682945,
+            "ci_net_return": [
+              -0.5593962926877796,
+              0.5113277536571594
+            ],
+            "cvar_05": -0.008606593520755417,
+            "avg_holding_bars": 22.654008438818565
+          },
+          "delta_net_return_vs_always_on": 0.11102349052186755,
+          "ci_delta": [
+            -0.2617774996018288,
+            0.23798417090083457
+          ],
+          "allocation_mix": {
+            "0.0": 0.0,
+            "0.5": 1.0,
+            "1.0": 0.0
+          },
+          "n_decisions": 15278,
+          "n_in_position": 5369,
+          "fold": null,
+          "audit_id": "audit_c819abce3100"
+        }
+      },
+      "created_at": "2026-11-08T13:20:43.690732Z"
+    },
+    {
+      "evidence_id": "ev_test_gate_tr_a08bc3e8f3",
+      "tool": "test_gate_train",
+      "args": {
+        "spec_hash": "spec_a2e686fa5d51",
+        "split": "train"
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "agent::P1",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "realized_vol_7d",
+              "op": "<=",
+              "threshold": 0.006409240155854531
+            }
+          ],
+          "allocation_when_true": 0.0,
+          "allocation_when_false": 1.0,
+          "thresholds_selected_on": "train"
+        },
+        "spec_hash": "spec_a2e686fa5d51",
+        "evaluation": {
+          "policy_id": "agent::P1",
+          "split": "train",
+          "metrics": {
+            "net_return": -0.07049224805052579,
+            "sharpe": 0.19444777716742837,
+            "sortino": 0.1060819231305583,
+            "max_drawdown": 0.5668870333118484,
+            "turnover": 720.0,
+            "n_switches": 720,
+            "exposure": 0.1856740776296555,
+            "ci_net_return": [
+              -0.8080773204029073,
+              3.2043888240187064
+            ],
+            "cvar_05": -0.011205518225846893,
+            "avg_holding_bars": 23.63888888888889
+          },
+          "always_on": {
+            "net_return": -0.8963137478905717,
+            "sharpe": -0.5990519906904812,
+            "sortino": -0.446250582963822,
+            "max_drawdown": 0.9235131785856477,
+            "turnover": 1309.0,
+            "n_switches": 1309,
+            "exposure": 0.38040276656557503,
+            "ci_net_return": [
+              -0.9839203145937133,
+              -0.3695988391314626
+            ],
+            "cvar_05": -0.013493397851705575,
+            "avg_holding_bars": 26.61832061068702
+          },
+          "delta_net_return_vs_always_on": 0.8258214998400459,
+          "ci_delta": [
+            0.16817164650228894,
+            3.384614052969345
+          ],
+          "allocation_mix": {
+            "0.0": 0.511901347863493,
+            "0.5": 0.0,
+            "1.0": 0.48809865213650705
+          },
+          "n_decisions": 45833,
+          "n_in_position": 17435,
+          "fold": null,
+          "audit_id": "audit_8c73201fb4c6"
+        }
+      },
+      "created_at": "2026-11-08T13:21:08.664280Z"
+    },
+    {
+      "evidence_id": "ev_arbiter_eval_a370762f54",
+      "tool": "arbiter_evaluate",
+      "args": {
+        "spec_hash": "spec_d728bc2ed453",
+        "split": "validation"
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "benchmark::exposure_matched::P1",
+          "family": "constant",
+          "allocation": 0.488099,
+          "matched_on": "train"
+        },
+        "spec_hash": "spec_d728bc2ed453",
+        "evaluation": {
+          "policy_id": "benchmark::exposure_matched::P1",
+          "split": "validation",
+          "metrics": {
+            "net_return": -0.08145705241568713,
+            "sharpe": -0.2477677789385314,
+            "sortino": -0.18508994962690564,
+            "max_drawdown": 0.15841316172077957,
+            "turnover": 230.382728,
+            "n_switches": 472,
+            "exposure": 0.17152791798664746,
+            "ci_net_return": [
+              -0.31000810079036484,
+              0.2513575839596195
+            ],
+            "cvar_05": -0.0042008696908871985,
+            "avg_holding_bars": 22.654008438818565
+          },
+          "always_on": {
+            "net_return": -0.19483542695663503,
+            "sharpe": -0.24776777893853164,
+            "sortino": -0.18508994962690578,
+            "max_drawdown": 0.3122038074048794,
+            "turnover": 472.0,
+            "n_switches": 472,
+            "exposure": 0.35142034297682945,
+            "ci_net_return": [
+              -0.5593962926877796,
+              0.5113277536571594
+            ],
+            "cvar_05": -0.008606593520755417,
+            "avg_holding_bars": 22.654008438818565
+          },
+          "delta_net_return_vs_always_on": 0.1133783745409479,
+          "ci_delta": [
+            -0.28258920457308045,
+            0.24284454673439473
+          ],
+          "allocation_mix": {
+            "0.0": 0.0,
+            "0.5": 0.0,
+            "1.0": 0.0
+          },
+          "n_decisions": 15278,
+          "n_in_position": 5369,
+          "fold": null,
+          "audit_id": "audit_7c2a3d5cd2d3"
+        }
+      },
+      "created_at": "2026-11-08T13:21:16.106557Z"
+    },
+    {
+      "evidence_id": "ev_walk_forward_9f70272bfb",
+      "tool": "walk_forward_fold",
+      "args": {
+        "spec_hash": "spec_a2e686fa5d51",
+        "fold": 1
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "agent::P1",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "realized_vol_7d",
+              "op": "<=",
+              "threshold": 0.006409240155854531
+            }
+          ],
+          "allocation_when_true": 0.0,
+          "allocation_when_false": 1.0,
+          "thresholds_selected_on": "train"
+        },
+        "spec_hash": "spec_a2e686fa5d51",
+        "fold": 1,
+        "evaluation": {
+          "policy_id": "agent::P1",
+          "split": "train",
+          "metrics": {
+            "net_return": 0.2273624297904917,
+            "sharpe": 0.5656723633922444,
+            "sortino": 0.2556358363742894,
+            "max_drawdown": 0.4655034797410673,
+            "turnover": 165.0,
+            "n_switches": 165,
+            "exposure": 0.15351719322743934,
+            "ci_net_return": [
+              -0.488287793984031,
+              1.7190041286658884
+            ],
+            "cvar_05": -0.00988820033167091,
+            "avg_holding_bars": 21.19277108433735
+          },
+          "always_on": {
+            "net_return": -0.4624141783014246,
+            "sharpe": -0.551654398654386,
+            "sortino": -0.3838005955837998,
+            "max_drawdown": 0.6596185497514595,
+            "turnover": 312.0,
+            "n_switches": 312,
+            "exposure": 0.38226566591028105,
+            "ci_net_return": [
+              -0.805942342373592,
+              0.5018508848397041
+            ],
+            "cvar_05": -0.012929107408467156,
+            "avg_holding_bars": 27.898089171974522
+          },
+          "delta_net_return_vs_always_on": 0.6897766080919163,
+          "ci_delta": [
+            0.20156160638798315,
+            1.5434475043285174
+          ],
+          "allocation_mix": {
+            "0.0": 0.5984018264840183,
+            "0.5": 0.0,
+            "1.0": 0.40159817351598176
+          },
+          "n_decisions": 11458,
+          "n_in_position": 4380,
+          "fold": 1,
+          "audit_id": "audit_e465fef64da1"
+        }
+      },
+      "created_at": "2026-11-08T13:21:31.796030Z"
+    },
+    {
+      "evidence_id": "ev_walk_forward_21e49fe81a",
+      "tool": "walk_forward_fold",
+      "args": {
+        "spec_hash": "spec_a2e686fa5d51",
+        "fold": 2
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "agent::P1",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "realized_vol_7d",
+              "op": "<=",
+              "threshold": 0.006409240155854531
+            }
+          ],
+          "allocation_when_true": 0.0,
+          "allocation_when_false": 1.0,
+          "thresholds_selected_on": "train"
+        },
+        "spec_hash": "spec_a2e686fa5d51",
+        "fold": 2,
+        "evaluation": {
+          "policy_id": "agent::P1",
+          "split": "train",
+          "metrics": {
+            "net_return": -0.01806666992694994,
+            "sharpe": 0.22613771688010617,
+            "sortino": 0.1430273655613195,
+            "max_drawdown": 0.4610267798200295,
+            "turnover": 234.0,
+            "n_switches": 234,
+            "exposure": 0.23337406179088846,
+            "ci_net_return": [
+              -0.5784839038599581,
+              1.257448643789617
+            ],
+            "cvar_05": -0.014491172446522317,
+            "avg_holding_bars": 22.854700854700855
+          },
+          "always_on": {
+            "net_return": -0.12109388402332111,
+            "sharpe": 0.09411863986709111,
+            "sortino": 0.07058049839514309,
+            "max_drawdown": 0.5381449273721188,
+            "turnover": 335.0,
+            "n_switches": 335,
+            "exposure": 0.35337755280153604,
+            "ci_net_return": [
+              -0.6858616991583565,
+              1.1324672912683909
+            ],
+            "cvar_05": -0.015730216779458003,
+            "avg_holding_bars": 24.101190476190474
+          },
+          "delta_net_return_vs_always_on": 0.10302721409637117,
+          "ci_delta": [
+            -0.2916257740301632,
+            0.5335208919058522
+          ],
+          "allocation_mix": {
+            "0.0": 0.33959002222771056,
+            "0.5": 0.0,
+            "1.0": 0.6604099777722895
+          },
+          "n_decisions": 11458,
+          "n_in_position": 4049,
+          "fold": 2,
+          "audit_id": "audit_6424711e7d2d"
+        }
+      },
+      "created_at": "2026-11-08T13:21:31.796166Z"
+    },
+    {
+      "evidence_id": "ev_walk_forward_2c89ae0691",
+      "tool": "walk_forward_fold",
+      "args": {
+        "spec_hash": "spec_a2e686fa5d51",
+        "fold": 3
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "agent::P1",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "realized_vol_7d",
+              "op": "<=",
+              "threshold": 0.006409240155854531
+            }
+          ],
+          "allocation_when_true": 0.0,
+          "allocation_when_false": 1.0,
+          "thresholds_selected_on": "train"
+        },
+        "spec_hash": "spec_a2e686fa5d51",
+        "fold": 3,
+        "evaluation": {
+          "policy_id": "agent::P1",
+          "split": "train",
+          "metrics": {
+            "net_return": -0.11509950916709577,
+            "sharpe": -0.12661442434307887,
+            "sortino": -0.066521635164253,
+            "max_drawdown": 0.41881460715502405,
+            "turnover": 138.0,
+            "n_switches": 138,
+            "exposure": 0.1501876254472467,
+            "ci_net_return": [
+              -0.5418807164373481,
+              0.5411041754899933
+            ],
+            "cvar_05": -0.008151700640059772,
+            "avg_holding_bars": 24.942028985507246
+          },
+          "always_on": {
+            "net_return": -0.5228248470535896,
+            "sharpe": -1.166526142965698,
+            "sortino": -0.9378128303388754,
+            "max_drawdown": 0.5798605892831676,
+            "turnover": 351.0,
+            "n_switches": 351,
+            "exposure": 0.4139104633912209,
+            "ci_net_return": [
+              -0.7825048613367449,
+              0.00505522443602332
+            ],
+            "cvar_05": -0.011524102664522551,
+            "avg_holding_bars": 26.948863636363637
+          },
+          "delta_net_return_vs_always_on": 0.4077253378864938,
+          "ci_delta": [
+            0.10682289715152718,
+            0.8206841064734438
+          ],
+          "allocation_mix": {
+            "0.0": 0.6371494834492937,
+            "0.5": 0.0,
+            "1.0": 0.3628505165507063
+          },
+          "n_decisions": 11459,
+          "n_in_position": 4743,
+          "fold": 3,
+          "audit_id": "audit_c04a5acfe09e"
+        }
+      },
+      "created_at": "2026-11-08T13:21:31.796248Z"
+    },
+    {
+      "evidence_id": "ev_walk_forward_d3fd06897c",
+      "tool": "walk_forward_fold",
+      "args": {
+        "spec_hash": "spec_2ca7c5381c93",
+        "fold": 1
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "rule::trend_up_and_vol_below_train_median",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "momentum_24h",
+              "op": ">",
+              "threshold": 0.0
+            },
+            {
+              "feature": "realized_vol_7d",
+              "op": "<=",
+              "threshold": 0.006409240155854531
+            }
+          ],
+          "allocation_when_true": 1.0,
+          "allocation_when_false": 0.0,
+          "thresholds_selected_on": "train"
+        },
+        "spec_hash": "spec_2ca7c5381c93",
+        "fold": 1,
+        "evaluation": {
+          "policy_id": "rule::trend_up_and_vol_below_train_median",
+          "split": "train",
+          "metrics": {
+            "net_return": -0.2419829426656921,
+            "sharpe": -3.3800850274591743,
+            "sortino": -1.01099446162625,
+            "max_drawdown": 0.24258842090846644,
+            "turnover": 216.0,
+            "n_switches": 216,
+            "exposure": 0.02836446151160761,
+            "ci_net_return": [
+              -0.3418506875379383,
+              -0.13110631782236215
+            ],
+            "cvar_05": -0.00005515756191134907,
+            "avg_holding_bars": 3.009259259259259
+          },
+          "always_on": {
+            "net_return": -0.4624141783014246,
+            "sharpe": -0.551654398654386,
+            "sortino": -0.3838005955837998,
+            "max_drawdown": 0.6596185497514595,
+            "turnover": 312.0,
+            "n_switches": 312,
+            "exposure": 0.38226566591028105,
+            "ci_net_return": [
+              -0.805942342373592,
+              0.5018508848397041
+            ],
+            "cvar_05": -0.012929107408467156,
+            "avg_holding_bars": 27.898089171974522
+          },
+          "delta_net_return_vs_always_on": 0.22043123563573253,
+          "ci_delta": [
+            -0.7013682359817061,
+            0.5626294681285829
+          ],
+          "allocation_mix": {
+            "0.0": 0.9257990867579908,
+            "0.5": 0.0,
+            "1.0": 0.07420091324200913
+          },
+          "n_decisions": 11458,
+          "n_in_position": 4380,
+          "fold": 1,
+          "audit_id": "audit_fc69de3c24d9"
+        }
+      },
+      "created_at": "2026-11-08T13:21:49.998658Z"
+    },
+    {
+      "evidence_id": "ev_walk_forward_2f22bc5d80",
+      "tool": "walk_forward_fold",
+      "args": {
+        "spec_hash": "spec_2ca7c5381c93",
+        "fold": 2
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "rule::trend_up_and_vol_below_train_median",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "momentum_24h",
+              "op": ">",
+              "threshold": 0.0
+            },
+            {
+              "feature": "realized_vol_7d",
+              "op": "<=",
+              "threshold": 0.006409240155854531
+            }
+          ],
+          "allocation_when_true": 1.0,
+          "allocation_when_false": 0.0,
+          "thresholds_selected_on": "train"
+        },
+        "spec_hash": "spec_2ca7c5381c93",
+        "fold": 2,
+        "evaluation": {
+          "policy_id": "rule::trend_up_and_vol_below_train_median",
+          "split": "train",
+          "metrics": {
+            "net_return": -0.10574001787889831,
+            "sharpe": -1.421184776514393,
+            "sortino": -0.2904678464073554,
+            "max_drawdown": 0.1287703575884952,
+            "turnover": 122.0,
+            "n_switches": 122,
+            "exposure": 0.012393087798917787,
+            "ci_net_return": [
+              -0.20669092487893123,
+              -0.00026558400937937425
+            ],
+            "cvar_05": -0.00002970232171621431,
+            "avg_holding_bars": 2.3278688524590163
+          },
+          "always_on": {
+            "net_return": -0.12109388402332111,
+            "sharpe": 0.09411863986709111,
+            "sortino": 0.07058049839514309,
+            "max_drawdown": 0.5381449273721188,
+            "turnover": 335.0,
+            "n_switches": 335,
+            "exposure": 0.35337755280153604,
+            "ci_net_return": [
+              -0.6858616991583565,
+              1.1324672912683909
+            ],
+            "cvar_05": -0.015730216779458003,
+            "avg_holding_bars": 24.101190476190474
+          },
+          "delta_net_return_vs_always_on": 0.0153538661444228,
+          "ci_delta": [
+            -1.2155990832375572,
+            0.5477328909539276
+          ],
+          "allocation_mix": {
+            "0.0": 0.9649296122499382,
+            "0.5": 0.0,
+            "1.0": 0.03507038775006174
+          },
+          "n_decisions": 11458,
+          "n_in_position": 4049,
+          "fold": 2,
+          "audit_id": "audit_49218e780460"
+        }
+      },
+      "created_at": "2026-11-08T13:21:49.998783Z"
+    },
+    {
+      "evidence_id": "ev_walk_forward_33d74e8bc3",
+      "tool": "walk_forward_fold",
+      "args": {
+        "spec_hash": "spec_2ca7c5381c93",
+        "fold": 3
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "rule::trend_up_and_vol_below_train_median",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "momentum_24h",
+              "op": ">",
+              "threshold": 0.0
+            },
+            {
+              "feature": "realized_vol_7d",
+              "op": "<=",
+              "threshold": 0.006409240155854531
+            }
+          ],
+          "allocation_when_true": 1.0,
+          "allocation_when_false": 0.0,
+          "thresholds_selected_on": "train"
+        },
+        "spec_hash": "spec_2ca7c5381c93",
+        "fold": 3,
+        "evaluation": {
+          "policy_id": "rule::trend_up_and_vol_below_train_median",
+          "split": "train",
+          "metrics": {
+            "net_return": -0.27729386907800035,
+            "sharpe": -3.1693396078425278,
+            "sortino": -0.7466209658758359,
+            "max_drawdown": 0.2810067337893779,
+            "turnover": 229.0,
+            "n_switches": 229,
+            "exposure": 0.02897285976088664,
+            "ci_net_return": [
+              -0.37523253419222935,
+              -0.1596682848972471
+            ],
+            "cvar_05": -0.00006342084656881064,
+            "avg_holding_bars": 2.8869565217391306
+          },
+          "always_on": {
+            "net_return": -0.5228248470535896,
+            "sharpe": -1.166526142965698,
+            "sortino": -0.9378128303388754,
+            "max_drawdown": 0.5798605892831676,
+            "turnover": 351.0,
+            "n_switches": 351,
+            "exposure": 0.4139104633912209,
+            "ci_net_return": [
+              -0.7825048613367449,
+              0.00505522443602332
+            ],
+            "cvar_05": -0.011524102664522551,
+            "avg_holding_bars": 26.948863636363637
+          },
+          "delta_net_return_vs_always_on": 0.2455309779755892,
+          "ci_delta": [
+            -0.291233682470854,
+            0.5339648650637806
+          ],
+          "allocation_mix": {
+            "0.0": 0.9300021083702298,
+            "0.5": 0.0,
+            "1.0": 0.06999789162977019
+          },
+          "n_decisions": 11459,
+          "n_in_position": 4743,
+          "fold": 3,
+          "audit_id": "audit_260447602c0f"
+        }
+      },
+      "created_at": "2026-11-08T13:21:49.998864Z"
+    },
+    {
+      "evidence_id": "ev_walk_forward_c821201fde",
+      "tool": "walk_forward_fold",
+      "args": {
+        "spec_hash": "spec_f59b5404bfca",
+        "fold": 1
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "rule::regime_filter",
+          "family": "regime_gate",
+          "flat_buckets": [
+            {
+              "axis": "trend_regime",
+              "bucket": "bull"
+            },
+            {
+              "axis": "trend_7d_regime",
+              "bucket": "sideways"
+            },
+            {
+              "axis": "vol_regime",
+              "bucket": "low"
+            }
+          ],
+          "full_buckets": [],
+          "allocation_flat": 0.0,
+          "allocation_full": 1.0,
+          "allocation_else": 1.0,
+          "selected_on": "train",
+          "summary": "Train intervals only: flat in trend_regime=bull, trend_7d_regime=sideways, vol_regime=low; allocation 1 in the remaining regimes."
+        },
+        "spec_hash": "spec_f59b5404bfca",
+        "fold": 1,
+        "evaluation": {
+          "policy_id": "rule::regime_filter",
+          "split": "train",
+          "metrics": {
+            "net_return": 0.4406732947729495,
+            "sharpe": 0.8244019451128602,
+            "sortino": 0.3337094492429212,
+            "max_drawdown": 0.4655034797410673,
+            "turnover": 255.0,
+            "n_switches": 255,
+            "exposure": 0.11398149764356781,
+            "ci_net_return": [
+              -0.35606937660714805,
+              1.9891955073561656
+            ],
+            "cvar_05": -0.006980801069279676,
+            "avg_holding_bars": 10.203125
+          },
+          "always_on": {
+            "net_return": -0.4624141783014246,
+            "sharpe": -0.551654398654386,
+            "sortino": -0.3838005955837998,
+            "max_drawdown": 0.6596185497514595,
+            "turnover": 312.0,
+            "n_switches": 312,
+            "exposure": 0.38226566591028105,
+            "ci_net_return": [
+              -0.805942342373592,
+              0.5018508848397041
+            ],
+            "cvar_05": -0.012929107408467156,
+            "avg_holding_bars": 27.898089171974522
+          },
+          "delta_net_return_vs_always_on": 0.9030874730743741,
+          "ci_delta": [
+            0.28805233559190463,
+            1.950118100877269
+          ],
+          "allocation_mix": {
+            "0.0": 0.7018264840182649,
+            "0.5": 0.0,
+            "1.0": 0.29817351598173514
+          },
+          "n_decisions": 11458,
+          "n_in_position": 4380,
+          "fold": 1,
+          "audit_id": "audit_ad64679fc4ac"
+        }
+      },
+      "created_at": "2026-11-08T13:22:14.399379Z"
+    },
+    {
+      "evidence_id": "ev_walk_forward_9964e97e08",
+      "tool": "walk_forward_fold",
+      "args": {
+        "spec_hash": "spec_f59b5404bfca",
+        "fold": 2
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "rule::regime_filter",
+          "family": "regime_gate",
+          "flat_buckets": [
+            {
+              "axis": "trend_regime",
+              "bucket": "bull"
+            },
+            {
+              "axis": "trend_7d_regime",
+              "bucket": "sideways"
+            },
+            {
+              "axis": "vol_regime",
+              "bucket": "low"
+            }
+          ],
+          "full_buckets": [],
+          "allocation_flat": 0.0,
+          "allocation_full": 1.0,
+          "allocation_else": 1.0,
+          "selected_on": "train",
+          "summary": "Train intervals only: flat in trend_regime=bull, trend_7d_regime=sideways, vol_regime=low; allocation 1 in the remaining regimes."
+        },
+        "spec_hash": "spec_f59b5404bfca",
+        "fold": 2,
+        "evaluation": {
+          "policy_id": "rule::regime_filter",
+          "split": "train",
+          "metrics": {
+            "net_return": 0.13942971120175796,
+            "sharpe": 0.44777490705439754,
+            "sortino": 0.24090001895580762,
+            "max_drawdown": 0.3703420014275898,
+            "turnover": 416.0,
+            "n_switches": 416,
+            "exposure": 0.1620701693140164,
+            "ci_net_return": [
+              -0.5057346430976231,
+              1.4699806657613
+            ],
+            "cvar_05": -0.012339160657385306,
+            "avg_holding_bars": 8.927884615384615
+          },
+          "always_on": {
+            "net_return": -0.12109388402332111,
+            "sharpe": 0.09411863986709111,
+            "sortino": 0.07058049839514309,
+            "max_drawdown": 0.5381449273721188,
+            "turnover": 335.0,
+            "n_switches": 335,
+            "exposure": 0.35337755280153604,
+            "ci_net_return": [
+              -0.6858616991583565,
+              1.1324672912683909
+            ],
+            "cvar_05": -0.015730216779458003,
+            "avg_holding_bars": 24.101190476190474
+          },
+          "delta_net_return_vs_always_on": 0.26052359522507906,
+          "ci_delta": [
+            -0.4615108651468785,
+            1.0367219956226372
+          ],
+          "allocation_mix": {
+            "0.0": 0.5413682390713757,
+            "0.5": 0.0,
+            "1.0": 0.45863176092862434
+          },
+          "n_decisions": 11458,
+          "n_in_position": 4049,
+          "fold": 2,
+          "audit_id": "audit_45a99174f4f2"
+        }
+      },
+      "created_at": "2026-11-08T13:22:14.399511Z"
+    },
+    {
+      "evidence_id": "ev_walk_forward_c4bc8657c5",
+      "tool": "walk_forward_fold",
+      "args": {
+        "spec_hash": "spec_f59b5404bfca",
+        "fold": 3
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "rule::regime_filter",
+          "family": "regime_gate",
+          "flat_buckets": [
+            {
+              "axis": "trend_regime",
+              "bucket": "bull"
+            },
+            {
+              "axis": "trend_7d_regime",
+              "bucket": "sideways"
+            },
+            {
+              "axis": "vol_regime",
+              "bucket": "low"
+            }
+          ],
+          "full_buckets": [],
+          "allocation_flat": 0.0,
+          "allocation_full": 1.0,
+          "allocation_else": 1.0,
+          "selected_on": "train",
+          "summary": "Train intervals only: flat in trend_regime=bull, trend_7d_regime=sideways, vol_regime=low; allocation 1 in the remaining regimes."
+        },
+        "spec_hash": "spec_f59b5404bfca",
+        "fold": 3,
+        "evaluation": {
+          "policy_id": "rule::regime_filter",
+          "split": "train",
+          "metrics": {
+            "net_return": -0.143110338682906,
+            "sharpe": -0.2376415118061366,
+            "sortino": -0.10791776831111498,
+            "max_drawdown": 0.4059974287186422,
+            "turnover": 222.0,
+            "n_switches": 222,
+            "exposure": 0.1040230386595689,
+            "ci_net_return": [
+              -0.5120459357434268,
+              0.5944601946310228
+            ],
+            "cvar_05": -0.0066633717480507155,
+            "avg_holding_bars": 10.73873873873874
+          },
+          "always_on": {
+            "net_return": -0.5228248470535896,
+            "sharpe": -1.166526142965698,
+            "sortino": -0.9378128303388754,
+            "max_drawdown": 0.5798605892831676,
+            "turnover": 351.0,
+            "n_switches": 351,
+            "exposure": 0.4139104633912209,
+            "ci_net_return": [
+              -0.7825048613367449,
+              0.00505522443602332
+            ],
+            "cvar_05": -0.011524102664522551,
+            "avg_holding_bars": 26.948863636363637
+          },
+          "delta_net_return_vs_always_on": 0.37971450837068355,
+          "ci_delta": [
+            0.06605652242745112,
+            0.768936434648422
+          ],
+          "allocation_mix": {
+            "0.0": 0.7486822686063673,
+            "0.5": 0.0,
+            "1.0": 0.2513177313936327
+          },
+          "n_decisions": 11459,
+          "n_in_position": 4743,
+          "fold": 3,
+          "audit_id": "audit_bf3a34530865"
+        }
+      },
+      "created_at": "2026-11-08T13:22:14.399593Z"
+    },
+    {
+      "evidence_id": "ev_walk_forward_fbdfbbd046",
+      "tool": "walk_forward_fold",
+      "args": {
+        "spec_hash": "spec_356f807d2741",
+        "fold": 1
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "rule::half_size_constant",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "realized_vol_7d",
+              "op": ">",
+              "threshold": -1.0
+            }
+          ],
+          "allocation_when_true": 0.5,
+          "allocation_when_false": 0.5,
+          "thresholds_selected_on": "none (constant)",
+          "summary": "Always half size: the exposure-only baseline."
+        },
+        "spec_hash": "spec_356f807d2741",
+        "fold": 1,
+        "evaluation": {
+          "policy_id": "rule::half_size_constant",
+          "split": "train",
+          "metrics": {
+            "net_return": -0.22654036795092758,
+            "sharpe": -0.551654398654386,
+            "sortino": -0.3838005955837998,
+            "max_drawdown": 0.40318885373028146,
+            "turnover": 156.0,
+            "n_switches": 312,
+            "exposure": 0.19113283295514052,
+            "ci_net_return": [
+              -0.5197548182985827,
+              0.2794457018160105
+            ],
+            "cvar_05": -0.006464553704233578,
+            "avg_holding_bars": 27.898089171974522
+          },
+          "always_on": {
+            "net_return": -0.4624141783014246,
+            "sharpe": -0.551654398654386,
+            "sortino": -0.3838005955837998,
+            "max_drawdown": 0.6596185497514595,
+            "turnover": 312.0,
+            "n_switches": 312,
+            "exposure": 0.38226566591028105,
+            "ci_net_return": [
+              -0.805942342373592,
+              0.5018508848397041
+            ],
+            "cvar_05": -0.012929107408467156,
+            "avg_holding_bars": 27.898089171974522
+          },
+          "delta_net_return_vs_always_on": 0.23587381035049704,
+          "ci_delta": [
+            -0.17245082279165763,
+            0.2856279524501108
+          ],
+          "allocation_mix": {
+            "0.0": 0.0,
+            "0.5": 1.0,
+            "1.0": 0.0
+          },
+          "n_decisions": 11458,
+          "n_in_position": 4380,
+          "fold": 1,
+          "audit_id": "audit_2e5ef0129251"
+        }
+      },
+      "created_at": "2026-11-08T13:22:38.643537Z"
+    },
+    {
+      "evidence_id": "ev_walk_forward_416ed22449",
+      "tool": "walk_forward_fold",
+      "args": {
+        "spec_hash": "spec_356f807d2741",
+        "fold": 2
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "rule::half_size_constant",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "realized_vol_7d",
+              "op": ">",
+              "threshold": -1.0
+            }
+          ],
+          "allocation_when_true": 0.5,
+          "allocation_when_false": 0.5,
+          "thresholds_selected_on": "none (constant)",
+          "summary": "Always half size: the exposure-only baseline."
+        },
+        "spec_hash": "spec_356f807d2741",
+        "fold": 2,
+        "evaluation": {
+          "policy_id": "rule::half_size_constant",
+          "split": "train",
+          "metrics": {
+            "net_return": -0.015208671127613371,
+            "sharpe": 0.09411863986709111,
+            "sortino": 0.07058049839514309,
+            "max_drawdown": 0.29523617787795886,
+            "turnover": 167.5,
+            "n_switches": 335,
+            "exposure": 0.17668877640076802,
+            "ci_net_return": [
+              -0.3823645270505096,
+              0.5140332204507191
+            ],
+            "cvar_05": -0.007865108389729002,
+            "avg_holding_bars": 24.101190476190474
+          },
+          "always_on": {
+            "net_return": -0.12109388402332111,
+            "sharpe": 0.09411863986709111,
+            "sortino": 0.07058049839514309,
+            "max_drawdown": 0.5381449273721188,
+            "turnover": 335.0,
+            "n_switches": 335,
+            "exposure": 0.35337755280153604,
+            "ci_net_return": [
+              -0.6858616991583565,
+              1.1324672912683909
+            ],
+            "cvar_05": -0.015730216779458003,
+            "avg_holding_bars": 24.101190476190474
+          },
+          "delta_net_return_vs_always_on": 0.10588521289570774,
+          "ci_delta": [
+            -0.5620315384680095,
+            0.2741909483056282
+          ],
+          "allocation_mix": {
+            "0.0": 0.0,
+            "0.5": 1.0,
+            "1.0": 0.0
+          },
+          "n_decisions": 11458,
+          "n_in_position": 4049,
+          "fold": 2,
+          "audit_id": "audit_e6c8d3bdbc94"
+        }
+      },
+      "created_at": "2026-11-08T13:22:38.643676Z"
+    },
+    {
+      "evidence_id": "ev_walk_forward_5516cbac98",
+      "tool": "walk_forward_fold",
+      "args": {
+        "spec_hash": "spec_356f807d2741",
+        "fold": 3
+      },
+      "payload": {
+        "policy_spec": {
+          "policy_id": "rule::half_size_constant",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "realized_vol_7d",
+              "op": ">",
+              "threshold": -1.0
+            }
+          ],
+          "allocation_when_true": 0.5,
+          "allocation_when_false": 0.5,
+          "thresholds_selected_on": "none (constant)",
+          "summary": "Always half size: the exposure-only baseline."
+        },
+        "spec_hash": "spec_356f807d2741",
+        "fold": 3,
+        "evaluation": {
+          "policy_id": "rule::half_size_constant",
+          "split": "train",
+          "metrics": {
+            "net_return": -0.28976180532484086,
+            "sharpe": -1.166526142965698,
+            "sortino": -0.9378128303388754,
+            "max_drawdown": 0.3344069447256508,
+            "turnover": 175.5,
+            "n_switches": 351,
+            "exposure": 0.20695523169561045,
+            "ci_net_return": [
+              -0.5210455671035313,
+              0.04534179890694675
+            ],
+            "cvar_05": -0.005762051332261276,
+            "avg_holding_bars": 26.948863636363637
+          },
+          "always_on": {
+            "net_return": -0.5228248470535896,
+            "sharpe": -1.166526142965698,
+            "sortino": -0.9378128303388754,
+            "max_drawdown": 0.5798605892831676,
+            "turnover": 351.0,
+            "n_switches": 351,
+            "exposure": 0.4139104633912209,
+            "ci_net_return": [
+              -0.7825048613367449,
+              0.00505522443602332
+            ],
+            "cvar_05": -0.011524102664522551,
+            "avg_holding_bars": 26.948863636363637
+          },
+          "delta_net_return_vs_always_on": 0.2330630417287487,
+          "ci_delta": [
+            0.014355960478924349,
+            0.2650125415898307
+          ],
+          "allocation_mix": {
+            "0.0": 0.0,
+            "0.5": 1.0,
+            "1.0": 0.0
+          },
+          "n_decisions": 11459,
+          "n_in_position": 4743,
+          "fold": 3,
+          "audit_id": "audit_c5e201247136"
+        }
+      },
+      "created_at": "2026-11-08T13:22:38.643759Z"
+    },
+    {
+      "evidence_id": "ev_strategy_hea_75c51802c2",
+      "tool": "strategy_health",
+      "args": {},
+      "payload": {
+        "status": "within_training_range",
+        "summary": "45 of 45 validation 14-day blocks fall inside the training range [-0.1623, +0.1235]: a loss alone does not show the strategy broke. Assumptions that changed: cost_per_bar, bar_volatility, sentiment_regime_shares, vol_regime_shares.",
+        "changed_assumptions": [
+          "cost_per_bar",
+          "bar_volatility",
+          "sentiment_regime_shares",
+          "vol_regime_shares"
+        ],
+        "train_range": {
+          "low": -0.1623087415839859,
+          "high": 0.12354180666138119,
+          "horizon_bars": 336,
+          "horizon_days": 14.0,
+          "source": "Lane A, train returns only"
+        },
+        "validation_blocks": [
+          {
+            "start": "2023-05-07T19:00:00+00:00",
+            "net_return": -0.04468228827590037,
+            "position": "inside"
+          },
+          {
+            "start": "2023-05-21T19:00:00+00:00",
+            "net_return": -0.033941410460854526,
+            "position": "inside"
+          },
+          {
+            "start": "2023-06-04T19:00:00+00:00",
+            "net_return": -0.01875951243231555,
+            "position": "inside"
+          },
+          {
+            "start": "2023-06-18T19:00:00+00:00",
+            "net_return": 0.03168155078541246,
+            "position": "inside"
+          },
+          {
+            "start": "2023-07-02T19:00:00+00:00",
+            "net_return": 0.011993183782821326,
+            "position": "inside"
+          },
+          {
+            "start": "2023-07-16T19:00:00+00:00",
+            "net_return": -0.0037199721581633316,
+            "position": "inside"
+          },
+          {
+            "start": "2023-07-30T19:00:00+00:00",
+            "net_return": 0.00494965009952919,
+            "position": "inside"
+          },
+          {
+            "start": "2023-08-13T19:00:00+00:00",
+            "net_return": -0.09700095174392764,
+            "position": "inside"
+          },
+          {
+            "start": "2023-08-27T19:00:00+00:00",
+            "net_return": 0.013340035685883489,
+            "position": "inside"
+          },
+          {
+            "start": "2023-09-10T19:00:00+00:00",
+            "net_return": 0.007231400128383525,
+            "position": "inside"
+          },
+          {
+            "start": "2023-09-24T19:00:00+00:00",
+            "net_return": 0.01951646107715521,
+            "position": "inside"
+          },
+          {
+            "start": "2023-10-08T19:00:00+00:00",
+            "net_return": -0.03048146999110679,
+            "position": "inside"
+          },
+          {
+            "start": "2023-10-22T19:00:00+00:00",
+            "net_return": 0.02984208668637134,
+            "position": "inside"
+          },
+          {
+            "start": "2023-11-05T19:00:00+00:00",
+            "net_return": 0.01018036275557499,
+            "position": "inside"
+          },
+          {
+            "start": "2023-11-19T19:00:00+00:00",
+            "net_return": 0.004916095017554412,
+            "position": "inside"
+          },
+          {
+            "start": "2023-12-03T19:00:00+00:00",
+            "net_return": -0.03528955655933319,
+            "position": "inside"
+          },
+          {
+            "start": "2023-12-17T19:00:00+00:00",
+            "net_return": 0.025404824683749938,
+            "position": "inside"
+          },
+          {
+            "start": "2023-12-31T19:00:00+00:00",
+            "net_return": -0.027596990649420006,
+            "position": "inside"
+          },
+          {
+            "start": "2024-01-14T19:00:00+00:00",
+            "net_return": -0.03258228711081934,
+            "position": "inside"
+          },
+          {
+            "start": "2024-01-28T19:00:00+00:00",
+            "net_return": 0.02776955682864246,
+            "position": "inside"
+          },
+          {
+            "start": "2024-02-11T19:00:00+00:00",
+            "net_return": 0.02659986943285997,
+            "position": "inside"
+          },
+          {
+            "start": "2024-02-25T19:00:00+00:00",
+            "net_return": 0.09369943339182929,
+            "position": "inside"
+          },
+          {
+            "start": "2024-03-10T19:00:00+00:00",
+            "net_return": -0.029570229498262823,
+            "position": "inside"
+          },
+          {
+            "start": "2024-03-24T19:00:00+00:00",
+            "net_return": -0.0013034210343959574,
+            "position": "inside"
+          },
+          {
+            "start": "2024-04-07T19:00:00+00:00",
+            "net_return": -0.017530452985486944,
+            "position": "inside"
+          },
+          {
+            "start": "2024-04-21T19:00:00+00:00",
+            "net_return": -0.06333764292998689,
+            "position": "inside"
+          },
+          {
+            "start": "2024-05-05T19:00:00+00:00",
+            "net_return": 0.03877932250130267,
+            "position": "inside"
+          },
+          {
+            "start": "2024-05-19T19:00:00+00:00",
+            "net_return": 0.033996601005181315,
+            "position": "inside"
+          },
+          {
+            "start": "2024-06-02T19:00:00+00:00",
+            "net_return": 0.007241773341649438,
+            "position": "inside"
+          },
+          {
+            "start": "2024-06-16T19:00:00+00:00",
+            "net_return": -0.03340150696912525,
+            "position": "inside"
+          },
+          {
+            "start": "2024-06-30T19:00:00+00:00",
+            "net_return": -0.04415022668066171,
+            "position": "inside"
+          },
+          {
+            "start": "2024-07-14T19:00:00+00:00",
+            "net_return": 0.023089111139858787,
+            "position": "inside"
+          },
+          {
+            "start": "2024-07-28T19:00:00+00:00",
+            "net_return": -0.09483737052028829,
+            "position": "inside"
+          },
+          {
+            "start": "2024-08-11T19:00:00+00:00",
+            "net_return": 0.021173487544918768,
+            "position": "inside"
+          },
+          {
+            "start": "2024-08-25T19:00:00+00:00",
+            "net_return": -0.07455577827932469,
+            "position": "inside"
+          },
+          {
+            "start": "2024-09-08T19:00:00+00:00",
+            "net_return": 0.00995431249820955,
+            "position": "inside"
+          },
+          {
+            "start": "2024-09-22T19:00:00+00:00",
+            "net_return": -0.04389907301709828,
+            "position": "inside"
+          },
+          {
+            "start": "2024-10-06T19:00:00+00:00",
+            "net_return": 0.027207289719993977,
+            "position": "inside"
+          },
+          {
+            "start": "2024-10-20T19:00:00+00:00",
+            "net_return": -0.02039490320042958,
+            "position": "inside"
+          },
+          {
+            "start": "2024-11-03T19:00:00+00:00",
+            "net_return": 0.04570847523368471,
+            "position": "inside"
+          },
+          {
+            "start": "2024-11-17T19:00:00+00:00",
+            "net_return": 0.03224230622230784,
+            "position": "inside"
+          },
+          {
+            "start": "2024-12-01T19:00:00+00:00",
+            "net_return": 0.05013342170646573,
+            "position": "inside"
+          },
+          {
+            "start": "2024-12-15T19:00:00+00:00",
+            "net_return": -0.05520897722780005,
+            "position": "inside"
+          },
+          {
+            "start": "2024-12-29T19:00:00+00:00",
+            "net_return": -0.0064849523017992405,
+            "position": "inside"
+          },
+          {
+            "start": "2025-01-12T19:00:00+00:00",
+            "net_return": 0.08347506845085872,
+            "position": "inside"
+          }
+        ],
+        "n_blocks": 45,
+        "n_below": 0,
+        "n_above": 0,
+        "p_below": 0.9999999999999981,
+        "p_above": 0.9999999999999981,
+        "validation_net_return": -0.19483542695663503,
+        "checks": [
+          {
+            "assumption": "exposure",
+            "train": 0.38040276656557503,
+            "validation": 0.35142034297682945,
+            "ratio": 0.9238112176459434,
+            "changed": false,
+            "note": "mean |position|"
+          },
+          {
+            "assumption": "turnover_per_bar",
+            "train": 0.028560207710601533,
+            "validation": 0.030894096085875115,
+            "ratio": 1.0817181863284293,
+            "changed": false,
+            "note": "how often the strategy trades"
+          },
+          {
+            "assumption": "cost_per_bar",
+            "train": 7.29306683737866e-6,
+            "validation": 0.0000358914957089121,
+            "ratio": 4.9213172605192455,
+            "changed": true,
+            "note": "fees + slippage per bar"
+          },
+          {
+            "assumption": "bar_volatility",
+            "train": 0.005419752386287512,
+            "validation": 0.0032999949964289265,
+            "ratio": 0.6088829823255814,
+            "changed": true,
+            "note": "std of per-bar net return"
+          },
+          {
+            "assumption": "liquidity_regime_shares",
+            "train": {
+              "deep": 0.4999890908297515,
+              "thin": 0.5000109091702485
+            },
+            "validation": {
+              "deep": 0.5297813849980364,
+              "thin": 0.4702186150019636
+            },
+            "total_variation": 0.029792294168284883,
+            "changed": false,
+            "note": "how often each regime occurs"
+          },
+          {
+            "assumption": "sentiment_regime_shares",
+            "train": {
+              "fear": 0.5052473108895338,
+              "greed": 0.49475268911046627
+            },
+            "validation": {
+              "fear": 0.10367849194920802,
+              "greed": 0.896321508050792
+            },
+            "total_variation": 0.40156881894032576,
+            "changed": true,
+            "note": "how often each regime occurs"
+          },
+          {
+            "assumption": "trend_7d_regime_shares",
+            "train": {
+              "bear": 0.333340606113499,
+              "bull": 0.333340606113499,
+              "sideways": 0.333318787773002
+            },
+            "validation": {
+              "bear": 0.2495745516428852,
+              "bull": 0.3035083126063621,
+              "sideways": 0.4469171357507527
+            },
+            "total_variation": 0.11359834797775074,
+            "changed": false,
+            "note": "how often each regime occurs"
+          },
+          {
+            "assumption": "trend_regime_shares",
+            "train": {
+              "bear": 0.333340606113499,
+              "bull": 0.333340606113499,
+              "sideways": 0.333318787773002
+            },
+            "validation": {
+              "bear": 0.27431600994894617,
+              "bull": 0.29113758345333157,
+              "sideways": 0.4345464065977222
+            },
+            "total_variation": 0.10122761882472026,
+            "changed": false,
+            "note": "how often each regime occurs"
+          },
+          {
+            "assumption": "vol_change_regime_shares",
+            "train": {
+              "above_baseline": 0.4999890908297515,
+              "below_baseline": 0.5000109091702485
+            },
+            "validation": {
+              "above_baseline": 0.5256578086136929,
+              "below_baseline": 0.4743421913863071
+            },
+            "total_variation": 0.02566871778394139,
+            "changed": false,
+            "note": "how often each regime occurs"
+          },
+          {
+            "assumption": "vol_regime_shares",
+            "train": {
+              "high": 0.4999890908297515,
+              "low": 0.5000109091702485
+            },
+            "validation": {
+              "high": 0.14871056420997514,
+              "low": 0.8512894357900249
+            },
+            "total_variation": 0.35127852661977643,
+            "changed": true,
+            "note": "how often each regime occurs"
+          }
+        ],
+        "rules": {
+          "tail_each_side": 0.05,
+          "p_alert": 0.05,
+          "ratio_band": [
+            0.6666666666666666,
+            1.5
+          ],
+          "tv_alert": 0.25
+        }
+      },
+      "created_at": "2026-11-08T13:22:38.683204Z"
+    }
+  ],
+  "n_distinct_agent_policies": 1,
+  "n_policies_tried": 6,
+  "holdout_accessed": false,
+  "strategy_health": {
+    "status": "within_training_range",
+    "summary": "45 of 45 validation 14-day blocks fall inside the training range [-0.1623, +0.1235]: a loss alone does not show the strategy broke. Assumptions that changed: cost_per_bar, bar_volatility, sentiment_regime_shares, vol_regime_shares.",
+    "changed_assumptions": [
+      "cost_per_bar",
+      "bar_volatility",
+      "sentiment_regime_shares",
+      "vol_regime_shares"
+    ],
+    "train_range": {
+      "low": -0.1623087415839859,
+      "high": 0.12354180666138119,
+      "horizon_bars": 336,
+      "horizon_days": 14.0,
+      "source": "Lane A, train returns only"
+    },
+    "validation_blocks": [
+      {
+        "start": "2023-05-07T19:00:00+00:00",
+        "net_return": -0.04468228827590037,
+        "position": "inside"
+      },
+      {
+        "start": "2023-05-21T19:00:00+00:00",
+        "net_return": -0.033941410460854526,
+        "position": "inside"
+      },
+      {
+        "start": "2023-06-04T19:00:00+00:00",
+        "net_return": -0.01875951243231555,
+        "position": "inside"
+      },
+      {
+        "start": "2023-06-18T19:00:00+00:00",
+        "net_return": 0.03168155078541246,
+        "position": "inside"
+      },
+      {
+        "start": "2023-07-02T19:00:00+00:00",
+        "net_return": 0.011993183782821326,
+        "position": "inside"
+      },
+      {
+        "start": "2023-07-16T19:00:00+00:00",
+        "net_return": -0.0037199721581633316,
+        "position": "inside"
+      },
+      {
+        "start": "2023-07-30T19:00:00+00:00",
+        "net_return": 0.00494965009952919,
+        "position": "inside"
+      },
+      {
+        "start": "2023-08-13T19:00:00+00:00",
+        "net_return": -0.09700095174392764,
+        "position": "inside"
+      },
+      {
+        "start": "2023-08-27T19:00:00+00:00",
+        "net_return": 0.013340035685883489,
+        "position": "inside"
+      },
+      {
+        "start": "2023-09-10T19:00:00+00:00",
+        "net_return": 0.007231400128383525,
+        "position": "inside"
+      },
+      {
+        "start": "2023-09-24T19:00:00+00:00",
+        "net_return": 0.01951646107715521,
+        "position": "inside"
+      },
+      {
+        "start": "2023-10-08T19:00:00+00:00",
+        "net_return": -0.03048146999110679,
+        "position": "inside"
+      },
+      {
+        "start": "2023-10-22T19:00:00+00:00",
+        "net_return": 0.02984208668637134,
+        "position": "inside"
+      },
+      {
+        "start": "2023-11-05T19:00:00+00:00",
+        "net_return": 0.01018036275557499,
+        "position": "inside"
+      },
+      {
+        "start": "2023-11-19T19:00:00+00:00",
+        "net_return": 0.004916095017554412,
+        "position": "inside"
+      },
+      {
+        "start": "2023-12-03T19:00:00+00:00",
+        "net_return": -0.03528955655933319,
+        "position": "inside"
+      },
+      {
+        "start": "2023-12-17T19:00:00+00:00",
+        "net_return": 0.025404824683749938,
+        "position": "inside"
+      },
+      {
+        "start": "2023-12-31T19:00:00+00:00",
+        "net_return": -0.027596990649420006,
+        "position": "inside"
+      },
+      {
+        "start": "2024-01-14T19:00:00+00:00",
+        "net_return": -0.03258228711081934,
+        "position": "inside"
+      },
+      {
+        "start": "2024-01-28T19:00:00+00:00",
+        "net_return": 0.02776955682864246,
+        "position": "inside"
+      },
+      {
+        "start": "2024-02-11T19:00:00+00:00",
+        "net_return": 0.02659986943285997,
+        "position": "inside"
+      },
+      {
+        "start": "2024-02-25T19:00:00+00:00",
+        "net_return": 0.09369943339182929,
+        "position": "inside"
+      },
+      {
+        "start": "2024-03-10T19:00:00+00:00",
+        "net_return": -0.029570229498262823,
+        "position": "inside"
+      },
+      {
+        "start": "2024-03-24T19:00:00+00:00",
+        "net_return": -0.0013034210343959574,
+        "position": "inside"
+      },
+      {
+        "start": "2024-04-07T19:00:00+00:00",
+        "net_return": -0.017530452985486944,
+        "position": "inside"
+      },
+      {
+        "start": "2024-04-21T19:00:00+00:00",
+        "net_return": -0.06333764292998689,
+        "position": "inside"
+      },
+      {
+        "start": "2024-05-05T19:00:00+00:00",
+        "net_return": 0.03877932250130267,
+        "position": "inside"
+      },
+      {
+        "start": "2024-05-19T19:00:00+00:00",
+        "net_return": 0.033996601005181315,
+        "position": "inside"
+      },
+      {
+        "start": "2024-06-02T19:00:00+00:00",
+        "net_return": 0.007241773341649438,
+        "position": "inside"
+      },
+      {
+        "start": "2024-06-16T19:00:00+00:00",
+        "net_return": -0.03340150696912525,
+        "position": "inside"
+      },
+      {
+        "start": "2024-06-30T19:00:00+00:00",
+        "net_return": -0.04415022668066171,
+        "position": "inside"
+      },
+      {
+        "start": "2024-07-14T19:00:00+00:00",
+        "net_return": 0.023089111139858787,
+        "position": "inside"
+      },
+      {
+        "start": "2024-07-28T19:00:00+00:00",
+        "net_return": -0.09483737052028829,
+        "position": "inside"
+      },
+      {
+        "start": "2024-08-11T19:00:00+00:00",
+        "net_return": 0.021173487544918768,
+        "position": "inside"
+      },
+      {
+        "start": "2024-08-25T19:00:00+00:00",
+        "net_return": -0.07455577827932469,
+        "position": "inside"
+      },
+      {
+        "start": "2024-09-08T19:00:00+00:00",
+        "net_return": 0.00995431249820955,
+        "position": "inside"
+      },
+      {
+        "start": "2024-09-22T19:00:00+00:00",
+        "net_return": -0.04389907301709828,
+        "position": "inside"
+      },
+      {
+        "start": "2024-10-06T19:00:00+00:00",
+        "net_return": 0.027207289719993977,
+        "position": "inside"
+      },
+      {
+        "start": "2024-10-20T19:00:00+00:00",
+        "net_return": -0.02039490320042958,
+        "position": "inside"
+      },
+      {
+        "start": "2024-11-03T19:00:00+00:00",
+        "net_return": 0.04570847523368471,
+        "position": "inside"
+      },
+      {
+        "start": "2024-11-17T19:00:00+00:00",
+        "net_return": 0.03224230622230784,
+        "position": "inside"
+      },
+      {
+        "start": "2024-12-01T19:00:00+00:00",
+        "net_return": 0.05013342170646573,
+        "position": "inside"
+      },
+      {
+        "start": "2024-12-15T19:00:00+00:00",
+        "net_return": -0.05520897722780005,
+        "position": "inside"
+      },
+      {
+        "start": "2024-12-29T19:00:00+00:00",
+        "net_return": -0.0064849523017992405,
+        "position": "inside"
+      },
+      {
+        "start": "2025-01-12T19:00:00+00:00",
+        "net_return": 0.08347506845085872,
+        "position": "inside"
+      }
+    ],
+    "n_blocks": 45,
+    "n_below": 0,
+    "n_above": 0,
+    "p_below": 0.9999999999999981,
+    "p_above": 0.9999999999999981,
+    "validation_net_return": -0.19483542695663503,
+    "checks": [
+      {
+        "assumption": "exposure",
+        "train": 0.38040276656557503,
+        "validation": 0.35142034297682945,
+        "ratio": 0.9238112176459434,
+        "changed": false,
+        "note": "mean |position|"
+      },
+      {
+        "assumption": "turnover_per_bar",
+        "train": 0.028560207710601533,
+        "validation": 0.030894096085875115,
+        "ratio": 1.0817181863284293,
+        "changed": false,
+        "note": "how often the strategy trades"
+      },
+      {
+        "assumption": "cost_per_bar",
+        "train": 7.29306683737866e-6,
+        "validation": 0.0000358914957089121,
+        "ratio": 4.9213172605192455,
+        "changed": true,
+        "note": "fees + slippage per bar"
+      },
+      {
+        "assumption": "bar_volatility",
+        "train": 0.005419752386287512,
+        "validation": 0.0032999949964289265,
+        "ratio": 0.6088829823255814,
+        "changed": true,
+        "note": "std of per-bar net return"
+      },
+      {
+        "assumption": "liquidity_regime_shares",
+        "train": {
+          "deep": 0.4999890908297515,
+          "thin": 0.5000109091702485
+        },
+        "validation": {
+          "deep": 0.5297813849980364,
+          "thin": 0.4702186150019636
+        },
+        "total_variation": 0.029792294168284883,
+        "changed": false,
+        "note": "how often each regime occurs"
+      },
+      {
+        "assumption": "sentiment_regime_shares",
+        "train": {
+          "fear": 0.5052473108895338,
+          "greed": 0.49475268911046627
+        },
+        "validation": {
+          "fear": 0.10367849194920802,
+          "greed": 0.896321508050792
+        },
+        "total_variation": 0.40156881894032576,
+        "changed": true,
+        "note": "how often each regime occurs"
+      },
+      {
+        "assumption": "trend_7d_regime_shares",
+        "train": {
+          "bear": 0.333340606113499,
+          "bull": 0.333340606113499,
+          "sideways": 0.333318787773002
+        },
+        "validation": {
+          "bear": 0.2495745516428852,
+          "bull": 0.3035083126063621,
+          "sideways": 0.4469171357507527
+        },
+        "total_variation": 0.11359834797775074,
+        "changed": false,
+        "note": "how often each regime occurs"
+      },
+      {
+        "assumption": "trend_regime_shares",
+        "train": {
+          "bear": 0.333340606113499,
+          "bull": 0.333340606113499,
+          "sideways": 0.333318787773002
+        },
+        "validation": {
+          "bear": 0.27431600994894617,
+          "bull": 0.29113758345333157,
+          "sideways": 0.4345464065977222
+        },
+        "total_variation": 0.10122761882472026,
+        "changed": false,
+        "note": "how often each regime occurs"
+      },
+      {
+        "assumption": "vol_change_regime_shares",
+        "train": {
+          "above_baseline": 0.4999890908297515,
+          "below_baseline": 0.5000109091702485
+        },
+        "validation": {
+          "above_baseline": 0.5256578086136929,
+          "below_baseline": 0.4743421913863071
+        },
+        "total_variation": 0.02566871778394139,
+        "changed": false,
+        "note": "how often each regime occurs"
+      },
+      {
+        "assumption": "vol_regime_shares",
+        "train": {
+          "high": 0.4999890908297515,
+          "low": 0.5000109091702485
+        },
+        "validation": {
+          "high": 0.14871056420997514,
+          "low": 0.8512894357900249
+        },
+        "total_variation": 0.35127852661977643,
+        "changed": true,
+        "note": "how often each regime occurs"
+      }
+    ],
+    "rules": {
+      "tail_each_side": 0.05,
+      "p_alert": 0.05,
+      "ratio_band": [
+        0.6666666666666666,
+        1.5
+      ],
+      "tv_alert": 0.25
+    },
+    "evidence_id": "ev_strategy_hea_75c51802c2"
+  },
+  "context": {
+    "summary": "On train, sentiment flips do not line up with the strategy's best or worst weeks more often than chance.",
+    "findings": [
+      {
+        "finding_id": "C1",
+        "statement": "0 of 4 worst train weeks started within 3 days after a greed-to-fear flip; the train base rate is 0.0956 (binomial p 1).",
+        "episode_ids": [],
+        "evidence_ids": [
+          "ev_sentiment_ep_e3f199beba"
+        ],
+        "tally": "worst_weeks_after_greed_to_fear_flip",
+        "strength": "none",
+        "caveats": [
+          "small sample of weeks per side",
+          "co-occurrence in time, not a cause"
+        ]
+      },
+      {
+        "finding_id": "C2",
+        "statement": "1 of 4 best train weeks started within 3 days after a fear-to-greed flip; the train base rate is 0.093 (binomial p 0.323).",
+        "episode_ids": [
+          "best_week_1"
+        ],
+        "evidence_ids": [
+          "ev_sentiment_ep_e3f199beba"
+        ],
+        "tally": "best_weeks_after_fear_to_greed_flip",
+        "strength": "weak",
+        "caveats": [
+          "small sample of weeks per side",
+          "co-occurrence in time, not a cause"
+        ]
+      }
+    ],
+    "limitations": [
+      "Fear & Greed only; no news archive with first-seen timestamps is available"
+    ]
+  },
+  "presentation": {
+    "version": 1,
+    "headline": {
+      "finding": "One filter earned a held-out test: Flat when 7-day volatility is low (≤ 0.006409). Nothing is approved yet.",
+      "meaning": "On Validation it beat the original by +58.2 pp (90% interval -1.7 to +96.4 pp) and returned +38.8% on its own. The held-out test has not been run.",
+      "next_action": "Commit this report, then run the one held-out test (scripts/frozen_look.py) before acting.",
+      "verdict": null,
+      "verdict_label": "Not recorded",
+      "verdict_scope": "No strategy verdict was recorded for this report.",
+      "verdict_source": ""
+    },
+    "stages": [
+      {
+        "stage": "Training",
+        "window": "Not recorded",
+        "what_happened": "The agents studied when the strategy makes and loses money, found 3 pattern(s), and tried 1 filter(s) on this data only.",
+        "result": "Original strategy -89.6% after costs (90% interval -98.3% to -40.9%); before costs -56.2%, worst drawdown 92.4%.",
+        "evidence_ids": [
+          "ev_regime_perfo_410156211c"
+        ]
+      },
+      {
+        "stage": "Validation",
+        "window": "from 2023-05-07, 45 two-week blocks",
+        "what_happened": "Code scored 6 rule(s) once on data the agents never saw: their proposals and the reference rules, after costs.",
+        "result": "Original strategy -19.5% (90% interval -55.9% to +51.1%); cash +0.0%.",
+        "evidence_ids": [
+          "ev_arbiter_eval_dc0eb75ed6",
+          "ev_arbiter_eval_aea4eac1d7",
+          "ev_arbiter_eval_5d0d9bebde",
+          "ev_arbiter_eval_b3722d6179",
+          "ev_arbiter_eval_098320ca7a",
+          "ev_arbiter_eval_a370762f54"
+        ]
+      },
+      {
+        "stage": "Held-out test",
+        "window": "Not recorded",
+        "what_happened": "Not recorded: the held-out test has not been run for this report.",
+        "result": "Not recorded. It runs once, after this report is committed, so it can't be tuned to.",
+        "evidence_ids": []
+      }
+    ],
+    "filters": [
+      {
+        "policy_id": "agent::P1",
+        "label": "Flat when 7-day volatility is low (≤ 0.006409)",
+        "plain_rule": "When 7-day volatility is at or below 0.006409: no position. Otherwise: full size. Thresholds were set on Training data.",
+        "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is met.",
+        "proposed_by": "Proposer agent",
+        "stages_checked": [
+          "Training",
+          "Training folds",
+          "Validation"
+        ],
+        "outcome": "selected_for_further_testing",
+        "outcome_label": "Selected for further testing",
+        "reason": "Met every pre-registered condition on Validation (beat the original and cash, interval above zero for the original, critic did not reject), so it earned one held-out test. Selection is not approval.",
+        "validation_vs_original_pp": 0.5823376857336173,
+        "validation_vs_original_ci_pp": [
+          -0.01701083746775508,
+          0.9638548189900813
+        ],
+        "validation_own_return": 0.3875022587769823,
+        "average_size_on_validation": 0.13317191283292978,
+        "held_out": null,
+        "details": [
+          "validation: delta vs always-on +0.5823 (90% CI -0.0170..+0.9639), net return +0.3875 = delta vs cash",
+          "validation CI includes zero; the frozen test decides",
+          "vs Lane A regime filter on validation: -0.0002 (reference, not a veto)",
+          "vs constant half size on validation: +0.4713 (exposure-only baseline; reference, not a veto)",
+          "timing check vs a constant 0.488x size (this gate's average train size) on validation: +0.4690 (diagnostic, not part of the pre-registered rule)",
+          "walk-forward on train folds: beats always-on on 3/3 (+0.6898, +0.1030, +0.4077); stability check, not a veto"
+        ],
+        "spec": {
+          "policy_id": "agent::P1",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "realized_vol_7d",
+              "op": "<=",
+              "threshold": 0.006409240155854531
+            }
+          ],
+          "allocation_when_true": 0.0,
+          "allocation_when_false": 1.0,
+          "thresholds_selected_on": "train"
+        },
+        "evidence_ids": [
+          "ev_feature_grid_85c593416f",
+          "ev_test_gate_tr_fe7647202c",
+          "ev_regime_perfo_410156211c",
+          "ev_arbiter_eval_dc0eb75ed6",
+          "ev_test_gate_tr_fe7647202c",
+          "ev_arbiter_eval_dc0eb75ed6",
+          "ev_walk_forward_2c89ae0691",
+          "ev_strategy_hea_75c51802c2"
+        ]
+      },
+      {
+        "policy_id": "rule::trend_up_and_vol_below_train_median",
+        "label": "Simple reference rule",
+        "plain_rule": "When 24-hour price momentum is above 0 and 7-day volatility is at or below 0.006409: full size. Otherwise: no position. Thresholds were set on Training data.",
+        "exposure_change": "Never adds risk: it only cuts the position to no position when the condition is not met.",
+        "proposed_by": "Reference rule (Lane A)",
+        "stages_checked": [
+          "Training folds",
+          "Validation"
+        ],
+        "outcome": "reference",
+        "outcome_label": "Comparison only",
+        "reason": "A comparison the agents' filters must beat. Never a candidate.",
+        "validation_vs_original_pp": -0.21233360187687134,
+        "validation_vs_original_ci_pp": [
+          -0.9633986830000766,
+          0.14185180117747712
+        ],
+        "validation_own_return": -0.40716902883350636,
+        "average_size_on_validation": 0.09498975600670516,
+        "held_out": null,
+        "details": [
+          "competitor: always carried to the frozen test for comparison",
+          "validation: delta vs always-on -0.2123, net return -0.4072 = delta vs cash",
+          "walk-forward on train folds: beats always-on on 3/3 (+0.2204, +0.0154, +0.2455); stability check, not a veto"
+        ],
+        "spec": {
+          "policy_id": "rule::trend_up_and_vol_below_train_median",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "momentum_24h",
+              "op": ">",
+              "threshold": 0.0
+            },
+            {
+              "feature": "realized_vol_7d",
+              "op": "<=",
+              "threshold": 0.006409240155854531
+            }
+          ],
+          "allocation_when_true": 1.0,
+          "allocation_when_false": 0.0,
+          "thresholds_selected_on": "train"
+        },
+        "evidence_ids": [
+          "ev_arbiter_eval_aea4eac1d7"
+        ]
+      },
+      {
+        "policy_id": "meta::lgbm_gate_v1",
+        "label": "LightGBM model filter",
+        "plain_rule": "A rule supplied by Lane A; its exact settings are in the spec.",
+        "exposure_change": "Changes position size between 0, half and full by market regime.",
+        "proposed_by": "Reference rule (Lane A)",
+        "stages_checked": [
+          "Validation"
+        ],
+        "outcome": "reference",
+        "outcome_label": "Comparison only",
+        "reason": "A comparison the agents' filters must beat. Never a candidate.",
+        "validation_vs_original_pp": -0.4129300614529534,
+        "validation_vs_original_ci_pp": [
+          -0.9952914504616893,
+          -0.14322315657757007
+        ],
+        "validation_own_return": -0.6077654884095884,
+        "average_size_on_validation": 0.4846340100577389,
+        "held_out": null,
+        "details": [
+          "competitor: always carried to the frozen test for comparison",
+          "validation: delta vs always-on -0.4129, net return -0.6078 = delta vs cash",
+          "Lane A refit walk-forward (model refit before each train fold): beats always-on on 2/3 (+0.0314, +0.0500, -0.1474); stability check, not a veto"
+        ],
+        "spec": {
+          "policy_id": "meta::lgbm_gate_v1",
+          "family": "lgbm_gate",
+          "features": [
+            "momentum_24h",
+            "momentum_7d",
+            "realized_vol_7d",
+            "atr_14",
+            "price_drawdown",
+            "volume_zscore",
+            "fear_greed"
+          ],
+          "thresholds": [
+            0.500761642578573,
+            0.5407616425785731
+          ],
+          "base_rate": 0.520761642578573,
+          "band": 0.02,
+          "fitted_on": "train",
+          "calibrated_on": "train_tail",
+          "seed": 7,
+          "model_hash": "73bf0568c647a0ef"
+        },
+        "evidence_ids": [
+          "ev_arbiter_eval_5d0d9bebde"
+        ]
+      },
+      {
+        "policy_id": "rule::regime_filter",
+        "label": "Lane A regime filter",
+        "plain_rule": "A rule supplied by Lane A; its exact settings are in the spec.",
+        "exposure_change": "Changes position size between 0, half and full by market regime.",
+        "proposed_by": "Reference rule (Lane A)",
+        "stages_checked": [
+          "Training folds",
+          "Validation"
+        ],
+        "outcome": "reference",
+        "outcome_label": "Comparison only",
+        "reason": "A comparison the agents' filters must beat. Never a candidate.",
+        "validation_vs_original_pp": 0.5825776124942794,
+        "validation_vs_original_ci_pp": [
+          -0.030118091921518174,
+          0.9758201652653931
+        ],
+        "validation_own_return": 0.3877421855376444,
+        "average_size_on_validation": 0.09275470292419445,
+        "held_out": null,
+        "details": [
+          "competitor: always carried to the frozen test for comparison",
+          "validation: delta vs always-on +0.5826, net return +0.3877 = delta vs cash",
+          "walk-forward on train folds: beats always-on on 3/3 (+0.9031, +0.2605, +0.3797); stability check, not a veto",
+          "Lane A: Train intervals only: flat in trend_regime=bull, trend_7d_regime=sideways, vol_regime=low; allocation 1 in the remaining regimes."
+        ],
+        "spec": {
+          "policy_id": "rule::regime_filter",
+          "family": "regime_gate",
+          "flat_buckets": [
+            {
+              "axis": "trend_regime",
+              "bucket": "bull"
+            },
+            {
+              "axis": "trend_7d_regime",
+              "bucket": "sideways"
+            },
+            {
+              "axis": "vol_regime",
+              "bucket": "low"
+            }
+          ],
+          "full_buckets": [],
+          "allocation_flat": 0.0,
+          "allocation_full": 1.0,
+          "allocation_else": 1.0,
+          "selected_on": "train",
+          "summary": "Train intervals only: flat in trend_regime=bull, trend_7d_regime=sideways, vol_regime=low; allocation 1 in the remaining regimes."
+        },
+        "evidence_ids": [
+          "ev_arbiter_eval_b3722d6179"
+        ]
+      },
+      {
+        "policy_id": "rule::half_size_constant",
+        "label": "Constant half size",
+        "plain_rule": "When 7-day volatility is above -1: half size. Otherwise: half size. Thresholds were set on Training data.",
+        "exposure_change": "Never adds risk: it only cuts the position to half size when the condition is met.",
+        "proposed_by": "Reference rule (code)",
+        "stages_checked": [
+          "Training folds",
+          "Validation"
+        ],
+        "outcome": "reference",
+        "outcome_label": "Comparison only",
+        "reason": "A comparison the agents' filters must beat. Never a candidate.",
+        "validation_vs_original_pp": 0.11102349052186755,
+        "validation_vs_original_ci_pp": [
+          -0.2617774996018288,
+          0.23798417090083457
+        ],
+        "validation_own_return": -0.08381193643476748,
+        "average_size_on_validation": 0.5,
+        "held_out": null,
+        "details": [
+          "competitor: always carried to the frozen test for comparison",
+          "validation: delta vs always-on +0.1110, net return -0.0838 = delta vs cash",
+          "degenerate: one multiplier on 100% of in-position validation decisions",
+          "walk-forward on train folds: beats always-on on 3/3 (+0.2359, +0.1059, +0.2331); stability check, not a veto",
+          "Lane A: Always half size: the exposure-only baseline."
+        ],
+        "spec": {
+          "policy_id": "rule::half_size_constant",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "realized_vol_7d",
+              "op": ">",
+              "threshold": -1.0
+            }
+          ],
+          "allocation_when_true": 0.5,
+          "allocation_when_false": 0.5,
+          "thresholds_selected_on": "none (constant)",
+          "summary": "Always half size: the exposure-only baseline."
+        },
+        "evidence_ids": [
+          "ev_arbiter_eval_098320ca7a"
+        ]
+      }
+    ],
+    "filter_counts": {
+      "rejected": 0,
+      "not_run": 0,
+      "selected_for_further_testing": 1,
+      "approved": 0,
+      "reference": 4
+    },
+    "trace": [
+      {
+        "step": 1,
+        "actor": "Diagnostic agent",
+        "actor_kind": "AI agent",
+        "action": "proposed",
+        "title": "Found 3 pattern(s) in when the strategy works",
+        "summary": "Train net -0.896 (gross -0.562).",
+        "items": [
+          "Works worse in low volatility (medium confidence)",
+          "Works worse in trend 7d regime=sideways (medium confidence)",
+          "Works worse in vol change regime=above baseline (medium confidence)"
+        ],
+        "changed_conclusion": null,
+        "evidence_ids": [
+          "ev_regime_perfo_410156211c"
+        ]
+      },
+      {
+        "step": 2,
+        "actor": "Context agent",
+        "actor_kind": "AI agent",
+        "action": "checked",
+        "title": "Checked market mood around the best and worst weeks",
+        "summary": "On train, sentiment flips do not line up with the strategy's best or worst weeks more often than chance.",
+        "items": [
+          "0 of 4 worst train weeks started within 3 days after a greed-to-fear flip; the train base rate is 0.0956 (binomial p 1). (none)",
+          "1 of 4 best train weeks started within 3 days after a fear-to-greed flip; the train base rate is 0.093 (binomial p 0.323). (weak)"
+        ],
+        "changed_conclusion": "Nothing strong enough to act on; it did not change the filters.",
+        "evidence_ids": [
+          "ev_sentiment_ep_e3f199beba"
+        ]
+      },
+      {
+        "step": 3,
+        "actor": "Proposer agent",
+        "actor_kind": "AI agent",
+        "action": "proposed",
+        "title": "Tried 1 filter(s) on Training, proposed 1",
+        "summary": "Each filter only changes position size. The strategy's own signals are never touched.",
+        "items": [
+          "Flat when 7-day volatility is low (≤ 0.006409): Follows H1: switch off when vol_regime=low holds."
+        ],
+        "changed_conclusion": null,
+        "evidence_ids": [
+          "ev_feature_grid_85c593416f",
+          "ev_regime_perfo_410156211c",
+          "ev_test_gate_tr_fe7647202c"
+        ]
+      },
+      {
+        "step": 4,
+        "actor": "Code: scoring",
+        "actor_kind": "Code",
+        "action": "checked",
+        "title": "Scored 5 rule(s) on Validation and Training folds",
+        "summary": "1 of 1 agent filter(s) beat the original on Validation. Reference rules were scored the same way.",
+        "items": [
+          "Flat when 7-day volatility is low (≤ 0.006409): +58.2 pp vs the original, own return +38.8%",
+          "Simple reference rule: -21.2 pp vs the original, own return -40.7%",
+          "LightGBM model filter: -41.3 pp vs the original, own return -60.8%",
+          "Lane A regime filter: +58.3 pp vs the original, own return +38.8%",
+          "Constant half size: +11.1 pp vs the original, own return -8.4%"
+        ],
+        "changed_conclusion": null,
+        "evidence_ids": [
+          "ev_feature_grid_85c593416f",
+          "ev_arbiter_eval_aea4eac1d7",
+          "ev_arbiter_eval_5d0d9bebde",
+          "ev_arbiter_eval_b3722d6179",
+          "ev_arbiter_eval_098320ca7a"
+        ]
+      },
+      {
+        "step": 5,
+        "actor": "Code: health check",
+        "actor_kind": "Code",
+        "action": "checked",
+        "title": "Asked: unlucky or broken?",
+        "summary": "45 of 45 validation 14-day blocks fall inside the training range [-0.1623, +0.1235]: a loss alone does not show the strategy broke.",
+        "items": [],
+        "changed_conclusion": null,
+        "evidence_ids": [
+          "ev_strategy_hea_75c51802c2"
+        ]
+      },
+      {
+        "step": 6,
+        "actor": "Critic agent",
+        "actor_kind": "AI agent",
+        "action": "challenged",
+        "title": "Challenged 1 filter(s): rejected 0",
+        "summary": "The critic looks for leakage, overfitting and fragile samples. It can block a filter, not approve one.",
+        "items": [
+          "Flat when 7-day volatility is low (≤ 0.006409): approved for one held-out test — validation improvement CI includes zero"
+        ],
+        "changed_conclusion": null,
+        "evidence_ids": [
+          "ev_arbiter_eval_dc0eb75ed6",
+          "ev_strategy_hea_75c51802c2",
+          "ev_test_gate_tr_fe7647202c",
+          "ev_walk_forward_2c89ae0691"
+        ]
+      },
+      {
+        "step": 7,
+        "actor": "Code: selection rule",
+        "actor_kind": "Code",
+        "action": "decided",
+        "title": "Selected one filter for the held-out test",
+        "summary": "The rule was fixed before the run: beat the original with an interval above zero, beat cash, change something real, and not be rejected by the critic.",
+        "items": [
+          "Selected: Flat when 7-day volatility is low (≤ 0.006409)",
+          "champion agent::P1 beats always-on and cash on validation and passed the critic"
+        ],
+        "changed_conclusion": null,
+        "evidence_ids": []
+      }
+    ],
+    "takeaway": {
+      "strategy": {
+        "strategy_id": "btc-meanrev-48-demo",
+        "what_we_have": "positions_and_reference",
+        "name": "BTC mean reversion 48",
+        "rule": "Buy BTCUSDT when the 48-hour z-score of the close falls below -1; sell when it returns to 0.",
+        "parameters": {
+          "window_bars": 48,
+          "entry_z": -1.0,
+          "exit_z": 0.0,
+          "bar": "1h",
+          "side": "long or flat"
+        },
+        "source": "A/kok_a/strategies.py (_mean_reversion, version meanrev-z48-v1)",
+        "runnable_code_included": false,
+        "note": "The analysis used this strategy's positions. Its definition and the file that generates them are listed here; this report itself contains no runnable code."
+      },
+      "selected_filter": {
+        "policy_id": "agent::P1",
+        "label": "Flat when 7-day volatility is low (≤ 0.006409)",
+        "plain_rule": "When 7-day volatility is at or below 0.006409: no position. Otherwise: full size. Thresholds were set on Training data.",
+        "status": "Selected for further testing",
+        "spec": {
+          "policy_id": "agent::P1",
+          "family": "threshold_gate",
+          "conditions": [
+            {
+              "feature": "realized_vol_7d",
+              "op": "<=",
+              "threshold": 0.006409240155854531
+            }
+          ],
+          "allocation_when_true": 0.0,
+          "allocation_when_false": 1.0,
+          "thresholds_selected_on": "train"
+        }
+      },
+      "selected_filter_note": "Exact settings of the selected filter. It has not been through the held-out test, so it is not approved.",
+      "evidence": [
+        {
+          "label": "Flat when 7-day volatility is low (≤ 0.006409): scoring evidence",
+          "evidence_id": "ev_feature_grid_85c593416f"
+        },
+        {
+          "label": "Flat when 7-day volatility is low (≤ 0.006409): scoring evidence",
+          "evidence_id": "ev_test_gate_tr_fe7647202c"
+        },
+        {
+          "label": "Flat when 7-day volatility is low (≤ 0.006409): scoring evidence",
+          "evidence_id": "ev_regime_perfo_410156211c"
+        },
+        {
+          "label": "Unlucky or broken check",
+          "evidence_id": "ev_strategy_hea_75c51802c2"
+        }
+      ],
+      "plans": "Nothing here places orders. Any saved paper plan stays saved, not running."
+    },
+    "glossary": [
+      {
+        "term": "Original strategy",
+        "meaning": "The strategy exactly as supplied, always on. Nothing here changes its signals."
+      },
+      {
+        "term": "Filter",
+        "meaning": "A rule that only changes position size (0, half or full) depending on market conditions. Also called a gate."
+      },
+      {
+        "term": "Training",
+        "meaning": "The oldest data. Agents may study it and try filters on it."
+      },
+      {
+        "term": "Validation",
+        "meaning": "Later data the agents never saw. Code scores each proposed filter here, once."
+      },
+      {
+        "term": "Held-out test",
+        "meaning": "The newest data, sealed. Opened once, after the selection is committed, and never used to choose."
+      },
+      {
+        "term": "pp",
+        "meaning": "Percentage points: the difference between two returns, e.g. -29% vs -56% is +27 pp."
+      },
+      {
+        "term": "90% interval",
+        "meaning": "The range the result would likely fall in on similar data. If it contains zero, the effect is not proven."
+      },
+      {
+        "term": "Critic",
+        "meaning": "An AI agent whose job is to find reasons a filter will not hold up. It can reject a filter; it cannot approve one by itself."
+      },
+      {
+        "term": "Training folds",
+        "meaning": "Three slices of the Training data used as a stability check. Not unseen data."
+      }
+    ],
+    "generated_by": "code (packages/research_agents/presentation.py); no new numbers, no new decisions"
+  }
+}

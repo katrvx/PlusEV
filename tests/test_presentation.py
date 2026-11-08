@@ -108,3 +108,19 @@ def test_report_model_accepts_presentation_and_old_reports_still_load():
     InvestigationReport.model_validate(MEANREV)                     # no presentation field: still valid
     r = InvestigationReport.model_validate({**MEANREV, "presentation": present(MEANREV).model_dump(mode="json")})
     assert r.presentation["headline"]["finding"]
+
+
+def test_one_held_out_look_per_window_whatever_the_policy(tmp_path):
+    from packages.research_agents import frozen
+    ledger = tmp_path / "ledger.json"
+    ledger.write_text(json.dumps([{"spec_hash": "spec_a", "experiment_id": "exp_1", "policy_id": "agent::a",
+                                   "looked_at": "2026-11-08", "artifact": "x.json"}]))
+    with pytest.raises(frozen.WindowAlreadyOpened):
+        frozen.check_window("exp_1", ledger)                       # a different filter, same window: refused
+    frozen.check_window("exp_2", ledger)                           # fresh data: allowed
+    with pytest.raises(frozen.WindowAlreadyOpened):
+        frozen.record({"spec_hash": "spec_b", "experiment_id": "exp_1", "policy_id": "agent::b",
+                       "looked_at": "now", "artifact": "y.json"}, ledger)
+    # the real ledger already holds the mean-reversion window, so the rerun's new candidate cannot take a look
+    with pytest.raises(frozen.WindowAlreadyOpened):
+        frozen.check_window(MEANREV["experiment_id"])

@@ -49,6 +49,7 @@ def main():
     champ = accepted[0]["policy_spec"]
     h = spec_hash(champ)
     frozen.check(h)
+    frozen.check_window(report["experiment_id"])   # one look per test window, whatever the policy
 
     from kok_a.experiment import load_for_lane_b, score_frozen
     exp, runner, *_ = load_for_lane_b(report["strategy_id"])
