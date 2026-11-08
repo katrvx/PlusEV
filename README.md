@@ -12,14 +12,16 @@ Hackathon MVP. Paper-only. Not a claim of validated alpha.
 
 **What it does.** You give it an existing trading strategy, and it never changes the strategy's signals. AI agents work out when the strategy has an edge: which trend, volatility, liquidity and sentiment regimes it makes money in. They propose a simple on/off rule (a "gate"). Deterministic code then decides, by a rule fixed in advance, whether that gate deserves a test on data nobody has looked at.
 
-**Real result on real data.** The sealed book is Binance spot BTCUSDT hourly bars from 2018-02-01 through 2026-10-31, with Fear & Greed. The table below is the Argon investigation on the earlier window, Nov 2024 to Oct 2026. Those two reports still need a rerun on the longer book. They are validation-stage results; the final test window in each report stayed sealed:
+**Real result on real data.** Binance spot BTCUSDT hourly bars, 2018-02-01 to 2026-10-31, with Fear & Greed. Research period 2018-02 → 2023-05, validation 2023-05 → 2025-02, and a sealed test 2025-02 → 2026-10 opened once. Two strategies whose parameters and costs (10 bp + 1 bp) were fixed before the run. Agents on Gemini 4 Argon:
 
 | | Trend (`btc-trend-24-72-demo`) | Mean reversion (`btc-meanrev-48-demo`) |
 |---|---|---|
-| Strategy as-is, validation | −7.1%, 90% CI spans zero | −40.3%, 90% CI below zero |
-| Bad luck or broken? | 10/10 two-week blocks inside the train range, so the loss alone is not evidence it broke. Sentiment flipped from 51% to 99% "fear" | 3/10 blocks below the range (more than chance), so it does not behave like it did in training |
-| Agent gates | 3 proposed, all vetoed by the AI critic: the Fear & Greed gates were off 99% of the time after the sentiment shift, and each failed its own falsification test | 3 proposed, all approved by the critic (best: +14.8% vs as-is, 3/3 train folds). The code still rejected them: they lose money, so they lose to cash |
-| What it means | Don't kill; monitor | Kill candidate: a filter that loses less is not a fix |
+| Strategy as-is | Research +276%; validation +134% (90% CI +14% … +413%) | Research −90%; validation −19% |
+| Unlucky or broken? | 43 of 45 two-week blocks inside the normal range (2 above it) | 45 of 45 inside, but its normal range is losing money: it never worked |
+| Agent gates | 3 proposed, **all vetoed by the critic**. The best, "trade only when Fear & Greed > 28", beat as-is by 32% on validation, but sentiment had flipped to greed (fear fell from 51% to 10% of the time), so the gate was simply on 97% of the time and lost 48% on the first research fold | **Champion found**: half size when 7-day volatility is below its research median. Validation +26.8% vs as-is (CI above zero), 3/3 research folds, critic approved |
+| Sealed test, one look | Lane A arbiter: **INCONCLUSIVE** (intervals contain zero) | Gate vs as-is **+27.3%, 90% CI +15.3% … +36.2%**, drawdown 60% → 36%: the improvement held. But the gated strategy still lost 29%. Lane A arbiter: **KILL** |
+
+The mean-reversion row is the point of the product: the agent found a real improvement that survived unseen data, and the system still says kill, because a filter that loses less does not make a strategy worth funding. The sealed look is recorded in `experiments/frozen_look_btc-meanrev-48-demo.json`, after the report that chose the champion was committed.
 
 The agents propose and explain; **code computes every number and makes every decision.**
 
@@ -27,7 +29,7 @@ The agents propose and explain; **code computes every number and makes every dec
 
 | What | Where |
 |---|---|
-| The two agent reports (every claim cites an evidence id from a real tool call) | `experiments/investigation_argon_lane_a.json`, `experiments/investigation_argon_meanrev.json`, or the web app → Explore → Evidence → *Open agent report* |
+| The two agent reports (every claim cites an evidence id from a real tool call) and the one sealed look | `experiments/investigation_argon_lane_a.json`, `experiments/investigation_argon_meanrev.json`, `experiments/frozen_look_btc-meanrev-48-demo.json`, or the web app → Explore → Evidence → *Open agent report* |
 | How the agents are kept honest | [`LANE_B.md`](LANE_B.md): number verifier, sealed holdout, pre-registered rule, three adversarial reviews |
 | Data, costs, baselines, arbiter, 14-day paper plan | [`A/README.md`](A/README.md) |
 | Web app and API | [`LANE_C.md`](LANE_C.md) |
@@ -37,14 +39,14 @@ The agents propose and explain; **code computes every number and makes every dec
 
 ```bash
 pip install -r requirements-lane-b.txt -r requirements-lane-c.txt && npm ci
-python3 -m pytest -q tests/ A/tests                              # 206 tests: leakage, costs, holdout, verifier, API
+python3 -m pytest -q tests/ A/tests                              # 207 tests: leakage, costs, holdout, verifier, API
 python3 -m uvicorn apps.api.main:app --port 8000 &                # API
 npm run dev                                                        # web app on http://127.0.0.1:3000
 python3 scripts/run_investigation.py --lane-a --fallback          # agents without an API key (deterministic)
 KOK_AGENT_MODEL=google:gemini-4-argon GEMINI_API_KEY=... python3 scripts/run_investigation.py --lane-a   # LLM agents
 ```
 
-**Honest limits.** The Argon reports above used Nov 2024–Oct 2026, about one market cycle. The sealed hourly book now runs from February 2018 through October 2026, and those reports have not been rerun on it. No news archive with first-seen timestamps exists for us, so news is not used (the point-in-time news store is built and tested). The 14-day paper plan is an approved hourly shadow log. The stored book ends at 2026-10-31 23:00 UTC, so the log has no bars yet and is not a result. Nothing here trades real money.
+**Honest limits.** Two demo strategies on one market (BTC), not imported live strategies, and not claimed as alpha. No news archive with first-seen timestamps exists for us, so news is not used and every run is market-only (the point-in-time news store is built and tested). The 14-day paper plan is an approved hourly shadow log; the stored book ends at 2026-10-31 23:00 UTC, so the log has no bars yet and is not a result. Nothing here trades real money.
 
 ---
 

@@ -84,6 +84,38 @@ On real data: 10 of 10 validation blocks fall inside the train range [−9.1%, +
 
 ## Two strategies on real data
 
+Lane A's 2018-02 → 2026-10 hourly BTCUSDT book (research → 2023-05, validation → 2025-02, sealed test → 2026-10). Both investigations ran on Gemini 4 Argon (`mode=llm`, no agent failures, holdout not accessed).
+
+| | `btc-trend-24-72-demo` | `btc-meanrev-48-demo` |
+|---|---|---|
+| Always-on | research +276%, validation +134% | research −90%, validation −19% |
+| Strategy health (validation) | `within_training_range`, 43/45 blocks inside, 2 above. Sentiment, volatility and cost per bar changed | `within_training_range`, 45/45 inside. Its normal range is a losing one |
+| Context agent | 2 of 4 best weeks followed a greed-to-fear flip (p 0.048, one of four tallies, so weak); worst weeks show no flips | Sentiment does not separate good and bad weeks |
+| Agent gates | 3 proposed, all vetoed. `fear_greed > 28` beat always-on by 32% on validation, but it was on 97% of the time after the sentiment shift (fear 51% → 10%) and lost 48% on the first research fold | Champion `vol_median_05_1` (half size when `realized_vol_7d` ≤ research median): validation +26.8% vs always-on (90% CI +1.1% … +40.9%), +7.3% vs cash, 3/3 folds, critic approved |
+| Sealed test (one look) | Lane A arbiter: INCONCLUSIVE | Gate vs always-on +27.3% (90% CI +15.3% … +36.2%), max drawdown 60.4% → 36.2%, but net −28.9%. Lane A arbiter: KILL |
+
+Reports: `experiments/investigation_argon_lane_a.json`, `experiments/investigation_argon_meanrev.json`. The sealed look is `experiments/frozen_look_btc-meanrev-48-demo.json`. It was taken after the report that chose the champion was committed (`ad3dff1`).
+
+## Agent 4: context (`context.py`)
+
+The spec's fourth agent is a context and news analyst. There is no news archive with first-seen timestamps, so this agent works on market sentiment (Fear & Greed), which Lane A joins point-in-time (each daily value as of its next-day availability). Code (`sentiment_episodes`, TRAIN only) picks the unchanged strategy's 4 worst and 4 best non-overlapping weeks (168 bars). For each week it records the Fear & Greed level, its 7-day change, and whether a greed-to-fear or fear-to-greed flip (across 50) happened in the 3 days before the week started. It also gives the train base rate of such flips and a one-sided binomial p-value. The agent writes findings that cite this evidence and name the weeks they use. The verifier rejects:
+- causal language ("because", "caused", "led to"…);
+- invented numbers;
+- unknown episode ids;
+- strength `moderate` unless a cited p-value is below 0.10.
+
+The findings go to the proposer as context only; gates are still based on the diagnostic hypotheses. Without a sentiment series (the stand-in), the stage is skipped and disclosed.
+
+On real data, for both strategies, sentiment flips do not line up with the best or worst weeks more often than chance (0 or 1 of 4 against base rates around 0.12). That is reported as a finding.
+
+## Bad luck vs broken (`health.py`)
+
+Spec section 8: a poor result alone is not proof that a strategy broke. Code, not an agent, cuts the unchanged strategy's validation period into 14-day blocks. It compares each block with Lane A's train-only 14-day range (5th to 95th percentile of block-bootstrapped train paths). About 5% of blocks should fall below that range by chance. If more do (one-sided binomial p < 0.05), the result is `outside_training_range`; otherwise it is `within_training_range`. It also checks which assumption changed between train and validation: exposure, turnover per bar, cost per bar, bar volatility (ratio outside 2/3–3/2), and how often each regime occurs (total variation ≥ 0.25). The thresholds are fixed in the module. Because the check reads validation, only the critic can call it (`strategy_health` tool) and it appears in the report (`strategy_health`, plus a line in `verdict_basis`). The fallback critic notes when the regime behind a gate's feature shifted.
+
+On real data: 10 of 10 validation blocks fall inside the train range [−9.1%, +10.1%]. The −7.1% validation loss is therefore not by itself evidence that the strategy broke. One assumption did change: sentiment went from about 51% "fear" bars on train to 99% on validation. That is exactly why the agent's Fear & Greed gate collapsed.
+
+## Two strategies on real data
+
 Both of Lane A's demo strategies on the same BTCUSDT 1h snapshot (validation results; the test stays sealed):
 
 | | `btc-trend-24-72-demo` | `btc-meanrev-48-demo` |
