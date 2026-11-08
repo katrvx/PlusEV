@@ -6,6 +6,8 @@ This is the concrete integration map for Lane A/B. It describes the code that ex
 
 Lane B is already merged into the current `main` checkout. Do not cherry-pick or merge a separate Lane B branch for this handoff; write its native report artifact and let the Part C reader discover it.
 
+The real 2018–2026 reports are in this branch. Read [`docs/LANE_A_NOTE_FOR_C.md`](docs/LANE_A_NOTE_FOR_C.md). `experiments/investigation_fixture.json` is the labelled synthetic example, not the judge result.
+
 | Need | Current file / export | Value to use |
 |---|---|---|
 | Shared browser types | [`packages/contracts/index.ts`](packages/contracts/index.ts) | Re-exports `types.ts`, `research.ts`, and `api.ts` |
