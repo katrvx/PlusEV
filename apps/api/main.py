@@ -643,7 +643,26 @@ def create_paper_test(request: PaperTestRequest) -> dict[str, Any]:
         raise HTTPException(status_code=409, detail="Only a completed, evaluated experiment can be frozen")
     paper_id = f"paper_{uuid.uuid4().hex[:14]}"
     strategy = db_get("strategies", "strategy_id", experiment["strategy_id"])
-    plan = {"paper_test_id": paper_id, "experiment_id": experiment["experiment_id"], "status": "planned", "duration_days": 14, "approved_at": iso(utc_now()), "policy_id": experiment["policy_id"], "mode": experiment["mode"], "execution": "paper_only", "message": "Frozen plan recorded. No trading or brokerage connection was started.", "snapshot": {"strategy_id": experiment["strategy_id"], "dataset_hash": experiment["dataset_hash"], "policy_id": experiment["policy_id"], "windows": experiment["windows"], "policy": experiment["policy"], "assumptions": strategy.get("assumptions", {}) if strategy else {}}}
+    plan = {
+        "paper_test_id": paper_id,
+        "experiment_id": experiment["experiment_id"],
+        "status": "awaiting_bars",
+        "duration_days": 14,
+        "approved_at": iso(utc_now()),
+        "policy_id": experiment["policy_id"],
+        "mode": experiment["mode"],
+        "execution": "paper_only",
+        "message": "Frozen plan approved. No trading or brokerage connection was started. The shadow log is waiting for the next hourly bar after 2026-10-31 23:00 UTC.",
+        "shadow": {
+            "interval": "1h",
+            "horizon_bars": 14 * 24,
+            "horizon_days": 14,
+            "fills_recorded": 0,
+            "conclusion": None,
+            "message": "Champion and challenger stay frozen. Each closed hour after 2026-10-31 23:00 UTC is logged. The stored book ends on that bar, so this 14-day path is not a result.",
+        },
+        "snapshot": {"strategy_id": experiment["strategy_id"], "dataset_hash": experiment["dataset_hash"], "policy_id": experiment["policy_id"], "windows": experiment["windows"], "policy": experiment["policy"], "assumptions": strategy.get("assumptions", {}) if strategy else {}},
+    }
     db_insert("paper_tests", paper_id, plan)
     return plan
 

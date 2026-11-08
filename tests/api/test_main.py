@@ -186,7 +186,12 @@ def test_paper_test_requires_approval_and_is_paper_only() -> None:
         raise AssertionError("unapproved paper test should fail")
     plan = create_paper_test(PaperTestRequest(experiment_id=experiment["experiment_id"], duration_days=14, approved=True))
     assert plan["duration_days"] == 14
+    assert plan["status"] == "awaiting_bars"
     assert plan["execution"] == "paper_only"
+    assert plan["shadow"]["interval"] == "1h"
+    assert plan["shadow"]["horizon_bars"] == 14 * 24
+    assert plan["shadow"]["fills_recorded"] == 0
+    assert plan["shadow"]["conclusion"] is None
     assert "No trading" in plan["message"]
 
 

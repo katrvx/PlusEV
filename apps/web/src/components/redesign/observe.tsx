@@ -12,7 +12,7 @@ export default function ObserveView({ plans, strategies, onReview }: { plans: Pa
   return <section className="ob-page" aria-labelledby="ob-title">
     <header className="ob-heading"><span className="ob-kicker">PAPER TESTS</span><h1 id="ob-title">Your paper plans.</h1></header>
     {plans.length === 0 ? <section className="ob-empty"><span className="ob-empty-mark"><FlaskConical size={24} /></span><h2>Your first paper test starts with a plan.</h2><p>Review a result and freeze its rules.</p><button className="ob-action kk-primary-button" type="button" onClick={onReview}><Plus size={16} />Review a paper plan</button></section> : <>
-      <div className="ob-status"><ShieldCheck size={17} /><p><strong>Saved · not running.</strong></p></div>
+      <div className="ob-status"><ShieldCheck size={17} /><p><strong>Saved. The shadow log waits for the next hourly bar.</strong></p></div>
       <section className="ob-list" aria-label="Saved paper plans"><div className="ob-list-head"><span>Saved plans</span><span>{plans.length} {plans.length === 1 ? "plan" : "plans"}</span></div>{plans.map(plan => {
         const strategy = strategyFor(plan);
         const snapshot = plan.snapshot;
@@ -21,7 +21,8 @@ export default function ObserveView({ plans, strategies, onReview }: { plans: Pa
         const conditions = policy?.conditions ?? [];
         return <article className="ob-plan" key={plan.paper_test_id}>
           <div className="ob-plan-main"><h2>{strategy?.name || (snapshot ? "Frozen strategy" : "Saved plan")}</h2><p>{strategy?.symbol || (snapshot?.strategy_id ? `Strategy ${snapshot.strategy_id}` : "Frozen strategy identity unavailable")} · {plan.mode === "demo" ? "Illustrative example" : "Measured plan"}</p></div>
-          <dl className="ob-plan-facts"><div><dt>Rules</dt><dd>Frozen</dd></div><div><dt>Duration</dt><dd>{plan.duration_days} days</dd></div><div><dt>Approved</dt><dd>{new Date(plan.approved_at).toLocaleDateString("en-GB", { dateStyle: "medium", timeZone: "UTC" })}</dd></div><div><dt>Status</dt><dd>Planned · not started</dd></div></dl>
+          <dl className="ob-plan-facts"><div><dt>Rules</dt><dd>Frozen</dd></div><div><dt>Duration</dt><dd>{plan.duration_days} days</dd></div><div><dt>Approved</dt><dd>{new Date(plan.approved_at).toLocaleDateString("en-GB", { dateStyle: "medium", timeZone: "UTC" })}</dd></div><div><dt>Status</dt><dd>{plan.shadow ? `${plan.shadow.fills_recorded} of ${plan.shadow.horizon_bars} hours logged` : "Waiting for the next hour"}</dd></div></dl>
+          {plan.shadow?.message ? <p className="ob-snapshot-muted">{plan.shadow.message}</p> : null}
           <details className="ob-plan-detail"><summary><FileText size={14} />Show frozen plan</summary><div className="ob-plan-detail-body">
             <p>Plan <code>{plan.paper_test_id}</code> · Experiment <code>{plan.experiment_id}</code> · Policy <code>{plan.policy_id}</code></p>
             {snapshot ? <>

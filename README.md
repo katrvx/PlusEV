@@ -12,7 +12,7 @@ Hackathon MVP. Paper-only. Not a claim of validated alpha.
 
 **What it does.** You give it an existing trading strategy, and it never changes the strategy's signals. AI agents work out when the strategy has an edge: which trend, volatility, liquidity and sentiment regimes it makes money in. They propose a simple on/off rule (a "gate"). Deterministic code then decides, by a rule fixed in advance, whether that gate deserves a test on data nobody has looked at.
 
-**Real result on real data.** Binance BTCUSDT 1h, Nov 2024 to Oct 2026, with Fear & Greed. Two strategies, agents on Gemini 4 Argon, and these are validation-stage results; the final test window is still sealed:
+**Real result on real data.** The sealed book is Binance spot BTCUSDT hourly bars from 2018-02-01 through 2026-10-31, with Fear & Greed. The table below is the Argon investigation on the earlier window, Nov 2024 to Oct 2026. Those two reports still need a rerun on the longer book. They are validation-stage results; the final test window in each report stayed sealed:
 
 | | Trend (`btc-trend-24-72-demo`) | Mean reversion (`btc-meanrev-48-demo`) |
 |---|---|---|
@@ -44,7 +44,7 @@ python3 scripts/run_investigation.py --lane-a --fallback          # agents witho
 KOK_AGENT_MODEL=google:gemini-4-argon GEMINI_API_KEY=... python3 scripts/run_investigation.py --lane-a   # LLM agents
 ```
 
-**Honest limits.** Two years of data covers roughly one market cycle, so few regime effects survive. No news archive with first-seen timestamps exists for us, so news is not used (the point-in-time news store is built and tested). The 14-day paper plan is recorded, not run. Nothing here trades real money.
+**Honest limits.** The Argon reports above used Nov 2024–Oct 2026, about one market cycle. The sealed hourly book now runs from February 2018 through October 2026, and those reports have not been rerun on it. No news archive with first-seen timestamps exists for us, so news is not used (the point-in-time news store is built and tested). The 14-day paper plan is an approved hourly shadow log. The stored book ends at 2026-10-31 23:00 UTC, so the log has no bars yet and is not a result. Nothing here trades real money.
 
 ---
 

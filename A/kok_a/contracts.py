@@ -191,11 +191,24 @@ class Decision(BaseModel):
     evidence: dict[str, float] = Field(default_factory=dict)
 
 
+class PaperFill(BaseModel):
+    """One hourly shadow decision. The fill is the next bar's open, same as the backtest."""
+
+    decision_time: datetime
+    champion_position: float
+    challenger_position: float
+    fill_open: float
+    champion_net: float
+    challenger_net: float
+    fee: float
+    slippage: float
+
+
 class PaperPlan(BaseModel):
     """A frozen 14-day shadow plan. Recording it is not a claim that it has run."""
 
     plan_id: str
-    status: Literal["recorded_not_started"] = "recorded_not_started"
+    status: Literal["recorded_not_started", "awaiting_bars", "running", "completed"] = "recorded_not_started"
     completed: bool = False
     approved: bool = False
     horizon_days: int = 14
@@ -208,4 +221,9 @@ class PaperPlan(BaseModel):
     predictive_range_low: float | None = None
     predictive_range_high: float | None = None
     predictive_horizon_bars: int | None = None
+    fills: list[PaperFill] = Field(default_factory=list)
+    champion_net_return: float | None = None
+    challenger_net_return: float | None = None
+    range_position: Literal["inside", "below", "above", "incomplete"] | None = None
+    paper_conclusion: Literal["INCONCLUSIVE", "MONITOR"] | None = None
     notes: list[str]

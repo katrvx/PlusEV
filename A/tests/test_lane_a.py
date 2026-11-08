@@ -756,3 +756,54 @@ def test_experiment_records_an_unstarted_paper_plan(bundle):
     rule = next(row for row in bundle.result.baselines if row.policy == "simple_rule" and row.split == "test")
     assert rule.metrics.cvar_05 is not None
     assert rule.metrics.avg_holding_bars is not None
+
+
+def test_hourly_shadow_log_records_fourteen_days_after_approval():
+    from kok_a.contracts import PaperPlan
+    from kok_a.paper import open_shadow, record_shadow
+
+    plan = open_shadow(
+        PaperPlan(
+            plan_id="paper_test",
+            strategy_id="btc-trend-24-72-demo",
+            strategy_version="trend-sma-24-72-v1",
+            champion_policy_id="always_on",
+            challenger_policy_id="cash",
+            frozen_at_experiment="exp",
+            cost_assumptions="10 bps fee + 1 bp slippage",
+            predictive_range_low=-0.05,
+            predictive_range_high=0.05,
+            predictive_horizon_bars=14 * 24,
+            notes=["not a result"],
+        )
+    )
+    assert plan.status == "awaiting_bars" and plan.approved is True
+    waiting = record_shadow(plan, pd.DataFrame())
+    assert waiting.status == "awaiting_bars" and waiting.fills == []
+    start = pd.Timestamp("2026-11-01", tz="UTC")
+    rows = pd.DataFrame(
+        {
+            "decision_time": start + pd.to_timedelta(range(14 * 24), unit="h"),
+            "champion_position": 1.0,
+            "challenger_position": 0.0,
+            "fill_open": 100.0,
+            "champion_net": 0.0001,
+            "challenger_net": 0.0,
+            "fee": 0.0,
+            "slippage": 0.0,
+        }
+    )
+    sealed = plan.model_copy(update={"approved": False, "status": "recorded_not_started"})
+    with pytest.raises(RuntimeError):
+        record_shadow(sealed, rows)
+    running = record_shadow(plan, rows.iloc[:10])
+    assert running.status == "running" and running.completed is False and running.paper_conclusion is None
+    done = record_shadow(plan, rows)
+    assert done.status == "completed" and done.completed is True
+    assert len(done.fills) == 14 * 24
+    assert done.fills[0].decision_time == start.to_pydatetime()
+    assert done.range_position == "inside" and done.paper_conclusion == "INCONCLUSIVE"
+    crash = rows.copy()
+    crash["champion_net"] = -0.01
+    crashed = record_shadow(plan, crash)
+    assert crashed.range_position == "below" and crashed.paper_conclusion == "MONITOR"

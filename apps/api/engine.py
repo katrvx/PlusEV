@@ -312,6 +312,9 @@ def _metrics(result: Any, selected: str, champion: Any) -> list[dict[str, Any]]:
         {"label": f"{POLICY_NAMES.get(selected, selected)} net return", "value": chosen.net_return, "format": "percent", "description": "Arbiter selection on the sealed test"},
         {"label": "Δ vs always-on", "value": chosen.net_return - base.net_return, "format": "percent", "description": "Difference of compounded test returns"},
         {"label": "Switches", "value": chosen.n_switches, "format": "integer", "description": "Position changes of the selected overlay on the test window"},
+        {"label": "Sortino", "value": chosen.sortino, "format": "number", "description": "Return against downside variation. Hourly bars, same annualisation as Sharpe."},
+        {"label": "5% CVaR", "value": chosen.cvar_05, "format": "percent", "description": "Mean of the worst 5% of hourly bar returns on the sealed test."},
+        {"label": "Average holding", "value": chosen.avg_holding_bars, "format": "number", "description": "Average consecutive hours with a position. One bar is one hour."},
     ]
     if champion is not None:
         rows.append(
@@ -339,11 +342,18 @@ def _baselines(result: Any, champion: Any) -> list[dict[str, Any]]:
 
 def _baseline(policy_id: str, name: str, metrics: Any) -> dict[str, Any]:
     sharpe = metrics.sharpe
+    sortino = getattr(metrics, "sortino", None)
+    cvar = getattr(metrics, "cvar_05", None)
+    holding = getattr(metrics, "avg_holding_bars", None)
     return {
         "id": policy_id,
         "name": name,
         "net_return": float(metrics.net_return),
         "sharpe": 0.0 if sharpe is None else float(sharpe),
+        "sortino": None if sortino is None else float(sortino),
+        "cvar_05": None if cvar is None else float(cvar),
+        "avg_holding_bars": None if holding is None else float(holding),
+        "holding_hours": None if holding is None else float(holding),
         "max_drawdown": -abs(float(metrics.max_drawdown)),
         "exposure": float(metrics.exposure),
         "turnover": float(metrics.turnover),

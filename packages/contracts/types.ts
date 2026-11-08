@@ -22,7 +22,11 @@ export type ImportRequest = {
 };
 export type ImportResult = { strategy: Strategy | null; issues: ValidationIssue[]; valid: boolean };
 export type Metric = { label: string; value: number | null; format: "percent" | "number" | "integer"; description: string };
-export type Baseline = { id: string; name: string; net_return: number; sharpe: number; max_drawdown: number; exposure: number; turnover: number; trades: number };
+export type Baseline = {
+  id: string; name: string; net_return: number; sharpe: number; max_drawdown: number;
+  exposure: number; turnover: number; trades: number;
+  sortino?: number | null; cvar_05?: number | null; avg_holding_bars?: number | null; holding_hours?: number | null;
+};
 export type EquityPoint = { date: string; base: number; rule: number; proposed: number; cash: number };
 export type Regime = { id: string; trend: string; volatility: string; net_return: number; trades: number; confidence_low: number; confidence_high: number; evidence_id: string; label?: string };
 export type Evidence = { id: string; title: string; kind: string; summary: string; source: string; window: string; facts: { label: string; value: string }[] };
@@ -48,5 +52,20 @@ export type PaperPlanSnapshot = {
   policy: { description: string; conditions: string[]; holdout_frozen: boolean; test_evaluated: boolean };
   assumptions: Partial<Strategy["assumptions"]>;
 };
-export type PaperPlan = { paper_test_id: string; experiment_id: string; status: "planned"; duration_days: number; approved_at: string; policy_id: string; mode: "demo" | "measured"; snapshot?: PaperPlanSnapshot };
+export type PaperShadow = {
+  interval: "1h";
+  horizon_bars: number;
+  horizon_days: number;
+  fills_recorded: number;
+  conclusion: "INCONCLUSIVE" | "MONITOR" | null;
+  message: string;
+};
+export type PaperPlan = {
+  paper_test_id: string; experiment_id: string;
+  status: "planned" | "awaiting_bars" | "running" | "completed";
+  duration_days: number; approved_at: string; policy_id: string; mode: "demo" | "measured";
+  snapshot?: PaperPlanSnapshot;
+  shadow?: PaperShadow;
+  message?: string;
+};
 export type Health = { status: string; research_engine: boolean; version: string };
