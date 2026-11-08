@@ -823,7 +823,7 @@ def test_fold_trials_carry_a_structured_fold_field():
 
 
 def test_redact_drops_lane_a_notes_that_quote_the_sealed_verdict():
-    """R3-F2: Lane A's dev view keeps a note with the test-derived verdict; agents never get it."""
+    """R3-F2: Lane A now drops this sentence in agent_view. redact still clears every note before a tool call."""
     from packages.research_agents.tools import redact
     exp = build()[0]
     leaky = exp.model_copy(update={"notes": ["Verdict KEEP comes from the deterministic arbiter"]})

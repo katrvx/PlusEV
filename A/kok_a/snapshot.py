@@ -20,12 +20,17 @@ from kok_a.market import SNAPSHOT_SYNTHETIC, hash_ohlcv, synthetic_ohlcv
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = ROOT / "fixtures"
 OHLCV_PATH = FIXTURE_DIR / "btcusdt_1h_spot.csv"
+FIVE_MIN_PATH = FIXTURE_DIR / "btcusdt_5m_spot.csv"
+FIVE_MIN_MANIFEST_PATH = FIXTURE_DIR / "snapshot_5m.json"
 FEAR_GREED_PATH = FIXTURE_DIR / "fear_greed.csv"
 MANIFEST_PATH = FIXTURE_DIR / "snapshot.json"
 
-SNAPSHOT_READY = "binance-spot-btcusdt-1h-202411-202610"
-READY_START = pd.Timestamp("2024-11-01", tz="UTC")
+SNAPSHOT_READY = "binance-spot-btcusdt-1h-201802-202610"
+READY_START = pd.Timestamp("2018-02-01", tz="UTC")
 READY_END = pd.Timestamp("2026-11-01", tz="UTC")  # exclusive; last open is 2026-10-31 23:00
+WINDOW_LABEL = "2018-02-01 through 2026-10-31"
+FIVE_MIN_START = pd.Timestamp("2026-05-08", tz="UTC")
+FIVE_MIN_END = pd.Timestamp("2026-11-08", tz="UTC")  # exclusive; last open is 2026-11-07 23:55
 
 BINANCE_KLINES = "https://api.binance.com/api/v3/klines"
 FNG_URL = "https://api.alternative.me/fng/?limit=0&format=json"
@@ -94,17 +99,46 @@ def fetch_ready_snapshot() -> dict:
     return manifest
 
 
-def _fetch_klines(start: pd.Timestamp, end: pd.Timestamp, symbol: str = "BTCUSDT") -> pd.DataFrame:
+def fetch_five_minute_snapshot() -> dict:
+    """BTCUSDT 5m for the six months ending 2026-11-08. Not the sealed-test snapshot."""
+
+    FIXTURE_DIR.mkdir(exist_ok=True)
+    raw = _fetch_klines(FIVE_MIN_START, FIVE_MIN_END, interval="5m")
+    _write_ohlcv(raw, FIVE_MIN_PATH)
+    loaded = read_binance_klines(FIVE_MIN_PATH)
+    gaps = _gap_count(loaded, pd.Timedelta(minutes=5))
+    manifest = {
+        "id": "binance-spot-btcusdt-5m-202605-202611",
+        "symbol": "BTCUSDT",
+        "venue": "binance_spot",
+        "interval": "5m",
+        "start": FIVE_MIN_START.isoformat(),
+        "end_exclusive": FIVE_MIN_END.isoformat(),
+        "n_bars": int(len(loaded)),
+        "n_gaps_over_5m": gaps,
+        "market_hash": hash_ohlcv(loaded),
+        "first_open": float(loaded["open"].iloc[0]),
+        "last_close": float(loaded["close"].iloc[-1]),
+        "sources": {"ohlcv": BINANCE_KLINES},
+        "note": "Visual series only. The sealed test stays on the hourly snapshot. 24/72 and 48 are hourly bar counts.",
+        "fetched_at": pd.Timestamp.now(tz="UTC").isoformat(),
+    }
+    FIVE_MIN_MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n")
+    return manifest
+
+
+def _fetch_klines(start: pd.Timestamp, end: pd.Timestamp, symbol: str = "BTCUSDT", interval: str = "1h") -> pd.DataFrame:
+    step_ms = {"1h": 3_600_000, "5m": 300_000}[interval]
     cursor = int(start.timestamp() * 1000)
     end_ms = int(end.timestamp() * 1000)
     rows: list[list] = []
     while cursor < end_ms:
-        url = f"{BINANCE_KLINES}?symbol={symbol}&interval=1h&startTime={cursor}&endTime={end_ms - 1}&limit=1000"
+        url = f"{BINANCE_KLINES}?symbol={symbol}&interval={interval}&startTime={cursor}&endTime={end_ms - 1}&limit=1000"
         batch = _get_json(url)
         if not batch:
             break
         rows.extend(batch)
-        nxt = int(batch[-1][0]) + 3_600_000
+        nxt = int(batch[-1][0]) + step_ms
         if nxt <= cursor:
             break
         cursor = nxt
@@ -147,9 +181,9 @@ def _fetch_fear_greed(start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
     return pd.DataFrame(records).sort_values("available_at").reset_index(drop=True)
 
 
-def _gap_count(ohlcv: pd.DataFrame) -> int:
+def _gap_count(ohlcv: pd.DataFrame, step: pd.Timedelta = pd.Timedelta(hours=1)) -> int:
     delta = pd.to_datetime(ohlcv["open_time"], utc=True).diff().dropna()
-    return int((delta > pd.Timedelta(hours=1)).sum())
+    return int((delta > step).sum())
 
 
 def _get_json(url: str):

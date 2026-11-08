@@ -1,0 +1,18 @@
+{
+  "id": "binance-spot-btcusdt-5m-202605-202611",
+  "symbol": "BTCUSDT",
+  "venue": "binance_spot",
+  "interval": "5m",
+  "start": "2026-05-08T00:00:00+00:00",
+  "end_exclusive": "2026-11-08T00:00:00+00:00",
+  "n_bars": 52992,
+  "n_gaps_over_5m": 0,
+  "market_hash": "3c79534c572cd91c",
+  "first_open": 80006.0,
+  "last_close": 75867.59,
+  "sources": {
+    "ohlcv": "https://api.binance.com/api/v3/klines"
+  },
+  "note": "Visual series only. The sealed test stays on the hourly snapshot. 24/72 and 48 are hourly bar counts.",
+  "fetched_at": "2026-11-08T10:42:18.303702+00:00"
+}

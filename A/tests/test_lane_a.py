@@ -36,6 +36,8 @@ from kok_a.lgbm_gate import BAND, LGBMGate
 from kok_a.market import hash_ohlcv, synthetic_ohlcv
 from kok_a.snapshot import (
     FEAR_GREED_PATH,
+    FIVE_MIN_MANIFEST_PATH,
+    FIVE_MIN_PATH,
     MANIFEST_PATH,
     OHLCV_PATH,
     SNAPSHOT_READY,
@@ -298,14 +300,14 @@ def test_ready_snapshot_is_real_binance_and_fear_greed_with_no_invented_news():
     bars = read_binance_klines(OHLCV_PATH)
     fear = read_fear_greed(FEAR_GREED_PATH)
     assert manifest["id"] == SNAPSHOT_READY
-    assert manifest["n_bars"] == 17520
-    assert manifest["n_gaps_over_1h"] == 0
+    assert manifest["n_bars"] == 76559
+    assert manifest["n_gaps_over_1h"] == 26
     assert bars["venue"].iloc[0] == "binance_spot"
     assert hash_ohlcv(bars) == manifest["market_hash"]
-    assert bars["open_time"].iloc[0] == pd.Timestamp("2024-11-01", tz="UTC")
+    assert bars["open_time"].iloc[0] == pd.Timestamp("2018-02-01", tz="UTC")
     assert bars["open_time"].iloc[-1] == pd.Timestamp("2026-10-31 23:00", tz="UTC")
     spacing = bars["open_time"].diff().dropna()
-    assert (spacing == pd.Timedelta(hours=1)).all()
+    assert (spacing == pd.Timedelta(hours=1)).sum() == len(spacing) - 26
     assert (fear["value"] == fear["value"].round()).all()
     assert fear["source"].str.contains("Alternative.me").all()
 
@@ -344,6 +346,21 @@ def test_ready_snapshot_is_real_binance_and_fear_greed_with_no_invented_news():
     assert ready.result.paper_plan.completed is False
     assert ready.result.paper_plan.approved is False
     assert ready.result.paper_plan.horizon_days == 14
+
+
+def test_five_minute_series_is_six_months_and_not_the_sealed_snapshot():
+    manifest = json.loads(FIVE_MIN_MANIFEST_PATH.read_text())
+    bars = read_binance_klines(FIVE_MIN_PATH)
+    assert manifest["id"] == "binance-spot-btcusdt-5m-202605-202611"
+    assert manifest["id"] != SNAPSHOT_READY
+    assert manifest["interval"] == "5m"
+    assert manifest["n_bars"] == 52992
+    assert manifest["n_gaps_over_5m"] == 0
+    assert hash_ohlcv(bars) == manifest["market_hash"]
+    assert bars["open_time"].iloc[0] == pd.Timestamp("2026-05-08", tz="UTC")
+    assert bars["open_time"].iloc[-1] == pd.Timestamp("2026-11-07 23:55", tz="UTC")
+    spacing = bars["open_time"].diff().dropna()
+    assert (spacing == pd.Timedelta(minutes=5)).all()
 
 
 def test_cost_rows_match_the_compounded_baseline_and_do_not_double_count(bundle):
@@ -679,6 +696,10 @@ def test_agent_view_drops_sealed_test_numbers_and_keeps_the_window(bundle):
     assert any(point.split == "test" for point in bundle.result.comparison_equity)
     assert any(row.split == "test" for row in bundle.result.baselines)
     assert bundle.result.decision is not None
+    verdict = bundle.result.decision.verdict
+    assert any("deterministic arbiter" in note and verdict in note for note in bundle.result.notes)
+    assert all("deterministic arbiter" not in note for note in view.notes)
+    assert all(verdict not in note for note in view.notes)
     view_range = view.train_predictive_range
     full_range = bundle.result.train_predictive_range
     assert view_range is not None and full_range is not None

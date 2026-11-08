@@ -36,7 +36,7 @@ from kok_a.lgbm_gate import LGBMGate
 from kok_a.regimes import discover_regime_filter, fit_regime_labels
 from kok_a.market import epoch_microseconds, hash_ohlcv
 from kok_a.simulate import ANNUALIZATION, FEE_BPS, SLIPPAGE_BPS, block_ci, simulate
-from kok_a.snapshot import SNAPSHOT_READY, SNAPSHOT_SYNTHETIC, load_inputs
+from kok_a.snapshot import SNAPSHOT_READY, SNAPSHOT_SYNTHETIC, WINDOW_LABEL, load_inputs
 from kok_a.strategies import positions
 
 QUANTILES = (0.2, 0.33, 0.5, 0.67, 0.8)
@@ -260,7 +260,7 @@ def agent_view(result: ExperimentResult) -> ExperimentResult:
         "Sealed-test metrics, the verdict, and the paper plan are omitted from this view. "
         "GateRunner.evaluate refuses split='test'."
     )
-    notes = list(result.notes)
+    notes = [item for item in result.notes if "deterministic arbiter" not in item]
     if note not in notes:
         notes.append(note)
     return result.model_copy(
@@ -455,7 +455,7 @@ def _analysis_sample(
         if external_positions is not None:
             raise RuntimeError(
                 f"only {len(sample)} imported decisions overlap the Binance spot BTCUSDT 1h snapshot "
-                "(2024-11-01 through 2026-10-31) after feature warm-up. Need at least 30 consecutive hours."
+                f"({WINDOW_LABEL}) after feature warm-up. Need at least 30 consecutive hours."
             )
         raise RuntimeError(f"only {len(sample)} usable decisions after warm-up")
     cut_train = int(len(sample) * 0.6)

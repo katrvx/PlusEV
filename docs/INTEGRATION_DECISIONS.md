@@ -24,7 +24,7 @@ The arbiter scores this competitor through `arbiter_evaluate`. That path does no
 - Bootstrap draws are seeded from the policy body, not its name. The ready path uses 2000 resamples.
 - The LightGBM gate fits on early train and calibrates on the last 25% of train. Validation is left out of that fit. `spec()` carries the seed and a hash of the fitted model.
 
-`load_for_lane_b` returns the development view. Test-window dates stay, so a news request that crosses the holdout can still be refused. Test metrics, the verdict, and the paper plan are removed. `GateRunner.evaluate` refuses `split="test"`. `score_frozen` is the one sealed look, and a changed body under an id that was already scored is refused.
+`load_for_lane_b` returns the development view. Test-window dates stay, so a news request that crosses the holdout can still be refused. Test metrics, the verdict, and the paper plan are removed. The note that names the sealed-test verdict (`Verdict … comes from the deterministic arbiter`) is dropped in that view; Lane B's `redact` still clears every note before a tool call. `GateRunner.evaluate` refuses `split="test"`. `score_frozen` is the one sealed look, and a changed body under an id that was already scored is refused.
 
 ## What the API will score
 
@@ -35,8 +35,8 @@ The arbiter scores this competitor through `arbiter_evaluate`. That path does no
 | Seeded demo strategy | The checked-in illustrative fixture. `mode` stays `demo`. |
 | BTCUSDT positions, timeframe `1h` / `1hr` / `1hour` / `60m` / `60min` / `hourly` | Lane A, then Lane B. `mode` is `measured` when the run finishes. |
 | Trade log | `awaiting_engine`, empty metrics. A trade log has no target position at each decision, so a gate cannot be simulated. |
-| Any other symbol or timeframe | `awaiting_engine`, empty metrics. This snapshot is Binance spot BTCUSDT 1h from 2024-11-01 through 2026-10-31. |
-| Positions that leave fewer than 30 consecutive usable hours | `failed`, empty metrics, `mode` `pending`. The January 2024 example CSVs do this on purpose: they do not overlap the snapshot. |
+| Any other symbol or timeframe | `awaiting_engine`, empty metrics. This snapshot is Binance spot BTCUSDT 1h from 2018-02-01 through 2026-10-31. |
+| Positions that leave fewer than 30 consecutive usable hours | `failed`, empty metrics, `mode` `pending`. The January 2024 example CSVs do this on purpose: they are a handful of rows, shorter than 30 hours. |
 
 Demo numbers are never copied onto an upload.
 

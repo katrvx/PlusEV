@@ -17,7 +17,7 @@ from typing import Any
 import pandas as pd
 
 ENGINE_CONNECTED = True
-SNAPSHOT_ID = "binance-spot-btcusdt-1h-202411-202610"
+SNAPSHOT_ID = "binance-spot-btcusdt-1h-201802-202610"
 HOURLY = {"1h", "1hr", "1hour", "60m", "60min", "hourly"}
 VERDICT_FOR_UI = {
     "KEEP": "KEEP",
@@ -65,7 +65,7 @@ def refusal_reason(strategy: dict[str, Any]) -> str | None:
     if symbol != "BTCUSDT" or timeframe not in HOURLY:
         return (
             "The connected evaluator only scores BTCUSDT hourly positions against the Binance "
-            "spot snapshot from 2024-11-01 through 2026-10-31. This import is stored and waiting. "
+            "spot snapshot from 2018-02-01 through 2026-10-31. This import is stored and waiting. "
             "No metrics were assigned."
         )
     return None
