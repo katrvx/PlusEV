@@ -127,7 +127,8 @@ def strategy_health(exp) -> dict | None:
     tail = (" Assumptions that changed: " + ", ".join(changed) + ".") if changed else " No tracked assumption changed."
     return {
         "status": status, "summary": head + tail, "changed_assumptions": changed,
-        "train_range": {"low": low, "high": high, "horizon_bars": horizon, "source": "Lane A, train returns only"},
+        "train_range": {"low": low, "high": high, "horizon_bars": horizon, "horizon_days": horizon / 24,
+                        "source": "Lane A, train returns only"},
         "validation_blocks": blocks, "n_blocks": n, "n_below": n_below, "n_above": n_above,
         "p_below": p_below, "p_above": p_above, "validation_net_return": _compound(net["validation"]),
         "checks": checks,

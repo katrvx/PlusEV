@@ -836,3 +836,16 @@ def test_quantile_levels_from_the_feature_grid_are_citable():
     g = ctx.feature_grid()
     assert not unsupported_numbers("threshold at the 0.33 quantile (q=0.33) of realized_vol_7d", [g])
     assert unsupported_numbers("threshold at the 0.35 quantile", [g])
+
+
+@pytest.mark.parametrize("text", ["below the 20-trade threshold", "a minimum of 20 trades", "under the threshold of 20",
+                                  "the 20 trade minimum"])
+def test_min_trades_threshold_phrasings_from_argon_are_allowed(text):
+    assert not unsupported_numbers(text, R3_EV)
+
+
+def test_health_evidence_states_the_block_length_in_days():
+    """Argon 8 Nov: the critic wrote '14-day blocks'; the evidence only had 336 bars."""
+    from packages.research_agents.health import strategy_health
+    h = strategy_health(_health_exp(lambda i, r: 0.003 * (-1) ** i - 0.00002))
+    assert h["train_range"]["horizon_days"] == 14 and not unsupported_numbers("each 14-day block", [h])
