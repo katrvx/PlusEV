@@ -31,8 +31,12 @@ class Axis:
 
 
 AXES: tuple[Axis, ...] = (
+    # Two trend windows. The names describe the price path, not whether the strategy should be on.
     Axis("trend_regime", "momentum_24h", "tercile", "bear", "bull", "sideways"),
+    Axis("trend_7d_regime", "momentum_7d", "tercile", "bear", "bull", "sideways"),
     Axis("vol_regime", "realized_vol_7d", "median", "low", "high"),
+    Axis("vol_change_regime", "vol_ratio_24h_7d", "median", "below_baseline", "above_baseline"),
+    # volume_zscore is a traded-volume proxy. It is not a spread or an order-book depth.
     Axis("liquidity_regime", "volume_zscore", "median", "thin", "deep"),
     Axis("sentiment_regime", "fear_greed", "median", "fear", "greed"),
 )

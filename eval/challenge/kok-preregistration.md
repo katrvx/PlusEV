@@ -83,3 +83,16 @@ will be identical (both flat) and power will be low, especially for trend.
 ## Log
 
 - 2026-11-08T12:25Z: pre-registration written. No challenge run yet.
+- Practice (protocol debugging only, outputs in a scratch folder outside the repo): kit
+  `generate` + `run` on 25 practice cases (seed 12345, mean_reversion raw and gated) and
+  `scripts/kok_challenge.py practice` on 40 practice cases (seed 777, mean_reversion). Protocol
+  worked, zero kit errors, offline kit-mode replay matched kit final cash on every path. No
+  rule or parameter changed.
+- Lead committed this file, packages/kit_adapter/*.py and scripts/kok_challenge.py as 2327e45
+  before any challenge run.
+- 2026-11-08T12:29Z: mean_reversion challenge run once (kit exit 0, 0 errors, 300/300 run).
+  Revealed seed 4041460934254655326; operator checked sha256 commitment = COMMITMENT.txt (match).
+  Raw replay + paired.json written. No rerun.
+- 2026-11-08T12:31Z: trend challenge run once (kit exit 0, 0 errors, 300/300 run).
+  Revealed seed 2983172727702243693; commitment check matched. Raw replay + paired.json
+  written. No rerun. No crashes in either run; no code or parameter changes after challenge output.

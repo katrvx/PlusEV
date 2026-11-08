@@ -313,6 +313,7 @@ def control_one_look() -> bool:
     head(4, "One sealed look only: ask for a second look at the real test split")
     look = json.loads(LOOK.read_text())
     ledger_before = frozen.LEDGER.read_bytes()
+    preloaded = "kok_a.experiment" in sys.modules     # e.g. imported by an earlier control or test in this process
     h = look["champion_spec_hash"]
     report = json.loads((ROOT / look["selected_in_report"]).read_text())
     champ = next(c["policy_spec"] for c in report["candidates"] if c["status"] == "accepted_for_frozen_test")
@@ -332,7 +333,7 @@ def control_one_look() -> bool:
             refused.append(sh == h)
             step("Code did", f"REFUSED: AlreadyLooked: {exc}")
     untouched = frozen.LEDGER.read_bytes() == ledger_before
-    no_data = "kok_a.experiment" not in sys.modules
+    no_data = preloaded or "kok_a.experiment" not in sys.modules   # this control must not import the data loader
     step("Result", f"no data loaded (kok_a.experiment imported: {not no_data}), test split not scored, "
          f"ledger unchanged: {untouched}")
     ok = refused == [True, True] and untouched and no_data

@@ -1,0 +1,82 @@
+exit code 0
+--- stdout ---
+{
+  "label": "CHALLENGE (self-serve): hidden markets cases",
+  "dataset": {
+    "version": 2,
+    "mode": "challenge",
+    "source": "AgentVerse seeded generator v2 (hidden challenge)",
+    "seed": null,
+    "pack": "markets",
+    "case_count": 300,
+    "tasks": {
+      "markets": 300
+    }
+  },
+  "dataset_cases": 300,
+  "attempted": 300,
+  "passed": 0,
+  "failed": 0,
+  "errors": 0,
+  "strategy_runs_completed": 300,
+  "not_run": 0,
+  "cycle_record_metrics": {
+    "cycle_precision": null,
+    "cycle_recall": null,
+    "cycle_f1": null
+  },
+  "market_summary": {
+    "paths": 300,
+    "wins_vs_buy_and_hold": 189,
+    "losses_vs_buy_and_hold": 111,
+    "ties": 0,
+    "beat_cash": 8,
+    "median_excess_vs_buy_and_hold_bps_of_capital": 71,
+    "mean_max_drawdown_bps": 155,
+    "sign_test_p_value": 7.846196405532836e-06,
+    "verdict": "Beat buy-and-hold more often than chance would explain on these paths."
+  },
+  "challenge": {
+    "commitment": "351b6261d83ba998bd20238388aaa0490b0fe3064ec10b8b495b5d13b9dc51fc",
+    "seed_status": "fresh random; revealed in SEED-REVEAL.txt after this run",
+    "kit_fingerprint": "5c90bf815848f4edd85bb2446e00382a24f003d936b3bad72f297a3b7885dad9",
+    "provenance": {
+      "project": "/home/claude/barometer",
+      "files_scanned": 249,
+      "adapter_command": [
+        "/usr/local/bin/python3",
+        "-m",
+        "packages.kit_adapter.kok",
+        "--strategy",
+        "mean_reversion",
+        "--mode",
+        "gated"
+      ],
+      "adapter_file_sha256": {},
+      "git_head": "2327e4591dc15d00900a5a8df2c0c39a972e3e92",
+      "git_dirty_files": 3,
+      "warnings": [
+        {
+          "file": ".claude/worktrees/agent-afb2b6510fdfbe4e7/A/kok_a/binance.py",
+          "reason": "downloads Binance history; fine for features, but check it is not used to look up hidden historical paths"
+        },
+        {
+          "file": ".claude/worktrees/agent-afb2b6510fdfbe4e7/A/kok_a/snapshot.py",
+          "reason": "downloads Binance history; fine for features, but check it is not used to look up hidden historical paths"
+        },
+        {
+          "file": "A/kok_a/binance.py",
+          "reason": "downloads Binance history; fine for features, but check it is not used to look up hidden historical paths"
+        },
+        {
+          "file": "A/kok_a/snapshot.py",
+          "reason": "downloads Binance history; fine for features, but check it is not used to look up hidden historical paths"
+        }
+      ]
+    }
+  },
+  "limits": "Passing defined checks does not validate an entire product. Market completion is not profitability. Synthetic data is not a real-world benchmark. This runner is not an OS security sandbox."
+}
+
+--- stderr ---
+Seed commitment: 351b6261d83ba998bd20238388aaa0490b0fe3064ec10b8b495b5d13b9dc51fc
