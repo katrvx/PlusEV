@@ -24,7 +24,7 @@ python3 scripts/run_investigation.py --lane-a --experiment-id btc-meanrev-48-dem
 ## What you do not need to change
 
 - Strategy parameters stay 24/72 and 48. Cost stays 10 bp plus 1 bp. They were fixed before the longer run.
-- A 14-day block is still 336 hourly bars. `health.py` dividing `horizon_bars` by 24 is still right.
+- A 14-day block is still 336 hourly bars. `health.py` dividing `horizon_bars` by 24 is still right. Your new context agent’s week is 168 bars. That is still seven days on this rail.
 - `load_for_lane_b` still returns train and validation only. The test dates stay so a news window that crosses the holdout is still refused. `decision` and `paper_plan` are still null. The note that quotes the sealed verdict (`Verdict … comes from the deterministic arbiter`) is dropped in that view. `redact` still clears every note.
 - Your verdict words stay `candidate_for_frozen_test` or `INCONCLUSIVE`. Lane A's arbiter is separate. On this book it already said: trend `btc-trend-24-72-demo` **INCONCLUSIVE** via `always_on` (the sealed intervals still contain zero); mean reversion `btc-meanrev-48-demo` **KILL** via `cash` (always-on drawdown 60.4% past the 40% cap, and its net-return interval is entirely below zero). Those are in `A/README.md`. They are not a substitute for your rerun.
 - News is still omitted. Coverage of `news_sentiment` is 0. There is no first-seen archive on this snapshot.
