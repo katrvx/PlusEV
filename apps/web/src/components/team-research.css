@@ -315,7 +315,6 @@
 .tr-health, .tr-look, .tr-context { margin-bottom: 8px; }
 .tr-look code { font-family: var(--kk-mono, monospace); font-size: 12px; }
 .tr-health-status strong { color: var(--kk-text, #121826); font-weight: 600; }
-.tr-health-status.within strong { color: var(--kk-success, #277958); }
 .tr-health-status.outside strong { color: var(--kk-danger, #b33f55); }
 .tr-health-body { padding: 18px 0 6px; }
 .tr-health-summary, .tr-context-summary { margin: 0 0 16px; font-size: 14px; line-height: 1.7; color: var(--kk-text, #121826); max-width: 860px; }

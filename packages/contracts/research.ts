@@ -126,6 +126,7 @@ export type TeamReport = {
     validation_blocks: { start: string; net_return: number; position: "inside" | "below" | "above" }[];
   } | null;
   context?: TeamContext | null;
+  validation_always_on?: { net_return: number; ci_net_return?: [number, number] | null } | null;
 };
 export type InvestigationWrapper = { source: "team_artifact" | "bundled_lane_b_fixture"; synthetic: boolean; source_path: string; report: TeamReport; frozen_look?: TeamFrozenLook | null };
 export type InvestigationSummary = {

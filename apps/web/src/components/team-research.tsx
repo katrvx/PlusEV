@@ -79,13 +79,14 @@ function groupTrials(trials: TeamTrial[]): TrialGroup[] {
   ];
 }
 
-function HealthCard({ health }: { health: NonNullable<TeamReport["strategy_health"]> }) {
+function HealthCard({ health, alwaysOnNet }: { health: NonNullable<TeamReport["strategy_health"]>; alwaysOnNet?: number | null }) {
   const blocks = health.validation_blocks || [];
   const range = health.train_range;
   const within = health.status === "within_training_range";
   const outsideStatus = health.status === "outside_training_range";
-  const status = within ? "Unlucky, not broken" : outsideStatus ? "Possibly broken" : health.status.replaceAll("_", " ");
-  const statusDetail = within ? "Validation results stay inside the range this strategy produced in training." : outsideStatus ? "Validation results left the range this strategy produced in training." : "";
+  const status = within ? "Behaves as in training" : outsideStatus ? "Not behaving like training" : health.status.replaceAll("_", " ");
+  const lostToo = within && typeof alwaysOnNet === "number" && alwaysOnNet < 0 ? " It lost money in training too." : "";
+  const statusDetail = (within ? "Validation results stay inside the range this strategy produced in training." : outsideStatus ? "Validation results left the range this strategy produced in training." : "") + lostToo;
   const horizon = range?.horizon_days ?? (range ? range.horizon_bars / 24 : null);
   const counts = { inside: blocks.filter(block => block.position === "inside").length, below: blocks.filter(block => block.position === "below").length, above: blocks.filter(block => block.position === "above").length };
   const width = 720, height = 168, left = 54, right = 10, top = 10, bottom = 24;
@@ -215,7 +216,7 @@ export default function TeamResearch({ initialExperimentId = "", strategyId = ""
       <div id="tr-view-panel" role="tabpanel" aria-labelledby={`tr-tab-${view}`}>
       {view === "findings" && <div className="tr-findings-layout">
         <div className="tr-main-column">
-          {report.strategy_health && <HealthCard health={report.strategy_health} />}
+          {report.strategy_health && <HealthCard health={report.strategy_health} alwaysOnNet={report.validation_always_on?.net_return} />}
           {frozenLook && <FrozenLookCard look={frozenLook} />}
           <section className="tr-section panel"><div className="tr-section-head"><div><span className="eyebrow">STRENGTHS & WEAK SPOTS</span><h2>What the agents discovered</h2><p>These are testable explanations, with evidence you can inspect.</p></div><Sparkles size={18} className="purple" /></div><div className="tr-hypotheses">{report.diagnostic.hypotheses.map(hypothesis => <HypothesisCard key={hypothesis.hypothesis_id} hypothesis={hypothesis} evidenceById={evidenceById} onEvidence={id => { setView("evidence"); setFocusedEvidence(id); }} />)}</div>
           {report.diagnostic.rejected_explanations.length > 0 && <details className="tr-rejected"><summary><CircleX size={16} />Explanations that did not hold up <span>{report.diagnostic.rejected_explanations.length}</span><ChevronDown size={16} /></summary><ul>{report.diagnostic.rejected_explanations.map(item => <li key={item}>{item}</li>)}</ul></details>}</section>
