@@ -62,7 +62,7 @@ Rule: nobody blocks on anybody. Every module has a fake-data fixture so it can b
 - **Feature freeze 11:00.** After this only bugs, deck, README.
 
 **11:00 – 15:00 · Deck**
-- Deck per [11](11-demo-and-pitch.md). Every claim has a table or figure from `eval/results/`. Numbers, intervals, counts (proposed → survived → confirmed).
+- Deck. Every claim has a table or figure from `eval/results/`. Numbers, intervals, counts (proposed → survived → confirmed).
 - Record the 90-second demo video. Live demos break.
 - Repo: README, licence, data manifest, `.env.example`, Actions green.
 

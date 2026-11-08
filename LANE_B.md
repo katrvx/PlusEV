@@ -111,6 +111,16 @@ Lane A's 2018-02 → 2026-10 hourly BTCUSDT book (research → 2023-05, validati
 
 Reports: `experiments/investigation_argon_lane_a.json`, `experiments/investigation_argon_meanrev.json`. The sealed look is `experiments/frozen_look_btc-meanrev-48-demo.json`. It was taken after the report that chose the champion was committed (`ad3dff1`).
 
+## The organisers' kit challenge
+
+The same gate (half size when 7-bar realized volatility is at or below its expanding median of earlier bars) runs as a kit adapter, `packages/kit_adapter/kok.py`. Pre-registered in `eval/challenge/kok-preregistration.md` (2327e45) before any run; one `challenge` per strategy, then a raw replay on the revealed cases. The kit executes all-in or flat, so 0.5 rounds to flat.
+
+- Mean reversion: gate better on 53 paths, worse on 12, identical on 235 (p = 2.8×10⁻⁷), +0.93% of capital on average. Cash beats the gated strategy 56 vs 8 (p = 5.6×10⁻¹⁰). The gate wins by being out of the market more, not by timing.
+- Trend: 290 of 300 identical; paths are shorter than its 72-bar warm-up. Untestable here.
+- Both "beat buy-and-hold" kit verdicts (189/300, 198/300) come from sitting in cash on falling paths.
+
+Outputs: `eval/challenge/kok-{mean_reversion,trend}/paired.json`. Tests: `tests/test_kit_adapter.py` (30). Live controls: `python3 scripts/demo_controls.py` (`tests/test_demo_controls.py`).
+
 ## Run on Lane A
 
 The default loader is still `fixtures/lane_a_stub.py`, so `tests/test_lane_b.py` does not need the Binance snapshot.

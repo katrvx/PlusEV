@@ -59,7 +59,6 @@ We run strategies with **planted truth** on real price history: one with a live 
 | 08 | [Risk controls and audit log](docs/08-risk-controls-and-audit-log.md) | Limits in code, hash-chained log, the control shown live |
 | 09 | [Data sources](docs/09-data-sources.md) | Every dataset with licence |
 | 10 | [Build plan](docs/10-build-plan.md) | Hour-by-hour, roles, scope guards |
-| 11 | [Demo and pitch](docs/11-demo-and-pitch.md) | Deck outline mapped to the rubric, 90-second demo script |
 | 12 | [References](docs/12-references.md) | Papers, products, threads |
 
 ## Judging rubric → where we score

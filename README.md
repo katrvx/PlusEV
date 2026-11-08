@@ -29,6 +29,20 @@ Hackathon MVP. Paper-only. Not a claim of validated alpha.
 
 The honest reading: the agents found a rule that reliably loses less, mostly by trading smaller. A strategy that loses money with or without it is a kill, not a fix. The single test look is in `experiments/frozen_look_btc-meanrev-48-demo.json`, taken after the report that chose the champion was committed.
 
+**Organisers' challenge (the AgentVerse kit, `bench.py challenge`).** We pre-registered the plan in [`eval/challenge/kok-preregistration.md`](eval/challenge/kok-preregistration.md) (committed 2327e45 before any run), then ran each strategy once with the gate on, and replayed the same revealed cases without it. Seed commitments matched; 0 errors; 300/300 paths each. Outputs: `eval/challenge/kok-mean_reversion/`, `eval/challenge/kok-trend/` (`paired.json` has every number).
+
+| Kit challenge, 300 paths | Mean reversion | Trend |
+|---|---|---|
+| Gate on vs gate off, same paths | Gate better on 53, worse on 12, identical on 235 (sign test p = 3×10⁻⁷). Mean +0.93% of capital (90% CI +0.58 … +1.29), drawdown 1.1 pp smaller | Better 2, worse 8, identical 290 (p = 0.11): **untestable**. The 12–80-bar paths are shorter than its 72-bar warm-up, so it is flat on ~95% of them |
+| Is that skill? | **No.** Cash beats the gated strategy on 56 paths vs 8 (p = 6×10⁻¹⁰). In the kit's all-in execution, half size rounds to flat, so the gate helps only by being out of the market more (exposure 0.50× of raw) | Cash beats it 10 vs 4 (p = 0.18) |
+| Kit verdict vs buy-and-hold | 189 wins vs 111 (p = 8×10⁻⁶), but it beats cash on only 8 paths: it wins mostly by sitting in cash on falling paths. Without the gate: 185 vs 115 | 198 vs 102, same reason: almost always flat |
+
+Same conclusion as on real data: the gate reliably loses less by holding less. It does not make the strategy worth running. A kit "beat buy-and-hold" verdict here comes from staying in cash, which is why we report the comparison with cash next to it.
+
+Reproduce: `python3 scripts/kok_challenge.py challenge --strategy mean_reversion` runs the kit's `challenge` with the gated adapter, then `python3 scripts/kok_challenge.py replay --strategy mean_reversion --seed <revealed seed>` runs the same cases without the gate. To plug our agent into the kit directly, the adapter is `python3 -m packages.kit_adapter.kok --strategy {mean_reversion,trend} --mode {gated,raw}`.
+
+**Show one control live (offline, about 4 seconds):** `python3 scripts/demo_controls.py` runs 4 controls: the sealed test split is refused to an agent; an invented number is rejected and the agent retries with copied numbers; a money-losing gate the AI critic approved is rejected by code; and a second look at the test split is refused even under a new name. `--only 2` runs one. It exits 1 if any control fails.
+
 The agents propose and explain; **code computes every number and makes every decision.**
 
 **Where to look**
@@ -45,12 +59,13 @@ The agents propose and explain; **code computes every number and makes every dec
 
 ```bash
 pip install -r requirements-lane-b.txt -r requirements-lane-c.txt && npm ci
-python3 -m pytest -q tests/ A/tests                              # 221 tests: leakage, costs, holdout, verifier, API
+python3 -m pytest -q tests/ A/tests                              # 255 tests: leakage, costs, holdout, verifier, kit adapter, API
 python3 -m uvicorn apps.api.main:app --port 8000 &                # API
 npm run dev                                                        # web app on http://127.0.0.1:3000
 python3 scripts/run_investigation.py --lane-a --fallback          # agents without an API key (deterministic)
 KOK_AGENT_MODEL=google:gemini-4-argon GEMINI_API_KEY=... python3 scripts/run_investigation.py --lane-a   # LLM agents
 python3 scripts/frozen_look.py --report experiments/<committed report>.json   # the one sealed look, refused if already taken
+python3 scripts/demo_controls.py                                  # 4 risk controls, live, offline
 ```
 
 **Honest limits.** Two demo strategies on one market (BTC), not imported live strategies, and not claimed as alpha. No news archive with first-seen timestamps exists for us, so news is not used and every run is market-only (the point-in-time news store is built and tested). The 14-day paper plan is an approved hourly shadow log; the stored book ends at 2026-10-31 23:00 UTC, so the log has no bars yet and is not a result. Nothing here trades real money.
