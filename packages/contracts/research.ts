@@ -128,7 +128,117 @@ export type TeamReport = {
   context?: TeamContext | null;
   validation_always_on?: { net_return: number; ci_net_return?: [number, number] | null } | null;
 };
-export type InvestigationWrapper = { source: "team_artifact" | "bundled_lane_b_fixture"; synthetic: boolean; source_path: string; report: TeamReport; frozen_look?: TeamFrozenLook | null };
+/**
+ * Plain-language view of one report (packages/research_agents/presentation.py).
+ * Built by code from the report; it adds no numbers and no decisions.
+ * Every `_pp` field is a fraction: 0.273 means +27.3 percentage points (pp).
+ * Returns and drawdowns are fractions too: -0.289 means -28.9%.
+ */
+export type PresentationStageName = "Training" | "Validation" | "Held-out test";
+export type PresentationOutcome = "rejected" | "not_run" | "selected_for_further_testing" | "approved" | "reference";
+export type PresentationHeadline = {
+  finding: string;
+  meaning: string;
+  next_action: string;
+  verdict?: string | null;
+  verdict_label: string;
+  verdict_scope?: string | null;
+  verdict_source?: string | null;
+};
+export type PresentationStage = {
+  stage: PresentationStageName | string;
+  window?: string | null;
+  what_happened: string;
+  result: string;
+  evidence_ids: string[];
+};
+export type PresentationHeldOut = {
+  looked_at?: string | null;
+  vs_original_pp?: number | null;
+  vs_original_ci_pp?: [number, number] | null;
+  own_return?: number | null;
+  original_return?: number | null;
+  max_drawdown?: number | null;
+  original_max_drawdown?: number | null;
+  summary: string;
+  source?: string | null;
+};
+export type PresentationFilter = {
+  policy_id: string;
+  label: string;
+  plain_rule: string;
+  exposure_change: string;
+  proposed_by: string;
+  stages_checked: string[];
+  outcome: PresentationOutcome;
+  outcome_label: string;
+  reason: string;
+  validation_vs_original_pp?: number | null;
+  validation_vs_original_ci_pp?: [number, number] | null;
+  validation_own_return?: number | null;
+  average_size_on_validation?: number | null;
+  held_out?: PresentationHeldOut | null;
+  details: string[];
+  spec: Record<string, unknown>;
+  evidence_ids: string[];
+};
+export type PresentationTraceItem = {
+  step: number;
+  actor: string;
+  actor_kind: "AI agent" | "Code";
+  action: "proposed" | "checked" | "challenged" | "decided";
+  title: string;
+  summary: string;
+  items: string[];
+  changed_conclusion?: string | null;
+  evidence_ids: string[];
+};
+export type PresentationStrategy = {
+  strategy_id: string;
+  what_we_have: "definition" | "positions_and_reference" | "positions_only";
+  name?: string | null;
+  rule?: string | null;
+  parameters?: Record<string, unknown> | null;
+  source?: string | null;
+  runnable_code_included: boolean;
+  note: string;
+};
+export type PresentationSelectedFilter = {
+  policy_id: string;
+  label: string;
+  plain_rule: string;
+  status: string;
+  spec: Record<string, unknown>;
+};
+export type PresentationEvidenceRef = { label: string; path?: string | null; evidence_id?: string | null };
+export type PresentationTakeaway = {
+  strategy: PresentationStrategy;
+  selected_filter?: PresentationSelectedFilter | null;
+  selected_filter_note?: string | null;
+  evidence: PresentationEvidenceRef[];
+  plans: string;
+};
+export type PresentationFilterCounts = Partial<Record<PresentationOutcome, number>>;
+export type ReportPresentation = {
+  version?: number;
+  headline: PresentationHeadline;
+  stages: PresentationStage[];
+  filters: PresentationFilter[];
+  filter_counts: PresentationFilterCounts;
+  trace: PresentationTraceItem[];
+  takeaway: PresentationTakeaway;
+  glossary: { term: string; meaning: string }[];
+  generated_by?: string;
+};
+export type InvestigationWrapper = {
+  source: "team_artifact" | "bundled_lane_b_fixture";
+  synthetic: boolean;
+  source_path: string;
+  report: TeamReport;
+  frozen_look?: TeamFrozenLook | null;
+  /** Optional plain-language view; null or absent for reports it cannot describe. */
+  presentation?: ReportPresentation | null;
+};
 export type InvestigationSummary = {
   experiment_id: string;
   strategy_id: string;
@@ -145,4 +255,8 @@ export type InvestigationSummary = {
   trial_count: number;
   evidence_count: number;
   n_policies_tried: number;
+  /** Optional: the plain-language finding and verdict label. */
+  headline?: Pick<PresentationHeadline, "finding" | "verdict_label"> | null;
+  /** Optional: how many checked filters ended in each outcome. */
+  filter_counts?: PresentationFilterCounts | null;
 };

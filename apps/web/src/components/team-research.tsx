@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowLeft, Beaker, ChevronDown, ChevronRight, CircleCheck, CircleX, Clock3, FileSearch, FlaskConical, Info, LockKeyhole, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
-import { teamApi, type InvestigationSummary, type InvestigationWrapper, type TeamCandidate, type TeamContext, type TeamEvidence, type TeamFrozenLook, type TeamHypothesis, type TeamReport, type TeamTrial } from "@/lib/team-api";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Beaker, BookOpen, Bot, ChevronDown, ChevronRight, CircleCheck, CircleX, Clock3, Cpu, Download, FileSearch, FlaskConical, Info, LockKeyhole, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
+import { teamApi, type InvestigationSummary, type InvestigationWrapper, type PresentationFilter, type PresentationOutcome, type PresentationStage, type PresentationTraceItem, type ReportPresentation, type TeamCandidate, type TeamContext, type TeamEvidence, type TeamFrozenLook, type TeamHypothesis, type TeamReport, type TeamTrial } from "@/lib/team-api";
 import "./team-research.css";
 
 const signed = (value: number) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value * 100).toFixed(1)}`;
@@ -159,6 +159,217 @@ function CandidateCard({ candidate }: { candidate: TeamCandidate }) {
   return <article className={`tr-candidate ${eligible ? "eligible" : competitor ? "competitor" : "rejected"}`}><div className="tr-candidate-head"><span className="tr-candidate-status">{eligible ? <><CircleCheck size={14} />Ready for a new-data test</> : competitor ? <><Info size={14} />Comparison rule</> : <><CircleX size={14} />Rejected</>}</span><code>{candidate.policy_id}</code></div>{label !== candidate.policy_id && <h3 className="tr-candidate-name">{label}</h3>}{typeof candidate.validation_delta_vs_always_on === "number" && <p className="tr-candidate-delta">Validation vs always-on: <strong>{pts(candidate.validation_delta_vs_always_on)}</strong>{candidate.validation_ci ? <> · 90% range {ptsRange(candidate.validation_ci)}</> : null}</p>}<p className="tr-candidate-note">{eligible ? "This trading rule passed the development-stage checks. It has not been validated on data it did not see during research." : competitor ? "This rule is included as a comparison point; it is not an agent-selected candidate." : "This trading rule will not proceed to the new-data test."}</p><ul>{candidate.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul><details className="tr-policy-spec"><summary>Trading rule details <ChevronRight size={13} /></summary><code>{json(candidate.policy_spec)}</code></details></article>;
 }
 
+/* ------------------------------------------------------------------------------------------------
+ * Readable report: the plain-language presentation (packages/research_agents/presentation.py).
+ * Every sentence and number below comes from that presentation; this component only lays it out.
+ * `_pp` fields and returns are fractions: 0.273 renders as "+27.3 pp", -0.289 as "-28.9%".
+ * ---------------------------------------------------------------------------------------------- */
+const signedPlain = (value: number) => `${value > 0 ? "+" : value < 0 ? "-" : ""}${Math.abs(value * 100).toFixed(1)}`;
+const ppText = (value: number | null | undefined) => typeof value !== "number" ? "—" : `${signedPlain(value)} pp`;
+const pctText = (value: number | null | undefined) => typeof value !== "number" ? "—" : `${signedPlain(value)}%`;
+const ppRangeText = (range: [number, number] | null | undefined) => range ? `90% interval ${signedPlain(range[0])} to ${signedPlain(range[1])} pp` : "";
+const toolLabel = (tool: string) => tool.replaceAll("_", " ");
+const signClass = (value: number | null | undefined) => typeof value !== "number" ? "" : value > 0 ? "pos" : value < 0 ? "neg" : "";
+const STAGE_NAMES = ["Training", "Validation", "Held-out test"] as const;
+const OUTCOME_ORDER: Record<PresentationOutcome, number> = { selected_for_further_testing: 0, approved: 1, rejected: 2, reference: 3, not_run: 4 };
+const OUTCOME_CLASS: Record<PresentationOutcome, string> = { selected_for_further_testing: "selected", approved: "approved", rejected: "rejected", reference: "reference", not_run: "not-run" };
+const COUNT_WORDS: [PresentationOutcome, string][] = [["selected_for_further_testing", "selected for further testing"], ["approved", "approved"], ["rejected", "rejected"], ["reference", "comparison only"], ["not_run", "tried on Training only"]];
+const verdictTone = (verdict: string | null | undefined) => {
+  const value = (verdict || "").toUpperCase();
+  return value === "KILL" ? "kill" : value === "KEEP" ? "keep" : value ? "unproven" : "muted";
+};
+
+type EvidenceHandlers = { evidenceById: Map<string, TeamEvidence>; onEvidence: (id: string) => void; onLibrary: () => void };
+
+function EvidenceLinks({ ids, evidenceById, onEvidence, onLibrary, max = 3 }: EvidenceHandlers & { ids: string[]; max?: number }) {
+  const unique = [...new Set(ids)].filter(id => evidenceById.has(id));
+  if (unique.length === 0) return null;
+  const shown = unique.slice(0, max);
+  const tools = unique.map(id => evidenceById.get(id)?.tool || id);
+  // Several records from one tool get a number, so each link reads differently.
+  const label = (id: string, index: number) => {
+    const tool = tools[index];
+    const same = tools.filter(item => item === tool).length;
+    return same > 1 ? `${toolLabel(tool)} ${tools.slice(0, index + 1).filter(item => item === tool).length}` : toolLabel(tool);
+  };
+  return <div className="rr-evidence-links">
+    <span>Open evidence</span>
+    {shown.map((id, index) => <button type="button" key={id} onClick={() => onEvidence(id)} title={id}><FileSearch size={12} />{label(id, index)}</button>)}
+    {unique.length > max && <button type="button" onClick={onLibrary}>+{unique.length - max} more</button>}
+  </div>;
+}
+
+function SectionHead({ eyebrow, title, children }: { eyebrow: string; title: string; children?: ReactNode }) {
+  return <div className="rr-head"><span className="rr-eyebrow">{eyebrow}</span><h2>{title}</h2>{children && <p>{children}</p>}</div>;
+}
+
+function FindingCard({ presentation }: { presentation: ReportPresentation }) {
+  const { headline } = presentation;
+  const tone = verdictTone(headline.verdict);
+  return <section className={`rr-finding ${tone}`} aria-labelledby="rr-finding-title">
+    <div className="rr-verdict-row">
+      <span className={`rr-verdict ${tone}`}>{headline.verdict_label}</span>
+      {headline.verdict_scope && <span className="rr-verdict-meta">Applies to: <strong>{headline.verdict_scope}</strong></span>}
+      {headline.verdict_source && <span className="rr-verdict-meta">Source: {headline.verdict_source}</span>}
+    </div>
+    <h2 id="rr-finding-title" className="rr-finding-text">{headline.finding}</h2>
+    <p className="rr-meaning">{headline.meaning}</p>
+    <p className="rr-next-step"><ArrowRight size={16} /><span><strong>Next step:</strong> {headline.next_action}</span></p>
+  </section>;
+}
+
+function StagesSection({ stages, ...handlers }: EvidenceHandlers & { stages: PresentationStage[] }) {
+  const byName = new Map(stages.map(stage => [stage.stage, stage]));
+  const ordered: PresentationStage[] = STAGE_NAMES.map(name => byName.get(name) || { stage: name, window: null, what_happened: "Not recorded.", result: "Not recorded.", evidence_ids: [] });
+  return <section className="rr-section" aria-labelledby="rr-stages-title">
+    <SectionHead eyebrow="HOW IT WAS TESTED" title="Research stages">Each stage uses later data than the one before. The agents worked on Training only.</SectionHead>
+    <ol className="rr-stages" id="rr-stages-title">{ordered.map((stage, index) => <li key={stage.stage} className="rr-stage">
+      <div className="rr-stage-top"><span className="rr-stage-num">{index + 1}</span><h3>{stage.stage}</h3></div>
+      <p className="rr-stage-window">{stage.window || "Dates not recorded"}</p>
+      <dl><dt>What happened</dt><dd>{stage.what_happened}</dd><dt>Result</dt><dd className="rr-stage-result">{stage.result}</dd></dl>
+      <EvidenceLinks ids={stage.evidence_ids} {...handlers} max={2} />
+    </li>)}</ol>
+  </section>;
+}
+
+function ExactSettings({ filter, ...handlers }: EvidenceHandlers & { filter: PresentationFilter }) {
+  return <details className="rr-settings"><summary>Exact settings<ChevronDown size={13} /></summary>
+    <code className="rr-code">{json(filter.spec)}</code>
+    {filter.details.length > 0 && <ul className="rr-details-list">{filter.details.map((item, index) => <li key={index}>{item}</li>)}</ul>}
+    <p className="rr-policy-id">Rule id <code>{filter.policy_id}</code></p>
+    <EvidenceLinks ids={filter.evidence_ids} {...handlers} max={4} />
+  </details>;
+}
+
+function FilterRow({ filter, ...handlers }: EvidenceHandlers & { filter: PresentationFilter }) {
+  const outcomeClass = OUTCOME_CLASS[filter.outcome] || "";
+  return <li className={`rr-filter ${outcomeClass}`}>
+    <div className="rr-filter-grid">
+      <div className="rr-cell rr-cell-rule">
+        <strong className="rr-filter-label">{filter.label}</strong>
+        <p>{filter.plain_rule}</p>
+        <p className="rr-sub"><span>Changes size:</span> {filter.exposure_change}</p>
+        <p className="rr-sub"><span>Proposed by:</span> {filter.proposed_by}</p>
+      </div>
+      <div className="rr-cell"><span className="rr-cell-label">Checked in</span><div className="rr-chips">{filter.stages_checked.map(stage => <span key={stage} className="rr-chip">{stage}</span>)}</div></div>
+      <div className="rr-cell"><span className="rr-cell-label">Outcome</span><span className={`rr-outcome ${outcomeClass}`}>{filter.outcome_label}</span><p className="rr-reason">{filter.reason}</p></div>
+      <div className="rr-cell rr-num"><span className="rr-cell-label">Validation vs original</span><strong className={signClass(filter.validation_vs_original_pp)}>{ppText(filter.validation_vs_original_pp)}</strong>{filter.validation_vs_original_ci_pp && <small>{ppRangeText(filter.validation_vs_original_ci_pp)}</small>}</div>
+      <div className="rr-cell rr-num"><span className="rr-cell-label">Own return on Validation</span><strong className={signClass(filter.validation_own_return)}>{pctText(filter.validation_own_return)}</strong>{typeof filter.average_size_on_validation === "number" && <small>average size {Math.round(filter.average_size_on_validation * 100)}%</small>}</div>
+    </div>
+    {filter.held_out && <p className="rr-held-out"><LockKeyhole size={14} /><span><strong>Held-out test:</strong> {filter.held_out.summary}</span></p>}
+    <ExactSettings filter={filter} {...handlers} />
+  </li>;
+}
+
+function FiltersSection({ presentation, ...handlers }: EvidenceHandlers & { presentation: ReportPresentation }) {
+  const main = presentation.filters.filter(filter => filter.outcome !== "not_run").sort((a, b) => (OUTCOME_ORDER[a.outcome] ?? 9) - (OUTCOME_ORDER[b.outcome] ?? 9));
+  const notRun = presentation.filters.filter(filter => filter.outcome === "not_run");
+  const refused = notRun.filter(filter => filter.reason.toLowerCase().startsWith("refused"));
+  const counts = COUNT_WORDS.map(([key, words]) => [presentation.filter_counts?.[key] ?? 0, words] as const).filter(([count]) => count > 0);
+  return <section className="rr-section" aria-labelledby="rr-filters-title">
+    <SectionHead eyebrow="WHAT WAS CHECKED" title="Checked filters">A filter only changes position size; the strategy&apos;s own signals are never changed.{counts.length > 0 ? ` ${counts.map(([count, words]) => `${count} ${words}`).join(" · ")}.` : ""}</SectionHead>
+    {main.length > 0 && <>
+      <div className="rr-filter-header" aria-hidden="true"><span>Filter</span><span>Checked in</span><span>Outcome</span><span>Validation vs original</span><span>Own return on Validation</span></div>
+      <ul className="rr-filters" id="rr-filters-title">{main.map(filter => <FilterRow key={filter.policy_id} filter={filter} {...handlers} />)}</ul>
+    </>}
+    {notRun.length > 0 && <details className="rr-not-run">
+      <summary><ChevronRight size={14} />Also tried on Training only ({notRun.length - refused.length}){refused.length > 0 ? ` · refused before running (${refused.length})` : ""}</summary>
+      <p className="rr-not-run-note">These were never scored on Validation, so they say nothing about unseen data.</p>
+      <ul>{notRun.map(filter => <li key={filter.policy_id}><strong>{filter.label}</strong><p>{filter.reason}</p><ExactSettings filter={filter} {...handlers} /></li>)}</ul>
+    </details>}
+  </section>;
+}
+
+function TraceSection({ trace, ...handlers }: EvidenceHandlers & { trace: PresentationTraceItem[] }) {
+  return <section className="rr-section" aria-labelledby="rr-trace-title">
+    <SectionHead eyebrow="THE RESEARCH PATH" title="How the agents got there">AI agents proposed and challenged. Code scored, selected and decided.</SectionHead>
+    <ol className="rr-trace" id="rr-trace-title">{trace.map(item => <li key={item.step} className="rr-trace-step">
+      <span className="rr-trace-num">{item.step}</span>
+      <div className="rr-trace-body">
+        <div className="rr-trace-meta"><strong>{item.actor}</strong><span className={`rr-kind ${item.actor_kind === "Code" ? "code" : "agent"}`}>{item.actor_kind === "Code" ? <Cpu size={12} /> : <Bot size={12} />}{item.actor_kind}</span><span className="rr-action">{item.action}</span></div>
+        <h3>{item.title}</h3>
+        <p>{item.summary}</p>
+        {item.items.length > 0 && <ul>{item.items.slice(0, 4).map((line, index) => <li key={index}>{line}</li>)}{item.items.length > 4 && <li className="rr-more">and {item.items.length - 4} more</li>}</ul>}
+        {item.changed_conclusion && <p className="rr-changed"><strong>Changed the conclusion:</strong> {item.changed_conclusion}</p>}
+        <EvidenceLinks ids={item.evidence_ids} {...handlers} />
+      </div>
+    </li>)}</ol>
+  </section>;
+}
+
+function downloadTakeaway(presentation: ReportPresentation) {
+  const filters = presentation.filters.map(filter => Object.fromEntries(Object.entries(filter).filter(([key]) => key !== "details")));
+  const body = { strategy: presentation.takeaway.strategy, selected_filter: presentation.takeaway.selected_filter ?? null, evidence: presentation.takeaway.evidence, headline: presentation.headline, filters };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(body, null, 2)], { type: "application/json" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${presentation.takeaway.strategy.strategy_id || "strategy"}-takeaway.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function TakeawaySection({ presentation, ...handlers }: EvidenceHandlers & { presentation: ReportPresentation }) {
+  const { strategy, selected_filter: selected, selected_filter_note: selectedNote, plans } = presentation.takeaway;
+  const seen = new Set<string>();
+  const evidence = presentation.takeaway.evidence.filter(item => { const key = item.path || item.evidence_id || item.label; if (seen.has(key)) return false; seen.add(key); return true; });
+  const parameters = Object.entries(strategy.parameters || {});
+  return <section className="rr-section" aria-labelledby="rr-take-title">
+    <SectionHead eyebrow="TAKE AWAY" title="The strategy and the evidence">What was tested, the exact settings of any selected filter, and where every number comes from.</SectionHead>
+    <div className="rr-take-grid" id="rr-take-title">
+      <article className="rr-take-card">
+        <span className="rr-card-kicker">Original strategy</span>
+        <h3>{strategy.name || strategy.strategy_id}</h3>
+        {strategy.rule && <p>{strategy.rule}</p>}
+        {parameters.length > 0 && <dl className="rr-params">{parameters.map(([key, value]) => <div key={key}><dt>{key.replaceAll("_", " ")}</dt><dd>{typeof value === "string" ? value : json(value)}</dd></div>)}</dl>}
+        {strategy.source && <p className="rr-sub"><span>Source:</span> <code>{strategy.source}</code></p>}
+        <p className="rr-take-note"><Info size={14} />{strategy.note}</p>
+      </article>
+      <article className="rr-take-card">
+        <span className="rr-card-kicker">Selected filter</span>
+        {selected ? <>
+          <h3>{selected.label}</h3>
+          <span className="rr-outcome selected">{selected.status}</span>
+          <p>{selected.plain_rule}</p>
+          <code className="rr-code">{json(selected.spec)}</code>
+        </> : <h3>None selected</h3>}
+        {selectedNote && <p className="rr-take-note"><Info size={14} />{selectedNote}</p>}
+      </article>
+    </div>
+    <div className="rr-take-evidence">
+      <h3>Evidence</h3>
+      <ul>{evidence.map((item, index) => {
+        const id = item.evidence_id || "";
+        const record = id ? handlers.evidenceById.get(id) : undefined;
+        return <li key={index}><span>{item.label}</span>{item.path ? <code>{item.path}</code> : record ? <button type="button" onClick={() => handlers.onEvidence(id)}><FileSearch size={12} />Open evidence · {toolLabel(record.tool)}</button> : id ? <code>{id}</code> : null}</li>;
+      })}</ul>
+    </div>
+    <p className="rr-plans"><LockKeyhole size={14} />{plans}</p>
+    <button type="button" className="button secondary rr-download" onClick={() => downloadTakeaway(presentation)}><Download size={15} />Download takeaway (JSON)</button>
+  </section>;
+}
+
+function ReadableReport({ presentation, ...handlers }: EvidenceHandlers & { presentation: ReportPresentation }) {
+  return <div className="rr-report">
+    <FindingCard presentation={presentation} />
+    <StagesSection stages={presentation.stages || []} {...handlers} />
+    <FiltersSection presentation={presentation} {...handlers} />
+    <TraceSection trace={presentation.trace || []} {...handlers} />
+    <TakeawaySection presentation={presentation} {...handlers} />
+    {(presentation.glossary || []).length > 0 && <details className="rr-glossary"><summary><BookOpen size={14} />Terms used<ChevronDown size={14} /></summary><dl>{presentation.glossary.map(item => <div key={item.term}><dt>{item.term}</dt><dd>{item.meaning}</dd></div>)}</dl></details>}
+  </div>;
+}
+
+/** With a readable report above, the technical report folds into one disclosure; without one it renders as before. */
+function FullReport({ collapsible, open, onToggle, children }: { collapsible: boolean; open: boolean; onToggle: (open: boolean) => void; children: ReactNode }) {
+  if (!collapsible) return <>{children}</>;
+  return <details id="tr-full-report" className="rr-full" open={open} onToggle={event => onToggle(event.currentTarget.open)}>
+    <summary><FileSearch size={17} /><span><strong>Full report details (IDs, logs, provenance)</strong><small>The trial log, raw tool outputs, candidates and source files behind everything above.</small></span><ChevronDown size={17} className="rr-full-chevron" /></summary>
+    <div className="rr-full-body">{children}</div>
+  </details>;
+}
+
 export type TeamResearchProps = {
   /** Prefer the report that belongs to the current experiment when the native report store has it. */
   initialExperimentId?: string;
@@ -179,6 +390,9 @@ export default function TeamResearch({ initialExperimentId = "", strategyId = ""
   const [showFolds, setShowFolds] = useState(true);
   const [focusedEvidence, setFocusedEvidence] = useState<string | null>(null);
   const [view, setView] = useState<"findings" | "tests" | "evidence">("findings");
+  /** The full technical report sits in one disclosure under the readable report. */
+  const [fullOpen, setFullOpen] = useState(false);
+  useEffect(() => { setFullOpen(false); }, [selectedId]);
 
   useEffect(() => { let cancelled = false; teamApi.investigations().then(items => { if (!cancelled) { const preferred = initialExperimentId && items.some(item => item.experiment_id === initialExperimentId) ? initialExperimentId : strategyId ? items.find(item => item.strategy_id === strategyId)?.experiment_id || items[0]?.experiment_id || "" : items[0]?.experiment_id || ""; setSummaries(items); setSelectedId(preferred); } }).catch(failure => { if (!cancelled) setError(failure instanceof Error ? failure.message : "Could not load investigations."); }).finally(() => { if (!cancelled) setLoading(false); }); return () => { cancelled = true; }; }, [initialExperimentId, strategyId]);
   useEffect(() => { if (!selectedId) { setWrapper(null); setError(""); setDetailLoading(false); return; } let cancelled = false; setDetailLoading(true); setWrapper(null); setError(""); teamApi.investigation(selectedId).then(item => { if (!cancelled) setWrapper(item); }).catch(failure => { if (!cancelled) { setWrapper(null); setError(failure instanceof Error ? failure.message : "Could not load this investigation."); } }).finally(() => { if (!cancelled) setDetailLoading(false); }); return () => { cancelled = true; }; }, [selectedId]);
@@ -192,13 +406,16 @@ export default function TeamResearch({ initialExperimentId = "", strategyId = ""
   const foldCount = (report?.trial_log || []).filter(item => item.fold != null).length;
   const attemptRows = (report?.trial_log.length || 0) - foldCount;
   const frozenLook = wrapper?.frozen_look || null;
+  const presentation = wrapper?.presentation || null;
+  const openEvidence = (id: string) => { setFullOpen(true); setView("evidence"); setFocusedEvidence(id); };
+  const openLibrary = () => { setFullOpen(true); setView("evidence"); window.setTimeout(() => document.getElementById("tr-full-report")?.scrollIntoView({ block: "start", behavior: "instant" }), 0); };
 
   const backControl = onBack && <button className="tr-back-link" type="button" onClick={onBack}><ArrowLeft size={15} />Back to evidence</button>;
   if (loading) return <div className="tr-loading">{backControl}<FlaskConical size={25} /><strong>Loading agent investigations</strong><span>Reading trusted research artifacts.</span></div>;
   if (error && summaries.length === 0) return <div className="tr-empty">{backControl}<TriangleAlert size={28} /><h2>Investigation artifacts unavailable</h2><p>{error}</p></div>;
   return <div className="tr-shell">
       <div className="tr-heading page-heading">
-      <div><span className="eyebrow"><Sparkles size={13} />AGENT RESEARCH</span><h1>Inside the investigation.</h1><p>Discover the strengths. Challenge the weaknesses. Follow the evidence.</p>{strategyId && <p className="tr-report-context">Workspace strategy: <strong>{strategyId}</strong>{report && report.strategy_id !== strategyId ? <> · Report strategy: <strong>{report.strategy_id}</strong></> : null}</p>}</div>
+      <div><span className="eyebrow"><Sparkles size={13} />AGENT RESEARCH</span><h1>Inside the investigation.</h1><p>{presentation ? "What the agents found, how it was checked, and what you can take away." : "Discover the strengths. Challenge the weaknesses. Follow the evidence."}</p>{strategyId && <p className="tr-report-context">Workspace strategy: <strong>{strategyId}</strong>{report && report.strategy_id !== strategyId ? <> · Report strategy: <strong>{report.strategy_id}</strong></> : null}</p>}</div>
       <div className="tr-heading-right">{onBack && <button className="tr-back-link" type="button" onClick={onBack}><ArrowLeft size={15} />Back to evidence</button>}{summaries.length > 0 && <label className="tr-selector-label">Research run<select className="tr-select" value={selectedId} onChange={event => setSelectedId(event.target.value)} aria-label="Choose an investigation">{summaries.map(item => <option value={item.experiment_id} key={item.experiment_id}>{item.strategy_id}</option>)}</select></label>}</div>
     </div>
     {error && <div className="tr-inline-error" role="alert"><TriangleAlert size={16} />{error}</div>}
@@ -206,6 +423,8 @@ export default function TeamResearch({ initialExperimentId = "", strategyId = ""
     {detailLoading ? <div className="tr-loading tr-panel-loading"><Clock3 size={22} /><strong>Opening the investigation</strong><span>Loading hypotheses, experiments, and their evidence.</span></div> : report ? <>
       {report.holdout_accessed && <div className="tr-holdout-warning"><AlertTriangle size={18} /><div><strong>New-data test access recorded</strong><p>The research appears to have seen the data reserved for the final check. Inspect the trial log before treating this investigation as suitable for an unbiased new-data test.</p></div></div>}
       {wrapper?.synthetic && <div className="tr-synthetic-note"><Beaker size={16} /><div><strong>Recorded example</strong> · Scripted research on sample market data, with no language-model call. Trading rules still need a new-data test.</div></div>}
+      {presentation && <ReadableReport presentation={presentation} evidenceById={evidenceById} onEvidence={openEvidence} onLibrary={openLibrary} />}
+      <FullReport collapsible={Boolean(presentation)} open={fullOpen} onToggle={setFullOpen}>
       <section className="tr-research-brief">
         <div className="tr-brief-content"><span className="eyebrow">THE RESEARCH QUESTION</span><h2>When does this strategy<br />deserve your confidence?</h2><p>Agents have examined the market conditions, tested competing explanations, and identified what to investigate next. The final check uses new data kept away from the research process.</p></div>
         <div className="tr-brief-numbers"><div><strong>{report.diagnostic.hypotheses.length.toString().padStart(2, "0")}</strong><span>hypotheses<br />investigated</span></div><div><strong>{report.n_policies_tried.toString().padStart(2, "0")}</strong><span>policy tests<br />tried</span></div><div><strong>{report.evidence.length.toString().padStart(2, "0")}</strong><span>evidence<br />records</span></div></div>
@@ -232,6 +451,7 @@ export default function TeamResearch({ initialExperimentId = "", strategyId = ""
       </div>}
       {view === "evidence" && <div className="tr-evidence-view"><section className="tr-side-panel panel"><div className="tr-side-head"><div><span className="eyebrow">TRACEABLE RESEARCH</span><h2>The evidence behind the findings</h2></div><span className="tr-count">{report.evidence.length}</span></div><div className="tr-evidence-list">{report.evidence.map(evidence => <div id={evidence.evidence_id} key={evidence.evidence_id}><EvidenceCard evidence={evidence} /></div>)}</div></section><section className="tr-side-panel panel"><div className="tr-side-head"><div><span className="eyebrow">NEXT STEPS</span><h2>Requested evaluation</h2></div><Clock3 size={17} /></div><div className="tr-request-list">{report.test_requests.length > 0 ? report.test_requests.map(request => <p key={request}><ChevronRight size={14} />{request}</p>) : <p className="tr-muted">No additional tests requested.</p>}</div><div className="tr-source-record"><span>Source artifact</span><code>{wrapper?.source_path}</code><span>Experiment</span><code>{report.experiment_id}</code></div></section></div>}
       </div>
+      </FullReport>
     </> : <div className="tr-empty"><FileSearch size={30} /><h2>No investigations found</h2><p>Start an investigation to bring your agents’ findings and evidence together.</p></div>}
   </div>;
 }
