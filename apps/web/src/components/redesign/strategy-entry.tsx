@@ -7,8 +7,12 @@ import { monotonePath } from "./chart-path";
 import { MagneticAction, Reveal } from "./ui-motion";
 import "./strategy-entry.css";
 
+type TriageItem = { id: string; name: string; verdict: string; detail: string };
+
 type Props = {
   example: Experiment | null;
+  triage?: TriageItem[];
+  onOpen?: (id: string) => void;
   onImport: (file?: File) => void;
   onExample: () => void;
   onResume?: () => void;
@@ -25,8 +29,9 @@ function ExamplePlayback({ example }: { example: Experiment | null }) {
   const [playing, setPlaying] = useState(true);
   const [finished, setFinished] = useState(false);
   const [reduced, setReduced] = useState(false);
+  const recorded = example?.strategy_id === "btc-trend-24-72-demo" || example?.strategy_id === "btc-meanrev-48-demo";
   const points = useMemo(() => {
-    const rows = (example?.mode === "demo" ? example.equity : []).filter(row => Number.isFinite(row.base) && Number.isFinite(row.proposed) && Number.isFinite(Date.parse(row.date)));
+    const rows = (example?.equity || []).filter(row => Number.isFinite(row.base) && Number.isFinite(row.proposed) && Number.isFinite(Date.parse(row.date)));
     if (rows.length < 2) return [];
     const low = Math.min(...rows.flatMap(row => [row.base, row.proposed]));
     const high = Math.max(...rows.flatMap(row => [row.base, row.proposed]));
@@ -91,8 +96,8 @@ function ExamplePlayback({ example }: { example: Experiment | null }) {
 
   return <div className="se-playback" ref={root}>
     {points.length > 0 && <>
-      <div className="se-example-label">Example <span>original + filtered</span></div>
-      <svg className="se-graph" viewBox="0 0 1000 260" preserveAspectRatio="none" role="img" aria-label="Animated playback of the recorded example: original strategy and suggested filter. Illustrative data, not live performance.">
+      <div className="se-example-label">{recorded ? "Recorded blocks" : "Example"} <span>{recorded ? "validation, unchanged strategy" : "original + filtered"}</span></div>
+      <svg className="se-graph" viewBox="0 0 1000 260" preserveAspectRatio="none" role="img" aria-label={recorded ? "Playback of the recorded validation blocks for the unchanged strategy." : "Animated playback of the recorded example: original strategy and suggested filter. Illustrative data, not live performance."}>
         <defs><clipPath id={clipId}><rect ref={clip} width="0" height="260" /></clipPath></defs>
         <g clipPath={`url(#${clipId})`}>
           <path d={area} fill="var(--kk-accent)" fillOpacity="0.045" />
@@ -102,11 +107,11 @@ function ExamplePlayback({ example }: { example: Experiment | null }) {
         <g ref={cursor} transform={`translate(${points[0].x},${points[0].proposed})`}><circle r="3" fill="var(--kk-accent)" /></g>
       </svg>
     </>}
-    <div className="se-playback-meta"><span>Example data · not a live result</span><span ref={date} className="se-date" />{points.length > 0 && !reduced && <button type="button" onClick={togglePlayback} aria-label={finished ? "Replay example animation" : playing ? "Pause example animation" : "Play example animation"}>{finished ? <RotateCcw size={14} /> : playing ? <Pause size={14} /> : <Play size={14} />}</button>}</div>
+    <div className="se-playback-meta"><span>{recorded ? "2018–2026 investigation" : "Example data · not a live result"}</span><span ref={date} className="se-date" />{points.length > 0 && !reduced && <button type="button" onClick={togglePlayback} aria-label={finished ? "Replay example animation" : playing ? "Pause example animation" : "Play example animation"}>{finished ? <RotateCcw size={14} /> : playing ? <Pause size={14} /> : <Play size={14} />}</button>}</div>
   </div>;
 }
 
-export default function StrategyEntry({ example, onImport, onExample, onResume }: Props) {
+export default function StrategyEntry({ example, triage = [], onOpen, onImport, onExample, onResume }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const dragCount = useRef(0);
@@ -122,6 +127,7 @@ export default function StrategyEntry({ example, onImport, onExample, onResume }
       <div className="se-direction" aria-hidden="true"><span /><ArrowDown size={20} /></div>
       <MagneticAction><button className="se-choose kk-primary-button" type="button" onClick={() => input.current?.click()}>Choose file <ArrowUpRight size={21} /></button></MagneticAction>
       <button className="se-example" type="button" onClick={onExample}>Try an example</button>
+      {triage.length > 0 && <ul className="se-triage" aria-label="Portfolio">{triage.map(item => <li key={item.id}><button type="button" onClick={() => onOpen?.(item.id)}><strong>{item.name}</strong><span>{item.verdict}</span><small>{item.detail}</small></button></li>)}</ul>}
       <input ref={input} type="file" accept=".csv,.parquet,.pq" className="se-file" tabIndex={-1} aria-label="Choose a strategy file" onChange={event => { const file = event.target.files?.[0]; if (file) onImport(file); event.target.value = ""; }} />
     </Reveal>
     <ExamplePlayback example={example} />

@@ -7,6 +7,15 @@
 .ov-hero-value strong { display: block; color: var(--kk-text); font: 650 clamp(64px, 7vw, 88px)/1.06 var(--kk-sans); letter-spacing: -.065em; font-variant-numeric: tabular-nums; }
 .ov-period { margin-top: 12px !important; color: var(--kk-secondary); font-size: 14px; line-height: 1.6; }
 .ov-chart-wrap { margin-top: 36px; }
+.ov-health { margin-top: 22px; }
+.ov-health-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.ov-health-head h2 { margin: 0; font-size: 16px; }
+.ov-health-head span, .ov-health-window { color: var(--kk-secondary); font-size: 13px; }
+.ov-health p { margin: 10px 0 0; color: var(--kk-secondary); font-size: 14px; line-height: 1.5; }
+.ov-blocks { display: flex; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
+.ov-block { flex: 1; min-height: 28px; border-radius: 4px; background: var(--kk-surface-raised); }
+.ov-block-below { background: var(--kk-accent); }
+.ov-block-above { background: var(--kk-text); }
 .ov-takeaway { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 24px; padding: 24px 28px; border-radius: var(--kk-radius-panel); background: var(--kk-surface-raised); }
 .ov-takeaway h2 { margin: 0; font-size: 20px; line-height: 1.35; }
 .ov-finding { margin: 6px 0 0; color: var(--kk-secondary); font-size: 14px; line-height: 1.5; }

@@ -23,8 +23,8 @@ export type ImportRequest = {
 export type ImportResult = { strategy: Strategy | null; issues: ValidationIssue[]; valid: boolean };
 export type Metric = { label: string; value: number | null; format: "percent" | "number" | "integer"; description: string };
 export type Baseline = {
-  id: string; name: string; net_return: number; sharpe: number; max_drawdown: number;
-  exposure: number; turnover: number; trades: number;
+  id: string; name: string; net_return: number; sharpe: number | null; max_drawdown: number | null;
+  exposure: number | null; turnover: number | null; trades: number | null;
   sortino?: number | null; cvar_05?: number | null; avg_holding_bars?: number | null; holding_hours?: number | null;
 };
 export type EquityPoint = { date: string; base: number; rule: number; proposed: number; cash: number };

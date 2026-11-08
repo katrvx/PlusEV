@@ -49,13 +49,30 @@ def test_health_and_demo_seed_are_explicit() -> None:
     assert health()["research_engine"] is True
     listed = strategies()
     assert any(item["strategy_id"] == "demo_btc_trend_v1" and item["status"] == "demo" for item in listed)
-    assert {item["strategy_id"] for item in listed} == {"demo_btc_trend_v1", "demo_btc_mean_reversion_v1"}
+    ids = {item["strategy_id"] for item in listed}
+    assert {"demo_btc_trend_v1", "demo_btc_mean_reversion_v1", "btc-trend-24-72-demo", "btc-meanrev-48-demo"} <= ids
     for strategy in listed:
+        if not strategy["strategy_id"].startswith("demo_"):
+            continue
         runs = api.experiments(strategy_id=strategy["strategy_id"])
         assert runs and runs[0]["mode"] == "demo"
         assert len(runs[0]["equity"]) == 45
         assert len(runs[0]["regimes"]) == 6
         assert "illustrative" in runs[0]["message"].lower()
+    root = Path(__file__).parents[2]
+    trend_report = json.loads((root / "experiments" / "investigation_argon_lane_a.json").read_text())
+    meanrev_report = json.loads((root / "experiments" / "investigation_argon_meanrev.json").read_text())
+    trend = api.experiments(strategy_id="btc-trend-24-72-demo")
+    assert trend[0]["experiment_id"] == trend_report["experiment_id"]
+    assert trend[0]["verdict"] == "INCONCLUSIVE"
+    assert trend[0]["strategy_id"] == trend_report["strategy_id"]
+    assert len(trend[0]["regimes"]) == 9
+    assert any(item["id"] == "always_on_train" and item["sortino"] is not None for item in trend[0]["baselines"])
+    meanrev = api.experiments(strategy_id="btc-meanrev-48-demo")
+    assert meanrev[0]["experiment_id"] == meanrev_report["experiment_id"]
+    assert meanrev[0]["strategy_id"] == meanrev_report["strategy_id"]
+    assert meanrev[0]["verdict"] == "KILL"
+    assert any(item["id"] == "sealed_gate" and item["net_return"] < 0 for item in meanrev[0]["baselines"])
 
 
 def test_positions_preview_suggests_industry_standard_mapping() -> None:

@@ -80,6 +80,12 @@ export type TeamReport = {
   n_distinct_agent_policies?: number;
   n_policies_tried: number;
   holdout_accessed: boolean;
+  strategy_health?: {
+    status: string;
+    summary: string;
+    train_range?: { low: number; high: number; horizon_bars: number; source?: string };
+    validation_blocks: { start: string; net_return: number; position: "inside" | "below" | "above" }[];
+  } | null;
 };
 export type InvestigationWrapper = { source: "team_artifact" | "bundled_lane_b_fixture"; synthetic: boolean; source_path: string; report: TeamReport };
 export type InvestigationSummary = {

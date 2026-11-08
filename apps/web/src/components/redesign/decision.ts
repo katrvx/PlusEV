@@ -3,23 +3,24 @@ import type { ChartSeries, Experiment } from "./types";
 const BLOCKED = new Set<Experiment["verdict"]>(["KILL", "INCONCLUSIVE"]);
 
 export function verdictLabel(verdict: Experiment["verdict"]) {
-  if (verdict === "CONDITIONAL" || verdict === "MODIFY") return "Modify";
-  if (verdict === "REDUCE" || verdict === "RESTRICT") return "Restrict";
+  if (verdict === "CONDITIONAL" || verdict === "MODIFY") return "Activate conditionally";
+  if (verdict === "REDUCE" || verdict === "RESTRICT") return "Reduce";
   if (verdict === "COMBINE") return "Combine";
   if (verdict === "MONITOR") return "Monitor";
-  if (verdict === "INCONCLUSIVE") return "Inconclusive";
+  if (verdict === "INCONCLUSIVE") return "Not proven";
   if (verdict === "KEEP") return "Keep";
   if (verdict === "KILL") return "Kill";
   return verdict;
 }
 
 export function verdictHeadline(verdict: Experiment["verdict"]) {
-  if (verdict === "CONDITIONAL" || verdict === "MODIFY") return "Run it where it holds up.";
+  if (verdict === "CONDITIONAL" || verdict === "MODIFY") return "Activate it only where it holds up.";
   if (verdict === "KEEP") return "Keep the strategy.";
   if (verdict === "KILL") return "Kill the strategy.";
-  if (verdict === "REDUCE" || verdict === "RESTRICT") return "Restrict size where the risk cap allows it.";
+  if (verdict === "REDUCE" || verdict === "RESTRICT") return "Reduce size where the risk cap allows it.";
   if (verdict === "COMBINE") return "Combine it with the paired book.";
   if (verdict === "MONITOR") return "Monitor it before changing.";
+  if (verdict === "INCONCLUSIVE") return "Not proven.";
   return "More evidence is needed before deciding.";
 }
 

@@ -22,7 +22,12 @@ const volatilityLabel = (value: string) => {
   return value;
 };
 
-const signedPercent = (value: number | null) => value === null ? "—" : `${value > 0 ? "+" : ""}${(value * 100).toFixed(1)}%`;
+const signedPercent = (value: number | null) => {
+  if (value === null) return "—";
+  const pct = value * 100;
+  const digits = pct !== 0 && Math.abs(pct) < 0.1 ? 3 : 1;
+  return `${pct > 0 ? "+" : ""}${pct.toFixed(digits)}%`;
+};
 const rangePercent = (low: number, high: number) => `${signedPercent(low)} to ${signedPercent(high)}`;
 
 function IntervalGraphic({ regimes, selectedId, onSelect, demo }: { regimes: Regime[]; selectedId: string | null; onSelect: (id: string) => void; demo: boolean }) {

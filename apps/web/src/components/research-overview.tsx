@@ -33,11 +33,11 @@ function marketSummary(regime: Experiment["regimes"][number]) {
 }
 
 function verdictLabel(verdict: Experiment["verdict"]) {
-  if (verdict === "CONDITIONAL" || verdict === "MODIFY") return "Modify";
-  if (verdict === "REDUCE" || verdict === "RESTRICT") return "Restrict";
+  if (verdict === "CONDITIONAL" || verdict === "MODIFY") return "Activate conditionally";
+  if (verdict === "REDUCE" || verdict === "RESTRICT") return "Reduce";
   if (verdict === "COMBINE") return "Combine";
   if (verdict === "MONITOR") return "Monitor";
-  if (verdict === "INCONCLUSIVE") return "Inconclusive";
+  if (verdict === "INCONCLUSIVE") return "Not proven";
   if (verdict === "KEEP") return "Keep";
   if (verdict === "KILL") return "Kill";
   return verdict;

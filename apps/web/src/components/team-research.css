@@ -31,6 +31,7 @@
 .tr-brief-numbers > div { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 .tr-brief-numbers strong { font-size: 42px; line-height: 1; color: #8d7bc0; font-weight: 400; letter-spacing: -2px; font-variant-numeric: tabular-nums; }
 .tr-brief-numbers span { font-size: 11px; line-height: 1.7; color: #8b819c; }
+.tr-brief-note { margin: 0 0 8px; color: var(--kk-secondary, #8b819c); font-size: 13px; line-height: 1.5; }
 .tr-workflow { grid-column: 1/-1; display: flex; align-items: center; justify-content: space-between; gap: 17px; padding: 15px 26px; border-top: 1px solid #ece7f6; background: #ffffff99; }
 .tr-workflow > span { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 500; color: #7b6c96; white-space: nowrap; }
 .tr-workflow > span > svg { color: #a18ac4; }

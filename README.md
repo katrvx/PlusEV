@@ -4,7 +4,7 @@
 
 AgentVerse 2026 · Finance track (supported by Jane Street) · UCL · 7–8 November 2026 · repo: +EV
 
-> Keep or Kill is an AI-powered research supervisor for trading strategies. It uses historical market regimes, sentiment and news to discover **when** an existing strategy has an edge, then independently tests whether activating or disabling it under those conditions actually improves risk-adjusted returns on unseen data.
+> Keep or Kill is an AI-powered research supervisor for trading strategies. It uses historical market regimes and sentiment to discover **when** an existing strategy has an edge, then independently tests whether activating or disabling it under those conditions actually improves risk-adjusted returns on unseen data. News is omitted: there is no first-seen archive.
 
 Hackathon MVP. Paper-only. Not a claim of validated alpha.
 
@@ -61,17 +61,17 @@ A backtest gives you a Sharpe ratio, not an answer to the questions that decide 
 An aggregate return chart can't tell these apart, and building point-in-time regime gates by hand is slow and easy to overfit.
 
 **User:** an independent systematic trader or small quant team running 2–10 strategies.
-**Decision:** keep, activate only in some conditions, reduce, combine, monitor, kill, or *inconclusive*.
+**Decision:** keep, activate conditionally, reduce, combine, monitor, kill, or not proven.
 
 ## How it works
 
 1. **Import** an existing strategy's timestamped target positions. The strategy is **immutable**: we never change its signals.
-2. **Reconstruct context** at every decision: trend, volatility, volume, funding, sentiment, news, all **point-in-time** (`data_max_available_at <= decision_time`).
+2. **Reconstruct context** at every decision: trend, volatility, volume, and Fear & Greed, all **point-in-time** (`data_max_available_at <= decision_time`). News is omitted. There is no first-seen archive, coverage is 0, and a news feature cannot be a gate.
 3. **Diagnose** where it works and fails: regime heatmaps with counts, costs and uncertainty.
 4. **Investigate** with AI agents that propose falsifiable hypotheses, call allowlisted tools, and cite **evidence IDs** from real tool output.
 5. **Propose a supervisory gate** (allocation multiplier 0 / 0.5 / 1 on top of the unchanged signals), from an allowlisted family only.
 6. **Challenge it** against always-on, cash, a simple rule and a LightGBM gate, with next-bar fills, fees, slippage and switching costs, on a **sealed chronological holdout** tested once.
-7. **Decide:** KEEP / ACTIVATE CONDITIONALLY / REDUCE / COMBINE / MONITOR / KILL / **INCONCLUSIVE**, with hard risk checks a deterministic arbiter applies (not an LLM).
+7. **Decide:** keep, activate conditionally, reduce, combine, monitor, kill, or not proven. The stored names are `KEEP`, `MODIFY`, `RESTRICT`, `COMBINE`, `MONITOR`, `KILL`, and `INCONCLUSIVE`. A deterministic arbiter applies the risk checks, not an LLM.
 8. **Paper-test:** freeze champion vs challenger for a 14-day shadow run. Recorded as a plan, never presented as a completed result.
 
 **Agents propose and explain; deterministic code computes every number and makes every decision.**
@@ -100,6 +100,7 @@ existing strategy (immutable) ─► import / validate / hash
 |---|---|
 | [`KEEP_OR_KILL_PROJECT_SPEC.md`](KEEP_OR_KILL_PROJECT_SPEC.md) | **Authoritative spec**: idea, maths, data rules, evaluation, agents, API, risk, demo script |
 | [`KEEP_OR_KILL_AGENTS.md`](KEEP_OR_KILL_AGENTS.md) | Handoff brief for the three lanes, shared contracts, collaboration rules, definition of done |
+| [`A/README.md`](A/README.md) | Lane A: hourly book, costs, baselines, arbiter, paper plan, and the sealed verdicts |
 | [`LANE_B.md`](LANE_B.md) | What Lane B built, its interface, guardrails, adversarial review, and what it needs from Lane A |
 | [`LANE_C.md`](LANE_C.md) | Web workspace, shared route constants and types, and the teammate integration guide |
 | [`docs/INTEGRATION_DECISIONS.md`](docs/INTEGRATION_DECISIONS.md) | Choices made while putting Lane A, current Lane B, and Lane C on one branch |
@@ -110,7 +111,7 @@ existing strategy (immutable) ─► import / validate / hash
 
 | Lane | Owns | Output interface | Status |
 |---|---|---|---|
-| **A · Quant / Data** | `A/` (target layout was `packages/ingestion`, `feature_store`, `strategies`, `quant`, `evaluation`) | `run_experiment(...) -> ExperimentResult`, including a deterministic verdict and a recorded 14-day plan | on this branch |
+| **A · Quant / Data** | [`A/README.md`](A/README.md) | `run_experiment(...) -> ExperimentResult`, including a deterministic verdict and a recorded 14-day plan | on this branch |
 | **B · Agents / Context** (Kate) | `packages/research_agents`, `meta_policy`, news enrichment | `investigate(experiment_id) -> InvestigationReport` | current `main` agents (four agents, adversarially reviewed three times, 126 tests, walk-forward folds, bad-luck-vs-broken check, Argon run on real data). Default loader is the synthetic stand-in. `--lane-a` uses Lane A's development view |
 | **C · API / UI / Demo** | `apps/api`, `apps/web`, docs, practice-plan interface | consumes native Lane B reports; adapts Lane A results into UI contracts | on this branch. BTCUSDT 1h position imports are scored by A and B. Start at [`LANE_C.md`](LANE_C.md). |
 
@@ -131,7 +132,7 @@ experiments/        run manifests, hashes, outputs
 tests/              no-future-data, execution lag, switching costs, holdout isolation, baselines
 ```
 
-Lane A’s code is in [`A/`](A/). The simple rule can allocate 0. A train-only regime filter can sit a strategy out where its own interval is entirely below zero. The arbiter returns KEEP, MODIFY, RESTRICT, MONITOR, KILL, or INCONCLUSIVE from the sealed test. COMBINE needs a second strategy, so a one-book run does not emit it. The 14-day paper plan records the policy that verdict chose, with `completed=false`. News is still omitted.
+Lane A’s code and results are in [`A/README.md`](A/README.md). The simple rule can allocate 0. A train-only regime filter can sit a strategy out where its own interval is entirely below zero. The screen says keep, activate conditionally, reduce, monitor, kill, or not proven. Those are the stored verdicts `KEEP`, `MODIFY`, `RESTRICT`, `MONITOR`, `KILL`, and `INCONCLUSIVE`. `COMBINE` needs a second strategy, so a one-book run does not emit it. LightGBM is fit on early train and calibrated on the last 25% of train, so validation stays untouched. The 14-day paper plan records the policy that verdict chose, with `completed=false`. News is still omitted.
 
 `python3 scripts/run_investigation.py --lane-a --fallback` runs Lane B's deterministic agents on Lane A's loader. That view keeps the test window's dates and drops its metrics, the verdict, and the paper plan. `--frozen` then scores the accepted champion once. `plusev/` and the Streamlit app are the earlier kit and do not call this path.
 

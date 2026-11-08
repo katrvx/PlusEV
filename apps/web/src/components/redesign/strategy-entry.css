@@ -16,6 +16,11 @@
 .se-choose:hover{background:var(--kk-button-hover)}
 .se-choose svg{transition:transform 180ms ease}.se-choose:hover svg{transform:translate(3px,-3px)}
 .se-example{min-height:44px;margin-top:5px;padding:8px 12px;border:0;background:none;color:var(--kk-secondary);font-size:14px;letter-spacing:.03em}
+.se-triage{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;width:min(720px,100%);margin:14px 0 0;padding:0;list-style:none}
+.se-triage button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:260px;padding:12px 14px;border:1px solid var(--kk-hairline);border-radius:12px;background:var(--kk-surface);color:var(--kk-text);text-align:left;cursor:pointer}
+.se-triage strong{font-size:14px}
+.se-triage span{color:var(--kk-accent);font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+.se-triage small{color:var(--kk-secondary);font-size:12px;line-height:1.4}
 .se-example:hover{color:var(--kk-text)}
 .se-file{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .se-playback{position:relative;flex:1;min-height:230px;margin-top:-5px;display:flex;flex-direction:column;justify-content:flex-end;pointer-events:none}

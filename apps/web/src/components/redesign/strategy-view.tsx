@@ -92,6 +92,9 @@ function DataDisclosure({ strategy }: { strategy: Strategy }) {
 }
 
 function ResearchState({ strategy, experiment, health, onRun, running }: { strategy: Strategy; experiment: Experiment | null; health: Health | null; onRun: () => void; running: boolean }) {
+  if (strategy.source === "recorded_investigation") {
+    return <div className="sv-research-state sv-research-state-note"><FileText size={17} aria-hidden="true" /><span>Recorded investigation. Open Explore to read it. This page is not rerun from a file drop.</span></div>;
+  }
   if (strategy.kind === "trades" || strategy.status === "diagnosis_only") {
     return <div className="sv-research-state sv-research-state-note"><FileText size={17} aria-hidden="true" /><span>Completed trades are for diagnosis. Add position history to test an on/off rule.</span></div>;
   }
@@ -117,7 +120,8 @@ function ResearchState({ strategy, experiment, health, onRun, running }: { strat
 }
 
 function ExperimentResult({ experiment }: { experiment: Experiment }) {
-  const isDemo = experiment.mode === "demo";
+  const recorded = experiment.message.startsWith("Recorded Argon");
+  const isDemo = experiment.mode === "demo" && !recorded;
   if (experiment.status !== "completed" || experiment.equity.length === 0) {
     if (experiment.status === "awaiting_engine" || experiment.mode === "pending") {
       return <div className="sv-result-empty" role="status"><LockKeyhole size={16} aria-hidden="true" /><span>{experiment.message || "Measured results will appear here when the research engine is connected."}</span></div>;
@@ -126,7 +130,7 @@ function ExperimentResult({ experiment }: { experiment: Experiment }) {
   }
 
   return <section className="sv-result" aria-labelledby="sv-result-title">
-    <div className="sv-section-heading"><div><h2 id="sv-result-title">{isDemo ? "Example curve." : "Recorded curve."}</h2></div><StatusLine tone={isDemo ? "accent" : "success"}>{isDemo ? "Illustrative" : "Measured"}</StatusLine></div>
+    <div className="sv-section-heading"><div><h2 id="sv-result-title">{recorded ? "Validation blocks." : isDemo ? "Example curve." : "Recorded curve."}</h2></div><StatusLine tone={isDemo ? "accent" : "success"}>{recorded ? "Not the sealed test" : isDemo ? "Illustrative" : "Measured"}</StatusLine></div>
     <div className="sv-chart-wrap"><ResearchChart data={experiment.equity} series={["base", "cash"]} label="Original strategy value" mode={experiment.mode} height={310} reveal /></div>
     <div className="sv-chart-caption"><span><i className="sv-line sv-line-original" />Original strategy</span><span><i className="sv-line sv-line-cash" />Cash reference</span><span>{experiment.windows.test && experiment.windows.test !== "pending" ? experiment.windows.test : "Recorded period"}</span></div>
   </section>;
@@ -144,6 +148,7 @@ export default function StrategyView({ strategy, experiment, health, onImport, o
       <div><h1>{title}</h1><p className="sv-subtitle">{strategy.name}</p></div>
     </header>
 
+    {strategy.source === "recorded_investigation" && <div className="sv-notice" role="note"><FlaskConical size={15} aria-hidden="true" /><span>Argon investigation on the hourly book, 2018-02-01 through 2026-10-31.</span></div>}
     {isDemo && <div className="sv-notice" role="note"><FlaskConical size={15} aria-hidden="true" /><span>Example data — illustrative, not measured performance.</span></div>}
 
     <section className="sv-check" aria-labelledby="sv-check-title">
